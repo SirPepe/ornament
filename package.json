@@ -1,0 +1,46 @@
+{
+  "name": "@sirpepe/schleifchen",
+  "version": "0.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "types": "dist",
+  "exports": {
+    ".": "./dist/index.js",
+    "./*": "./dist/*.js"
+  },
+  "scripts": {
+    "lint": "eslint --ext .ts src",
+    "test": "jest",
+    "build": "babel src --extensions .ts --out-dir dist",
+    "types": "tsc -d",
+    "prepublishOnly": "rm -rf dist && npm run lint && npm run types && npm run test && npm run build",
+    "release": "release-it"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/cli": "^7.22.5",
+    "@babel/core": "^7.22.1",
+    "@babel/plugin-proposal-decorators": "^7.22.3",
+    "@babel/preset-env": "^7.22.4",
+    "@babel/preset-typescript": "^7.21.5",
+    "@types/jest": "^29.5.2",
+    "@typescript-eslint/eslint-plugin": "^5.59.8",
+    "@typescript-eslint/parser": "^5.59.8",
+    "babel-jest": "^29.5.0",
+    "eslint": "^8.41.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "install": "^0.13.0",
+    "jest": "^29.5.0",
+    "jest-environment-jsdom": "^29.5.0",
+    "npm": "^9.6.7",
+    "prettier": "^2.8.8",
+    "release-it": "^15.11.0",
+    "typescript": "^5.0.4"
+  },
+  "dependencies": {
+    "zod": "^3.21.4"
+  },
+  "release-it": {}
+}
