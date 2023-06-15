@@ -12,9 +12,8 @@
     "lint": "eslint --ext .ts src",
     "test": "jest",
     "build": "babel src --extensions .ts --out-dir dist",
-    "types": "tsc -d",
-    "prepublishOnly": "rm -rf dist && npm run lint && npm run types && npm run test && npm run build",
-    "release": "release-it"
+    "types": "tsc -p tsconfig.build.json",
+    "release": "rm -rf dist && npm run types && npm run lint && npm run test && npm run build && release-it"
   },
   "author": "",
   "license": "ISC",
