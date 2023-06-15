@@ -334,7 +334,7 @@ export function literal<T extends HTMLElement, V>(
 
 /* eslint-disable */
 type Handler<T, E extends Event> = ((this: T, evt: E) => boolean | undefined | void) | null;
-type HandlerTransform<T, E extends Event> = Transformer<
+type HandlerTransform<T extends HTMLElement, E extends Event> = Transformer<
   T,
   Handler<T, E>
 >;

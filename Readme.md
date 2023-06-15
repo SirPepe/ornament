@@ -237,7 +237,48 @@ testEl.foo = 3;
 
 ## Transformers
 
-### `string()`
+Transformers define how the accessor decorators `@attr()` and `@prop()`
+implement attribute and property handling. Their type signature is as follows:
+
+```typescript
+export type Transformer<T extends HTMLElement, V> = {
+  // parse() turns attribute values (usually string | null) into property
+  // values. Must *never* throw exceptions, but always deal with its input in a
+  // graceful way, just like the attribute handling in built-in elements works.
+  parse: (this: T, value: unknown) => V;
+  // Validates setter inputs, which may be of absolutely any type. May throw for
+  // invalid values, just like setters on built-in elements may.
+  validate: (this: T, value: unknown) => V;
+  // Turns property values into attributes values (strings), thereby controlling
+  // the attribute representation of an accessor together with
+  // updateAttrPredicate(). Must never throw.
+  stringify: (this: T, value?: V | null) => string;
+  // Decides if, based on a new value, an attribute gets updated to match the
+  // new value (true/false) or removed (null). Defaults to a function that
+  // always returns true.
+  updateAttrPredicate?: (this: T, value: V) => boolean | null;
+  // Runs before accessor initialization and can be used to perform side effects
+  // or to grab the accessors initial value as defined in the class.
+  beforeInitCallback?: (
+    this: T,
+    value: V,
+    defaultValue: V,
+    context: ClassAccessorDecoratorContext<T, V>
+  ) => void;
+  // Runs before an accessor's setter sets a new value and can be used to
+  // perform side effects
+  beforeSetCallback?: (
+    this: T,
+    value: V,
+    context: ClassAccessorDecoratorContext<T, V>
+  ) => void;
+};
+```
+
+If you want to extend Schleifchen, you should simply clone one of the built-in
+transformers and modify it to your liking!
+
+### Transformer `string()`
 
 Implements a string attribute or property. Loosely modeled after built-in string
 attributes such as `id` and `lang`.
@@ -258,7 +299,7 @@ removed, the value that was used to initialize the accessor (in this case
 `undefined`. If the accessor was not initialized with a value, the empty string
 is used.
 
-### `href()`
+### Transformer `href()`
 
 Implements a string attribute or property that works like `href` on `a` in that
 it automatically turns relative URLs into absolute URLs.
@@ -281,7 +322,7 @@ testEl.foo = "https://example.com/foo/bar/"
 console.log(testEl.foo); // > "https://example.com/foo/bar/"
 ```
 
-### `number(options?)`
+### Transformer `number(options?)`
 
 Implements a number attribute or property.
 
@@ -309,7 +350,7 @@ happens when the property is set to `undefined`.
 - **`min` (number, optional)**: Smallest possible value. Defaults to `-Infinity`. Attribute values less than `min` get clamped, property values get validated and (if too small) rejected with an exception.
 - **`max` (number, optional)**: Largest possible value. Defaults to `Infinity`. Attribute values greater than `max` get clamped, property values get validated and (if too large) rejected with an exception.
 
-### `int(options?)`
+### Transformer `int(options?)`
 
 Implements a bigint attribute or property. Attribute values are expressed as
 plain numeric strings without the tailing `n` used in JavaScript bigints.
@@ -338,7 +379,7 @@ above examples `0n`) is returned. The same happens when the property is set to
 - **`min` (bigint, optional)**: Smallest possible value. Defaults to the maximum possible bigint value. Attribute values less than `min` get clamped, property values get validated and (if too small) rejected with an exception.
 - **`max` (bigint, optional)**: Largest possible value. Defaults to the minimum possible bigint value. Attribute values greater than `max` get clamped, property values get validated and (if too large) rejected with an exception.
 
-### `boolean()`
+### Transformer `boolean()`
 
 Implements a boolean attribute or property. Modeled after built-in boolean
 attributes such as `disabled`. Changes to the property values toggle the
@@ -357,7 +398,7 @@ value gets coerced to booleans. If the attribute `foo` gets set to any value
 (including the empty string), `foo` returns `true` - only a missing attribute
 counts as `false`.
 
-### `literal(options)`
+### Transformer `literal(options)`
 
 Implements an attribute or property with a finite number of valid values. Should
 really be called "enum", but that's a reserved word in JavaScript. It works by
@@ -387,7 +428,7 @@ first element in `values`.
 - **`values` (array)**: List of valid values. Must contain at least one element.
 - **`transformer` (Transformer)**: Transformer to use, eg. `string()` for a list of strings, `number()` for numbers etc.
 
-### `record()`
+### Transformer `record()`
 
 Implements a plain object property that gets reflected as a JSON attribute when
 used with `@attr()`. Such attributes do not exist in standard HTML, but may be
@@ -408,7 +449,7 @@ accessor has no initial value. Using the setter with non-objects throws
 TypeErrors. Note that this transformer is really just a wrapper around
 `JSON.parse()` and `JSON.stringify()` without any object validation.
 
-### `eventHandler()`
+### Transformer `eventHandler()`
 
 Implements an old-school inline event handler property/attribute in the style of
 `onclick="console.log(42)"`. To work properly, this should only be used in
@@ -469,6 +510,10 @@ class Test extends HTMLElement {
   // Provides readonly access to #foo
   get foo() {
     return this.#foo;
+  }
+
+  change() {
+    this.#foo++;
   }
 
   // Reacts to changes to #foo

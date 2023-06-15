@@ -9,17 +9,17 @@ export const transformerSchema = z.object({
   beforeSetCallback: z.function().optional(),
 });
 
-export type Transformer<T, V> = {
-  // parse() turns unknown inputs into property values. Primarily used for
-  // attribute handling. Must never throw, just like the attribute handling in
-  // built-in elements.
+export type Transformer<T extends HTMLElement, V> = {
+  // parse() turns attribute values (usually string | null) into property
+  // values. Must *never* throw exceptions, but always deal with its input in a
+  // graceful way, just like the attribute handling in built-in elements works.
   parse: (this: T, value: unknown) => V;
-  // Validates setter inputs. May throw for invalid values, just like setters on
-  // built-in elements.
+  // Validates setter inputs, which may be of absolutely any type. May throw for
+  // invalid values, just like setters on built-in elements may.
   validate: (this: T, value: unknown) => V;
-  // Turns property values into attributes, thereby controlling the attribute
-  // representation of an accessor together with removeAttrPredicate(). Must
-  // never throw.
+  // Turns property values into attributes values (strings), thereby controlling
+  // the attribute representation of an accessor together with
+  // updateAttrPredicate(). Must never throw.
   stringify: (this: T, value?: V | null) => string;
   // Decides if, based on a new value, an attribute gets updated to match the
   // new value (true/false) or removed (null). Defaults to a function that
