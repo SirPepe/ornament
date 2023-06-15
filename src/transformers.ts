@@ -25,6 +25,24 @@ export function string(): Transformer<HTMLElement, string> {
   };
 }
 
+export function href(): Transformer<HTMLElement, string> {
+  const anchor = document.createElement("a");
+  return {
+    parse(value) {
+      if (value === null) {
+        value = "";
+      }
+      anchor.href = String(value);
+      return anchor.href;
+    },
+    validate(value) {
+      anchor.href = String(value);
+      return anchor.href;
+    },
+    stringify: String,
+  };
+}
+
 export function boolean(): Transformer<HTMLElement, boolean> {
   return {
     parse(value) {

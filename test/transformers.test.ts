@@ -2,16 +2,15 @@
  * @jest-environment jsdom
  */
 
-import z from "zod";
 import { attr, define, prop } from "../src/decorators";
 import {
   boolean,
   eventHandler,
+  href,
   int,
   literal,
   number,
   record,
-  object,
   string,
 } from "../src/transformers";
 import { generateTagName, tick } from "./helpers";
@@ -78,6 +77,25 @@ describe("Transformers", () => {
       expect(el.foo).toBe("Hello");
       el.foo = undefined as any;
       expect(el.foo).toBe("");
+    });
+  });
+
+  describe("href()", () => {
+    test("as attribute", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(href()) accessor foo = "";
+      }
+      const el = new Test();
+      expect(el.foo).toBe("http://localhost/");
+      el.setAttribute("foo", "asdf");
+      await tick(); // attribute reactions are async
+      expect(el.foo).toBe("http://localhost/asdf");
+      el.removeAttribute("foo");
+      await tick(); // attribute reactions are async
+      expect(el.foo).toBe("http://localhost/");
+      el.foo = "https://example.com/asdf/";
+      expect(el.foo).toBe("https://example.com/asdf/");
     });
   });
 

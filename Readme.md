@@ -258,6 +258,29 @@ removed, the value that was used to initialize the accessor (in this case
 `undefined`. If the accessor was not initialized with a value, the empty string
 is used.
 
+### `href()`
+
+Implements a string attribute or property that works like `href` on `a` in that
+it automatically turns relative URLs into absolute URLs.
+
+```javascript
+import { define, attr, href } from "@sirpepe/schleifchen"
+
+@define("test-element")
+class Test extends HTMLElement {
+  @attr(href()) accessor foo = "";
+}
+
+let testEl = new Test();
+
+// Assuming that the page is served from localhost:
+console.log(testEl.foo); // > "http://localhost"
+testEl.foo = "asdf"
+console.log(testEl.foo); // > "http://localhost/asdf"
+testEl.foo = "https://example.com/foo/bar/"
+console.log(testEl.foo); // > "https://example.com/foo/bar/"
+```
+
 ### `number(options?)`
 
 Implements a number attribute or property.
