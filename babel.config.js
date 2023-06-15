@@ -14,7 +14,7 @@ module.exports = (api) => {
       [
         "@babel/plugin-proposal-decorators",
         {
-          version: "2023-01",
+          version: "2023-05",
         },
       ],
     ],
