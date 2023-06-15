@@ -62,12 +62,19 @@ class GreeterElement extends HTMLElement {
 }
 ```
 
+Schleifchen uses [the latest Decorators API](https://2ality.com/2022/10/javascript-decorators.html)
+as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
+(with option `version` set to `""2023-05""`) and
+[TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
+(with the option `experimentalDecorators` turned *off*).
+
 ## Scope
 
 Schleifchen is decidedly not a framework and its scope is strictly limited to
 only the most tedious bits of building standards-compliant web components. Its
 sole goal is is to make attribute and property handling less of a chore.
-Schleifchen's decorators are easy to add and also easy to remove and replace.
+Schleifchen's decorators are easy to add, easy to extend, but also *very* easy
+to remove or replace.
 
 Schleifchen does not concern itself with rendering Shadow DOM, managing
 cross-element communication, or state management. If you need any of these
@@ -98,7 +105,7 @@ This component uses an event handler to update the decorated accessor `value`,
 which in turn causes the `@reactive` method `#render()` to update the UI
 accordingly. Other approaches, such as full-blown frameworks make similar
 functionality even more accessible, but those are usually full-blown frameworks
-with all sorts of attached baggage and mist of them have no capability to
+with all sorts of attached baggage and most of them have no capability to
 properly express dom properties and attributes exactly like the build-in
 elements do. If you are about any of the above, Schleifchen will save you quite
 a few keystrokes.
@@ -106,7 +113,19 @@ a few keystrokes.
 ## Notable deviations from standard behavior
 
 1. Schleifchen implements attribute change handling via MutationObservers and
-   not via the usual `attributeChangedCallback()`.
+   not via the usual `attributeChangedCallback()`. This means that attribute
+   updates are noticeably asynchronous, which is very different from how
+   build-in elements behave. This is due to the fact that it is hard (and
+   probably a bad idea) to have accessor decorators modify other class members
+   such as the `attributeChangedCallback()`. MutationObservers are a simpler and
+   much more elegant solution, but one with observable differences from the
+   standard behavior.
+2. Schleifchen's built-in transformers perform a little bit more opinionated
+   handholding that is usual for built-in elements. For example, the
+   [number transformer](#transformernumberoptions) never returns NaN, but
+   instead falls back to the accessor's initial value if it encounters an
+   invalid value. If this bothers you, don't worry: building your own
+   transformers is (somewhat) easy!
 
 ## Decorators
 
@@ -154,8 +173,8 @@ testEl.foo = "asdf"; // throw exception (thanks to the number transformer)
 ```
 
 Accessors defined with `@prop()` works as a JavaScript-only API. Values can only
-be accessed through the accessors, invalid values are rejected with exceptions.
-`@prop()` can be used on private accessors.
+be accessed through the accessor's getter, invalid values are rejected with
+exceptions. `@prop()` can be used on private accessors.
 
 ### `@attr(transformer, options?)`
 
@@ -177,7 +196,7 @@ class Test extends HTMLElement {
 
   // Automatically runs when "foo" (or any accessor decorated with @prop() or
   // @attr()) changes
-  @reactive log() {
+  @reactive() log() {
     console.log(`Foo changed to ${this.foo}`);
   }
 }
@@ -217,7 +236,7 @@ class Test extends HTMLElement {
   @prop(number()) accessor foo = 0;
   @prop(number()) accessor bar = 0;
 
-  @reactive log() {
+  @reactive({ initial: false }) log() {
     console.log(`foo is now ${this.foo}, bar is now ${this.bar}`);
   }
 }
@@ -517,7 +536,7 @@ class Test extends HTMLElement {
   }
 
   // Reacts to changes to #foo
-  @reactive log() {
+  @reactive() log() {
     console.log(this.#foo);
   }
 }
