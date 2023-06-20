@@ -2,31 +2,31 @@ import { transformerSchema, type Transformer } from "./types";
 import z from "zod";
 
 export function string(): Transformer<HTMLElement, string> {
-  let fallbackValue = "";
+  const fallbackValues = new WeakMap<HTMLElement, string>();
   return {
     parse(value) {
       if (value) {
         return String(value);
       }
-      return fallbackValue;
+      return fallbackValues.get(this) ?? "";
     },
     validate(value) {
       if (typeof value === "undefined") {
-        return fallbackValue;
+        return fallbackValues.get(this) ?? "";
       }
       return String(value);
     },
     stringify: String,
     beforeInitCallback(_, defaultValue) {
       if (typeof defaultValue === "string") {
-        fallbackValue = defaultValue;
+        fallbackValues.set(this, defaultValue);
       }
     },
   };
 }
 
 export function href(): Transformer<HTMLElement, string> {
-  let initialized = false;
+  const valueInitialized = new WeakMap<HTMLElement, boolean>();
   return {
     parse(value) {
       if (value === null) {
@@ -38,13 +38,13 @@ export function href(): Transformer<HTMLElement, string> {
     },
     validate(value) {
       const tmp = document.createElement("a");
-      if (initialized) {
+      if (valueInitialized.get(this)) {
         tmp.href = String(value);
       }
       return tmp.href;
     },
     beforeInitCallback() {
-      initialized = true;
+      valueInitialized.set(this, true);
     },
     stringify: String,
   };
@@ -94,17 +94,17 @@ type NumberOptions = z.infer<typeof numberOptionsSchema>;
 export function number(
   options: NumberOptions = {}
 ): Transformer<HTMLElement, number> {
-  let fallbackValue = 0;
+  const fallbackValues = new WeakMap<HTMLElement, number>();
   const { min = -Infinity, max = Infinity } =
     numberOptionsSchema.parse(options);
   return {
     parse(value) {
       if (value === null) {
-        return fallbackValue;
+        return fallbackValues.get(this) ?? 0;
       }
       const asNumber = Number(value);
       if (Number.isNaN(asNumber)) {
-        return fallbackValue;
+        return fallbackValues.get(this) ?? 0;
       }
       if (asNumber <= min) {
         return min;
@@ -116,7 +116,7 @@ export function number(
     },
     validate(value) {
       if (typeof value === "undefined") {
-        return fallbackValue;
+        return fallbackValues.get(this) ?? 0;
       }
       const asNumber = Number(value);
       if (Number.isNaN(asNumber)) {
@@ -130,7 +130,7 @@ export function number(
     stringify: String,
     beforeInitCallback(_, defaultValue) {
       if (typeof defaultValue === "number") {
-        fallbackValue = defaultValue;
+        fallbackValues.set(this, defaultValue);
       }
     },
   };
@@ -173,7 +173,7 @@ type BigIntOptions = z.infer<typeof bigintOptionsSchema>;
 export function int(
   options: BigIntOptions = {}
 ): Transformer<HTMLElement, bigint> {
-  let fallbackValue = 0n;
+  const fallbackValues = new WeakMap<HTMLElement, bigint>();
   const { min, max } = bigintOptionsSchema.parse(options);
   return {
     parse(value) {
@@ -188,14 +188,14 @@ export function int(
           }
           return asInt;
         } catch {
-          return fallbackValue;
+          return fallbackValues.get(this) ?? 0n;
         }
       }
-      return fallbackValue;
+      return fallbackValues.get(this) ?? 0n;
     },
     validate(value) {
       if (typeof value === "undefined") {
-        return fallbackValue;
+        return fallbackValues.get(this) ?? 0n;
       }
       const asInt = BigInt(value as any);
       if (typeof min !== "undefined" && asInt < min) {
@@ -209,7 +209,7 @@ export function int(
     stringify: String,
     beforeInitCallback(_, defaultValue) {
       if (typeof defaultValue === "bigint") {
-        fallbackValue = defaultValue;
+        fallbackValues.set(this, defaultValue);
       }
     },
   };
@@ -236,17 +236,17 @@ function immutable<T>(target: T): T {
 }
 
 export function record(): Transformer<HTMLElement, any> {
-  let fallbackValue = immutable({});
+  const fallbackValues = new WeakMap<HTMLElement, any>();
   return {
     parse(value) {
       try {
         const obj = JSON.parse(String(value));
         if (obj === null || typeof obj !== "object") {
-          return fallbackValue;
+          return fallbackValues.get(this) ?? immutable({});
         }
         return immutable(obj);
       } catch {
-        return fallbackValue;
+        return fallbackValues.get(this) ?? immutable({});
       }
     },
     validate(value) {
@@ -258,30 +258,8 @@ export function record(): Transformer<HTMLElement, any> {
     stringify: JSON.stringify,
     beforeInitCallback(_, defaultValue) {
       if (typeof defaultValue === "object" && defaultValue !== null) {
-        fallbackValue = immutable(defaultValue);
+        fallbackValues.set(this, immutable(defaultValue));
       }
-    },
-  };
-}
-
-export function object<T>(
-  zodSchema: z.ZodObject<any, any, any, any, T>
-): Transformer<HTMLElement, T> {
-  let fallbackValue: T;
-  return {
-    parse(value) {
-      const result = zodSchema.safeParse(JSON.parse(String(value)));
-      if (result.success) {
-        return result.data;
-      }
-      return fallbackValue;
-    },
-    validate(value) {
-      return zodSchema.parse(value);
-    },
-    stringify: JSON.stringify,
-    beforeInitCallback(_, defaultValue) {
-      fallbackValue = zodSchema.parse(defaultValue);
     },
   };
 }
@@ -299,8 +277,8 @@ type LiteralOptions<T extends HTMLElement, V> = {
 export function literal<T extends HTMLElement, V>(
   inputOptions: LiteralOptions<T, V>
 ): Transformer<T, V> {
+  const fallbackValues = new WeakMap<HTMLElement, V>();
   const options = literalOptionsSchema.parse(inputOptions);
-  let fallbackValue = options.values[0];
   const validate = options.transformer.validate ?? options.transformer.parse;
   const stringify = options.transformer.stringify ?? String;
   return {
@@ -309,11 +287,11 @@ export function literal<T extends HTMLElement, V>(
       if (options.values.includes(parsed)) {
         return parsed;
       }
-      return fallbackValue;
+      return fallbackValues.get(this) ?? options.values[0];
     },
     validate(value) {
       if (typeof value === "undefined") {
-        return fallbackValue;
+        return fallbackValues.get(this) ?? options.values[0];
       }
       const validated = validate.call(this, value);
       if (options.values.includes(validated)) {
@@ -324,7 +302,7 @@ export function literal<T extends HTMLElement, V>(
     stringify,
     beforeInitCallback(_, defaultValue) {
       if (options.values.includes(defaultValue)) {
-        fallbackValue = defaultValue;
+        return fallbackValues.set(this, defaultValue);
       }
     },
     updateAttrPredicate(value: V) {
@@ -351,8 +329,9 @@ export function eventHandler<
   T extends HTMLElement,
   E extends Event
 >(): HandlerTransform<T, E> {
-  let func: Handler<T, E> = null;
+  const functions = new WeakMap<HTMLElement, Handler<T, E>>();
   function handler(this: T, evt: E) {
+    const func = functions.get(this);
     if (func) {
       const doDefault = func.call(this, evt);
       if (doDefault === false) {
@@ -389,7 +368,7 @@ export function eventHandler<
         throw new Error("Event handler name must start with 'on'");
       }
       if (value) {
-        func = value;
+        functions.set(this, value);
         this.addEventListener(context.name.slice(2), handler as any);
       }
     },
@@ -398,13 +377,13 @@ export function eventHandler<
       // handler must be detached and then re-attached to reflect the new firing
       // order of event handlers. If both the new and old handlers are
       // functions, the swap happens in-place.
+      const func = functions.get(this);
       if (!func || !value) {
         const name = (context.name as string).slice(2);
         this.removeEventListener(name, handler as any);
         this.addEventListener(name, handler as any);
       }
-      func = value; // change the actual event handler
-      return true;
+      functions.set(this, value); // change the actual event handler
     },
     updateAttrPredicate() {
       return false;

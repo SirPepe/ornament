@@ -3,7 +3,7 @@
  */
 
 import { attr, define, prop, reactive } from "../src/decorators";
-import { string } from "../src/transformers";
+import { href, string } from "../src/transformers";
 import { generateTagName, tick } from "./helpers";
 
 describe("Decorators", () => {
@@ -74,6 +74,20 @@ describe("Decorators", () => {
       await tick(); // Attribute reactions are async
       expect(el.x).toBe("C");
       expect(el.getAttribute("x")).toBe("C");
+    });
+
+    test("no cross-instance effects", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(href()) accessor x = "";
+      }
+      const el1 = new Test();
+      const el2 = new Test();
+      expect(el1.x).toBe("");
+      expect(el2.x).toBe("");
+      el1.x = window.location.href;
+      expect(el1.x).toBe(window.location.href);
+      expect(el2.x).toBe("");
     });
 
     test("initialize attribute value", async () => {
