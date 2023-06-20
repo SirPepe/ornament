@@ -26,18 +26,25 @@ export function string(): Transformer<HTMLElement, string> {
 }
 
 export function href(): Transformer<HTMLElement, string> {
-  const anchor = document.createElement("a");
+  let initialized = false;
   return {
     parse(value) {
       if (value === null) {
-        value = "";
+        return "";
       }
-      anchor.href = String(value);
-      return anchor.href;
+      const tmp = document.createElement("a");
+      tmp.href = String(value);
+      return tmp.href;
     },
     validate(value) {
-      anchor.href = String(value);
-      return anchor.href;
+      const tmp = document.createElement("a");
+      if (initialized) {
+        tmp.href = String(value);
+      }
+      return tmp.href;
+    },
+    beforeInitCallback() {
+      initialized = true;
     },
     stringify: String,
   };

@@ -87,15 +87,28 @@ describe("Transformers", () => {
         @attr(href()) accessor foo = "";
       }
       const el = new Test();
+      expect(el.foo).toBe("");
+      el.foo = "";
       expect(el.foo).toBe("http://localhost/");
       el.setAttribute("foo", "asdf");
       await tick(); // attribute reactions are async
       expect(el.foo).toBe("http://localhost/asdf");
       el.removeAttribute("foo");
       await tick(); // attribute reactions are async
-      expect(el.foo).toBe("http://localhost/");
+      expect(el.foo).toBe("");
       el.foo = "https://example.com/asdf/";
       expect(el.foo).toBe("https://example.com/asdf/");
+    });
+
+    test("from HTML", async () => {
+      const tagName = generateTagName();
+      @define(tagName)
+      class Test extends HTMLElement {
+        @attr(href()) accessor foo = "";
+      }
+      const fixture = document.createElement("div");
+      fixture.innerHTML = `<${tagName} foo="https://example.com/asdf"></${tagName}>`;
+      expect((fixture.children[0] as any).foo).toBe("https://example.com/asdf");
     });
   });
 
