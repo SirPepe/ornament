@@ -28,6 +28,7 @@ export default [
       file: "dist/esm/index.js",
       format: "esm",
     },
+    external: ["zod"],
     ...commonConfig,
   },
   {
