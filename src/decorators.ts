@@ -149,36 +149,51 @@ function registerReactivityInitialCallCallback(
 // Reactivity notifications for @reactive
 class ReactivityEvent extends Event {
   #source: HTMLElement;
+  #keys: Set<string | symbol>;
 
-  constructor(source: HTMLElement) {
+  constructor(source: HTMLElement, keys: Set<string | symbol>) {
     super("reactivity");
     this.#source = source;
+    this.#keys = keys;
   }
 
   get source(): HTMLElement {
     return this.#source;
+  }
+
+  get keys(): Set<string | symbol> {
+    return this.#keys;
   }
 }
 
 // All elements that use @reactive share an event bus to keep things simple.
 const reactivityEventBus = new EventTarget();
 let reactivityDispatchHandle: number | null = null;
-const reactivityTargets = new Set<HTMLElement>();
-function enqueueReactivityEvent(target: HTMLElement): void {
-  reactivityTargets.add(target);
+const reactivityTargetsWithKeys = new Map<HTMLElement, Set<string | symbol>>();
+function enqueueReactivityEvent(
+  target: HTMLElement,
+  key: string | symbol
+): void {
+  const keys = reactivityTargetsWithKeys.get(target);
+  if (keys) {
+    keys.add(key);
+  } else {
+    reactivityTargetsWithKeys.set(target, new Set([key]));
+  }
   if (reactivityDispatchHandle === null) {
     reactivityDispatchHandle = requestAnimationFrame(() => {
-      for (const target of reactivityTargets) {
-        reactivityEventBus.dispatchEvent(new ReactivityEvent(target));
+      for (const targetAndKeys of reactivityTargetsWithKeys) {
+        reactivityEventBus.dispatchEvent(new ReactivityEvent(...targetAndKeys));
       }
       reactivityDispatchHandle = null;
-      reactivityTargets.clear();
+      reactivityTargetsWithKeys.clear();
     });
   }
 }
 
 type ReactiveOptions<T extends HTMLElement> = {
   initial?: boolean;
+  keys?: (string | symbol)[];
   predicate?: (this: T) => boolean;
 };
 
@@ -187,11 +202,30 @@ type ReactiveDecorator<T extends HTMLElement> = (
   context: ClassMethodDecoratorContext<T, () => any>
 ) => void;
 
+function getPredicate<T extends HTMLElement>(
+  options: ReactiveOptions<T> = {}
+): (this: T, keys: Set<string | symbol> | "*") => boolean {
+  const predicate = options.predicate ?? (() => true);
+  const selectKeys = options.keys ?? [];
+  if (selectKeys.length === 0) {
+    return predicate;
+  }
+  return function reactivityPredicate(
+    this: T,
+    keys: Set<string | symbol> | "*"
+  ): boolean {
+    if (keys === "*") {
+      return predicate.call(this);
+    }
+    return predicate.call(this) && selectKeys.some((key) => keys.has(key));
+  };
+}
+
 export function reactive<T extends HTMLElement>(
   options: ReactiveOptions<T> = {}
 ): ReactiveDecorator<T> {
   const initial = options.initial ?? true;
-  const predicate = options.predicate ?? (() => true);
+  const predicate = getPredicate(options);
   return function (value, context): void {
     if (context.kind !== "method") {
       throw new TypeError(`Method decorator @reactive used on ${context.kind}`);
@@ -203,12 +237,12 @@ export function reactive<T extends HTMLElement>(
       // initial call needs to be delayed.
       if (initial) {
         registerReactivityInitialCallCallback(this, () => {
-          predicate.call(this) && value.call(this);
+          predicate.call(this, "*") && value.call(this);
         });
       }
       // Start listening for subsequent reactivity events
       reactivityEventBus.addEventListener("reactivity", (evt: any) => {
-        if (evt.source === this && predicate.call(this)) {
+        if (evt.source === this && predicate.call(this, evt.keys)) {
           value.call(this);
         }
       });
@@ -274,7 +308,7 @@ export function attr<T extends HTMLElement, V>(
               const value = parse.call(this, newValue);
               transformer.beforeSetCallback?.call(this, value, context);
               set.call(this, value);
-              enqueueReactivityEvent(this);
+              enqueueReactivityEvent(this, context.name);
             }
           }
         }).observe(this, {
@@ -311,7 +345,7 @@ export function attr<T extends HTMLElement, V>(
             this.setAttribute(attrName, stringify.call(this, newValue));
           }
         }
-        enqueueReactivityEvent(this);
+        enqueueReactivityEvent(this, context.name);
       },
       get() {
         return get.call(this);
@@ -346,7 +380,7 @@ export function prop<T extends HTMLElement, V>(
         initReactivePropertyUnlessAlreadyInitialized(this);
         const newValue = validate.call(this, input);
         set.call(this, newValue);
-        enqueueReactivityEvent(this);
+        enqueueReactivityEvent(this, context.name);
       },
       get() {
         return get.call(this);

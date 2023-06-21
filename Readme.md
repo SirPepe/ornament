@@ -269,8 +269,9 @@ IDL property's accessor, where invalid values *are* rejected with exceptions.
 ### `@reactive(options?)`
 
 Method decorator that causes class methods to re-run when any accessor decorated
-with `@prop()` or `@attr()` changes. Method runs are debounced to that multiple
-changes to accessor values only cause a single method call:
+with `@prop()` or `@attr()` changes. Method runs are debounced with
+`requestAnimationFrame()` so that multiple changes to accessor values only cause
+a single method call:
 
 ```javascript
 import { define, prop, number } from "@sirpepe/schleifchen"
@@ -290,13 +291,14 @@ testEl.foo = 1;
 testEl.bar = 2;
 testEl.foo = 3;
 
-// only logs "foo is now 3, bar is now 2" on the next microtask
+// only logs "foo is now 3, bar is now 2" on the next frame
 ```
 
 #### Options for `@reactive()`
 
 - **`initial` (boolean, optional)**: Whether or not to run the function when the element initializes, before any actual changes to any decorated accessor. Defaults to `true`
-- **`predicate` ((this: T) => boolean, optional)**: The predicate function, if provided, gets called each time a reactive method is scheduled to run. If the predicate function returns false, the function does not run. The predicate function is called with `this` set to the element instance. By default all reactive methods are called for each change.
+- **`keys` (Array\<string | symbol\>, optional)**: List of attributes to monitor. Defaults to monitoring all content and IDL attributes.
+- **`predicate` ((this: T) => boolean, optional)**: The predicate function, if provided, gets called each time a reactive method is scheduled to run. If the predicate function returns `false`, the function does not run. The predicate function is called with `this` set to the element instance. By default all reactive methods are called for each change of attributes listed in `options.keys`.
 
 ## Transformers
 

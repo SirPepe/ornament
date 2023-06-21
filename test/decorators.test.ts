@@ -206,6 +206,65 @@ describe("Decorators", () => {
       ]);
     });
 
+    test("select option", async () => {
+      const spyX = jest.fn();
+      const spyY = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @prop(string()) accessor y = "Z";
+        @reactive({ keys: ["x"], initial: false }) testX() {
+          spyX(this.x, this.y);
+        }
+        @reactive({ keys: ["y"], initial: false }) testY() {
+          spyY(this.x, this.y);
+        }
+      }
+      const el = new Test();
+      el.x = "B";
+      await tick(); // Reactions are batched and therefore async
+      expect(spyX).toBeCalledTimes(1);
+      expect(spyX.mock.calls).toEqual([["B", "Z"]]);
+      expect(spyY).toBeCalledTimes(0);
+      el.y = "Y";
+      await tick(); // Reactions are batched and therefore async
+      expect(spyX).toBeCalledTimes(1);
+      expect(spyX.mock.calls).toEqual([["B", "Z"]]);
+      expect(spyY).toBeCalledTimes(1);
+      expect(spyY.mock.calls).toEqual([["B", "Y"]]);
+    });
+
+    test("select option with private keys", async () => {
+      const spyX = jest.fn();
+      const spyY = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor #x = "A";
+        @prop(string()) accessor y = "Z";
+        setX(value: string): void {
+          this.#x = value;
+        }
+        @reactive({ keys: ["#x"], initial: false }) testX() {
+          spyX(this.#x, this.y);
+        }
+        @reactive({ keys: ["y"], initial: false }) testY() {
+          spyY(this.#x, this.y);
+        }
+      }
+      const el = new Test();
+      el.setX("B");
+      await tick(); // Reactions are batched and therefore async
+      expect(spyX).toBeCalledTimes(1);
+      expect(spyX.mock.calls).toEqual([["B", "Z"]]);
+      expect(spyY).toBeCalledTimes(0);
+      el.y = "Y";
+      await tick(); // Reactions are batched and therefore async
+      expect(spyX).toBeCalledTimes(1);
+      expect(spyX.mock.calls).toEqual([["B", "Z"]]);
+      expect(spyY).toBeCalledTimes(1);
+      expect(spyY.mock.calls).toEqual([["B", "Y"]]);
+    });
+
     test("attribute changes via setter trigger @reactive", async () => {
       const spy = jest.fn();
       @define(generateTagName())
