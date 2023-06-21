@@ -217,8 +217,10 @@ export function reactive<T extends HTMLElement>(
       // accessors initialize *after* this method decorator initializes, the
       // initial call needs to be delayed.
       if (initial) {
+        // Initial calls of debounced methods must not be delayed
+        const target = originalMethodMap.get(value) ?? value;
         registerReactivityInitialCallCallback(this, () => {
-          predicate.call(this, "*") && value.call(this);
+          predicate.call(this, "*") && target.call(this);
         });
       }
       // Start listening for subsequent reactivity events
@@ -376,62 +378,64 @@ type DebounceOptions = {
   fn?: (cb: () => void) => () => void;
 };
 
-type InFunc<T, A extends unknown[]> = (this: T, ...args: A) => any;
+const originalMethodMap = new WeakMap();
+
+type Func<T, A extends unknown[]> = (this: T, ...args: A) => any;
 
 type FieldOrMethodContext<T, A extends unknown[]> =
-  | ClassMethodDecoratorContext<T, InFunc<T, A>>
-  | ClassFieldDecoratorContext<T, InFunc<T, A>>;
+  | ClassMethodDecoratorContext<T, Func<T, A>>
+  | ClassFieldDecoratorContext<T, Func<T, A>>;
+
+function createDebouncedMethod<T, A extends unknown[]>(
+  method: Func<T, A>,
+  wait: (cb: () => void) => () => void
+): Func<T, A> {
+  let cancelWait: null | (() => void) = null;
+  function debouncedMethod(this: T, ...args: A): any {
+    if (cancelWait) {
+      cancelWait();
+    }
+    cancelWait = wait(() => {
+      method.call(this, ...args);
+      cancelWait = null;
+    });
+  }
+  originalMethodMap.set(debouncedMethod, method);
+  return debouncedMethod;
+}
 
 export function debounce<T extends HTMLElement, A extends unknown[]>(
   options: DebounceOptions = {}
 ) {
   const fn = options.fn ?? debounce.raf();
   function decorator(
-    value: InFunc<T, A>,
-    ctx: ClassMethodDecoratorContext<T, InFunc<T, A>>
-  ): InFunc<T, A>;
+    value: Func<T, A>,
+    ctx: ClassMethodDecoratorContext<T, Func<T, A>>
+  ): Func<T, A>;
   function decorator(
     value: undefined,
-    ctx: ClassFieldDecoratorContext<T, InFunc<unknown, A>>
-  ): (init: InFunc<unknown, A>) => InFunc<unknown, A>;
+    ctx: ClassFieldDecoratorContext<T, Func<unknown, A>>
+  ): (init: Func<unknown, A>) => Func<unknown, A>;
   function decorator(
-    value: InFunc<T, A> | undefined,
+    value: Func<T, A> | undefined,
     ctx: FieldOrMethodContext<T, A>
-  ): InFunc<T, A> | ((init: InFunc<unknown, A>) => InFunc<unknown, A>) {
+  ): Func<T, A> | ((init: Func<unknown, A>) => Func<unknown, A>) {
     if (ctx.kind === "field") {
       // Field decorator (bound methods)
-      return function init(func: InFunc<unknown, A>): InFunc<unknown, A> {
+      return function init(func: Func<unknown, A>): Func<unknown, A> {
         if (typeof func !== "function") {
           throw new TypeError(
             "@debounce() can only be applied to function class fields"
           );
         }
-        let cancel: null | (() => void) = null;
-        return function method(...args: A): void {
-          if (cancel) {
-            cancel();
-          }
-          cancel = fn(() => {
-            func(...args);
-            cancel = null;
-          });
-        };
+        return createDebouncedMethod(func, fn);
       };
     } else {
       // Method decorator
       if (typeof value === "undefined") {
         throw new Error("This should never happen");
       }
-      let cancel: null | (() => void) = null;
-      return function (this: T, ...args: A): void {
-        if (cancel) {
-          cancel();
-        }
-        cancel = fn(() => {
-          value.call(this, ...args);
-          cancel = null;
-        });
-      };
+      return createDebouncedMethod(value, fn);
     }
   }
   return decorator;

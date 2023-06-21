@@ -342,4 +342,24 @@ describe("Decorators", () => {
       expect(spy.mock.calls).toEqual([["B"]]);
     });
   });
+
+  describe("@reactive + @debounce", () => {
+    test("debounced @reactive method", async () => {
+      const spy = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive() @debounce() test() {
+          spy(this.x);
+        }
+      }
+      const el = new Test();
+      el.x = "B";
+      el.x = "C";
+      el.x = "D";
+      await wait(25);
+      expect(spy).toBeCalledTimes(2); // initial + one update
+      expect(spy.mock.calls).toEqual([["A"], ["D"]]);
+    });
+  });
 });
