@@ -190,6 +190,21 @@ describe("Decorators", () => {
   });
 
   describe("@reactive", () => {
+    test("initial call with reactive property", async () => {
+      const spy = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive() test() {
+          spy(this.x);
+        }
+      }
+      new Test();
+      await tick(); // Initial call must be delayed
+      expect(spy).toBeCalledTimes(1);
+      expect(spy.mock.calls).toEqual([["A"]]);
+    });
+
     test("prop changes trigger @reactive", async () => {
       const spy = jest.fn();
       @define(generateTagName())
@@ -201,26 +216,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "B";
-      el.x = "C";
-      el.x = "D";
-      await tick(); // Reactions are batched and therefore async
       expect(spy).toBeCalledTimes(2); // initial + one update
-      expect(spy.mock.calls).toEqual([["A"], ["D"]]);
-    });
-
-    test("initial call with reactive property", async () => {
-      const spy = jest.fn();
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        @prop(string()) accessor x = "A";
-        @reactive() test() {
-          spy(this.x);
-        }
-      }
-      new Test();
-      await tick(); // Reactions are batched and therefore async
-      expect(spy).toBeCalledTimes(1);
-      expect(spy.mock.calls).toEqual([["A"]]);
+      expect(spy.mock.calls).toEqual([["A"], ["B"]]);
     });
 
     test("two prop changes", async () => {
@@ -234,13 +231,12 @@ describe("Decorators", () => {
         }
       }
       const el = new Test();
-      el.x = "W";
-      el.y = "Y";
       el.x = "B";
-      await tick(); // Reactions are batched and therefore async
-      expect(spy).toBeCalledTimes(2); // initial + one update
+      el.y = "Y";
+      expect(spy).toBeCalledTimes(3); // initial + two updates
       expect(spy.mock.calls).toEqual([
         ["A", "Z"],
+        ["B", "Z"],
         ["B", "Y"],
       ]);
     });
@@ -261,12 +257,10 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "B";
-      await tick(); // Reactions are batched and therefore async
       expect(spyX).toBeCalledTimes(1);
       expect(spyX.mock.calls).toEqual([["B", "Z"]]);
       expect(spyY).toBeCalledTimes(0);
       el.y = "Y";
-      await tick(); // Reactions are batched and therefore async
       expect(spyX).toBeCalledTimes(1);
       expect(spyX.mock.calls).toEqual([["B", "Z"]]);
       expect(spyY).toBeCalledTimes(1);
@@ -292,12 +286,10 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.setX("B");
-      await tick(); // Reactions are batched and therefore async
       expect(spyX).toBeCalledTimes(1);
       expect(spyX.mock.calls).toEqual([["B", "Z"]]);
       expect(spyY).toBeCalledTimes(0);
       el.y = "Y";
-      await tick(); // Reactions are batched and therefore async
       expect(spyX).toBeCalledTimes(1);
       expect(spyX.mock.calls).toEqual([["B", "Z"]]);
       expect(spyY).toBeCalledTimes(1);
@@ -315,11 +307,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "B";
-      el.x = "C";
-      el.x = "D";
-      await tick(); // Reactions are batched and therefore async
       expect(spy).toBeCalledTimes(2); // initial + one update
-      expect(spy.mock.calls).toEqual([["A"], ["D"]]);
+      expect(spy.mock.calls).toEqual([["A"], ["B"]]);
     });
 
     test("attributes changes via setAttribute trigger @reactive", async () => {
@@ -333,11 +322,9 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.setAttribute("x", "B");
-      el.setAttribute("x", "C");
-      el.setAttribute("x", "D");
-      await tick(); // Reactions are batched and therefore async
+      await tick(); // Attribute reactions are async
       expect(spy).toBeCalledTimes(2); // initial + one update
-      expect(spy.mock.calls).toEqual([["A"], ["D"]]);
+      expect(spy.mock.calls).toEqual([["A"], ["B"]]);
     });
 
     test("skip initial call with options.initial = false", async () => {
@@ -351,11 +338,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "B";
-      el.x = "C";
-      el.x = "D";
-      await tick(); // Reactions are batched and therefore async
       expect(spy).toBeCalledTimes(1); // one update
-      expect(spy.mock.calls).toEqual([["D"]]);
+      expect(spy.mock.calls).toEqual([["B"]]);
     });
   });
 });
