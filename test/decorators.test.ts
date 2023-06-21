@@ -2,9 +2,9 @@
  * @jest-environment jsdom
  */
 
-import { attr, define, prop, reactive } from "../src/decorators";
+import { attr, debounce, define, prop, reactive } from "../src/decorators";
 import { href, string } from "../src/transformers";
-import { generateTagName, tick } from "./helpers";
+import { generateTagName, tick, wait } from "./helpers";
 
 describe("Decorators", () => {
   describe("@define", () => {
@@ -147,6 +147,45 @@ describe("Decorators", () => {
           @attr(string()) accessor [key] = "A";
         }
       }).toThrow(TypeError);
+    });
+  });
+
+  describe("@debounce", () => {
+    test("debouncing class field functions", async () => {
+      const spy = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @debounce() test = (x: number) => {
+          spy(x, this);
+          return x;
+        };
+      }
+      const el = new Test();
+      const func = el.test;
+      el.test(1);
+      el.test(2);
+      func(3);
+      await wait(100);
+      expect(spy).toBeCalledTimes(1);
+      expect(spy.mock.calls).toEqual([[3, el]]);
+    });
+
+    test("debouncing class methods", async () => {
+      const spy = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @debounce() test(x: number): number {
+          spy(x, this);
+          return x;
+        }
+      }
+      const el = new Test();
+      el.test(1);
+      el.test(2);
+      el.test(3);
+      await wait(100);
+      expect(spy).toBeCalledTimes(1);
+      expect(spy.mock.calls).toEqual([[3, el]]);
     });
   });
 

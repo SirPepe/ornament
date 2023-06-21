@@ -300,6 +300,38 @@ testEl.foo = 3;
 - **`keys` (Array\<string | symbol\>, optional)**: List of attributes to monitor. Defaults to monitoring all content and IDL attributes.
 - **`predicate` ((this: T) => boolean, optional)**: The predicate function, if provided, gets called each time a reactive method is scheduled to run. If the predicate function returns `false`, the function does not run. The predicate function is called with `this` set to the element instance. By default all reactive methods are called for each change of attributes listed in `options.keys`.
 
+### `@debounce(options?)`
+
+Method and class field decorator for debouncing method/function invocation:
+
+```javascript
+class Test extends HTMLElement {
+  @debounce() test(x) {
+    console.log(x);
+  }
+}
+const el = new Test();
+el.test(1);
+el.test(2);
+el.test(3);
+
+// only logs "3"
+```
+
+**Note for TypeScript:** Debouncing a method or class field function makes it
+impossible for the method/function to return anything but `undefined`.
+TypeScript does currently not allow decorators to modify its targets type, so
+`@debounce()` can't do that. If you apply `@debounce()` to a method
+`(x: number) => number`, TypeScript will keep using this signature, even though
+the decorated method will no longer be able to return anything but `undefined`.
+
+#### Options for `@debounce()`
+
+- **`fn` (function, optional)**: The debounce function to use. Defaults to `debounce.raf()`. The following debounce functions are available:
+  - `debounce.raf()`: uses `requestAnimationFrame()`
+  - `debounce.timeout(ms: number)`: uses `setTimeout()`
+  - `debounce.asap()`: runs the function after the next microtask
+
 ## Transformers
 
 Transformers define how the accessor decorators `@attr()` and `@prop()`

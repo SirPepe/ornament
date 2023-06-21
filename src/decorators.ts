@@ -389,40 +389,87 @@ export function prop<T extends HTMLElement, V>(
   };
 }
 
-// Class field decorator @debounce() debounces functions.
+// Class field/method decorator @debounce() debounces functions.
 
-/* eslint-disable */
-type Debounceable<A extends unknown[]> = (...args: A[]) => void;
-type DebounceDecoratorCtx<A extends unknown[]> = ClassFieldDecoratorContext<
-  unknown,
-  Debounceable<A>
->;
-type DebounceDecoratorResult<A extends unknown[]> = (
-  func: Debounceable<A>
-) => Debounceable<A>;
-/* eslint-enable */
+type DebounceOptions = {
+  fn?: (cb: () => void) => () => void;
+};
 
-export function debounce<A extends unknown[]>(
-  time = 1000
-): (_: unknown, ctx: DebounceDecoratorCtx<A>) => DebounceDecoratorResult<A> {
-  return function debounceDecorator(value, ctx) {
-    if (ctx.kind !== "field") {
-      throw new TypeError("@debounce is a field decorator");
-    }
-    return function init(func: Debounceable<A>): Debounceable<A> {
-      if (typeof func !== "function") {
-        throw new TypeError("@debounce can only be applied to functions");
-      }
-      let handle: number | undefined = undefined;
-      return function (...args: any[]): any {
-        if (typeof handle !== "undefined") {
-          window.clearTimeout(handle);
+type InFunc<T, A extends unknown[]> = (this: T, ...args: A) => any;
+
+type FieldOrMethodContext<T, A extends unknown[]> =
+  | ClassMethodDecoratorContext<T, InFunc<T, A>>
+  | ClassFieldDecoratorContext<T, InFunc<T, A>>;
+
+export function debounce<T extends HTMLElement, A extends unknown[]>(
+  options: DebounceOptions = {}
+) {
+  const fn = options.fn ?? debounce.raf();
+  function decorator(
+    value: InFunc<T, A>,
+    ctx: ClassMethodDecoratorContext<T, InFunc<T, A>>
+  ): InFunc<T, A>;
+  function decorator(
+    value: undefined,
+    ctx: ClassFieldDecoratorContext<T, InFunc<unknown, A>>
+  ): (init: InFunc<unknown, A>) => InFunc<unknown, A>;
+  function decorator(
+    value: InFunc<T, A> | undefined,
+    ctx: FieldOrMethodContext<T, A>
+  ): InFunc<T, A> | ((init: InFunc<unknown, A>) => InFunc<unknown, A>) {
+    if (ctx.kind === "field") {
+      // Field decorator (bound methods)
+      return function init(func: InFunc<unknown, A>): InFunc<unknown, A> {
+        if (typeof func !== "function") {
+          throw new TypeError(
+            "@debounce() can only be applied to function class fields"
+          );
         }
-        handle = window.setTimeout(() => {
-          handle = undefined;
-          func(...args);
-        }, time);
+        let cancel: null | (() => void) = null;
+        return function method(...args: A): void {
+          if (cancel) {
+            cancel();
+          }
+          cancel = fn(() => {
+            func(...args);
+            cancel = null;
+          });
+        };
       };
-    };
-  };
+    } else {
+      // Method decorator
+      if (typeof value === "undefined") {
+        throw new Error("This should never happen");
+      }
+      let cancel: null | (() => void) = null;
+      return function (this: T, ...args: A): void {
+        if (cancel) {
+          cancel();
+        }
+        cancel = fn(() => {
+          value.call(this, ...args);
+          cancel = null;
+        });
+      };
+    }
+  }
+  return decorator;
 }
+
+debounce.asap = function (): (cb: () => void) => () => void {
+  return (cb: () => void): (() => void) => asap(cb);
+};
+
+debounce.raf = function (): (cb: () => void) => () => void {
+  return function (cb: () => void): () => void {
+    const handle = requestAnimationFrame(cb);
+    return (): void => cancelAnimationFrame(handle);
+  };
+};
+
+debounce.timeout = function (value: number): (cb: () => void) => () => void {
+  return function (cb: () => void): () => void {
+    const timerId = setTimeout(cb, value);
+    return (): void => clearTimeout(timerId);
+  };
+};
