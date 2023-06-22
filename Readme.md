@@ -65,7 +65,7 @@ class GreeterElement extends HTMLElement {
 }
 ```
 
-Schleifchen uses [the latest Decorators API](https://2ality.com/2022/10/javascript-decorators.html)
+Schleifchen uses [the latest ECMAScript Decorators API](https://2ality.com/2022/10/javascript-decorators.html)
 as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
 (with option `version` set to `""2023-05""`) and
 [TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
@@ -79,17 +79,17 @@ attribute and property handling.
 
 Attributes have two faces: the *content attribute* and the *IDL attribute*.
 Content attributes are always strings and are defined either via HTML or via
-JavaScript methods like `setAttribute()`. IDL attributes or JavaScript
-properties can be accessed via properties such as `someElement.foo` and may be
+JavaScript methods like `setAttribute()`. IDL attributes (aka JavaScript
+properties) can be accessed via properties such as `someElement.foo` and may be
 of any type. Both faces of attributes need to be implemented for it to be truly
-compatible with any software out there - a JS frontend framework works primarily
-with IDL attributes, while HTML authors or server-side renderers will work with
-content attributes. Content and IDL attributes need to be synchronized, which
-can entail any of the following tasks:
+compatible with any software out there - a JS frontend framework may work
+primarily with IDL attributes, while HTML authors or server-side rendering
+software will work with content attributes. Content and IDL attributes need to
+be synchronized, which can entail any of the following tasks:
 
 - Updating the content attribute when the IDL attribute gets changed (eg. update the HTML attribute `id` when running `element.id = "foo"` in JS)
-- Updating the IDL attribute when the content attribute gets changed (`element.id` should return `"bar"` after `element.setAttribute("id", "bar")`)
-- Converting types while updating content and/or IDL attributes (a value may be a `number` as an IDL attribute, but content attributes are by definition always strings)
+- Updating the IDL attribute when the content attribute gets changed (eg. `element.id` should return `"bar"` after `element.setAttribute("id", "bar")`)
+- Converting types while updating content and/or IDL attributes (an attribute may be a `number` as an IDL attribute, but content attributes are by definition always strings)
 - Rejecting invalid types on the IDL setter (as opposed to converting types from content to IDL attributes which, like all of HTML, never throws an error)
 - Connecting IDL and content attributes with different names (like how the content attribute `class` maps to the IDL attribute `className`)
 - Fine-tuning the synchronization behavior depending on circumstances (see the interaction between the `value` content and IDL attributes on `<input>`)
@@ -117,40 +117,11 @@ The line starting with with `@attr` gets you a content and IDL attribute named
 - Causes @reactive() class methods to run on update (see [@reactive()](#reactiveoptions))
 
 Schleifchen's decorators are meant to be easy to add, easy to extend, but also
-*very* easy to remove or replace. Schleifchen does not concern itself with
-rendering Shadow DOM, managing cross-element communication, or state management.
-If you need any of these features, ou can of course combine Schleifchen with
-other libraries such as [uhtml](https://github.com/WebReflection/uhtml) to deal
-with eg. Shadow DOM:
-
-```javascript
-import { render, html } from "uhtml";
-import { define, prop, reactive, int } from "@sirpepe/schleifchen";
-
-@define("counter-element")
-export class CounterElement extends HTMLElement {
-  @prop(int()) accessor value = 0;
-
-  @reactive() #render() {
-    render(
-      this.shadowRoot ?? this.attachShadow({ mode: "open" }),
-      html`
-        Current value: ${this.value}
-        <button .click={() => ++this.value}>Add 1</button>
-      `
-    );
-  }
-}
-```
-
-This component uses an event handler to update the decorated accessor `value`,
-which in turn causes the `@reactive` method `#render()` to update the UI
-accordingly. Other approaches, such as full-blown frameworks make similar
-functionality even more accessible, but those are usually full-blown frameworks
-with all sorts of attached baggage and most of them have no capability to
-properly express dom properties and attributes exactly like the build-in
-elements do. If you are about any of the above, Schleifchen will save you quite
-a few keystrokes.
+*very* easy to remove or replace with more complicated hand-written logic.
+Schleifchen still wants you to have full control over your components' behavior,
+just with less boilerplate. If you just want to turn off your brain, churn out
+components and keep praying for continued support of third-party software, you
+are better off with a true framework like [lit](https://lit.dev/).
 
 ## Notable deviations from standard behavior
 
@@ -269,9 +240,7 @@ IDL property's accessor, where invalid values *are* rejected with exceptions.
 ### `@reactive(options?)`
 
 Method decorator that causes class methods to re-run when any accessor decorated
-with `@prop()` or `@attr()` changes. Method runs are debounced with
-`requestAnimationFrame()` so that multiple changes to accessor values only cause
-a single method call:
+with `@prop()` or `@attr()` changes:
 
 ```javascript
 import { define, prop, number } from "@sirpepe/schleifchen"
@@ -289,10 +258,13 @@ class Test extends HTMLElement {
 let testEl = document.createElement("test-element");
 testEl.foo = 1;
 testEl.bar = 2;
-testEl.foo = 3;
 
-// only logs "foo is now 3, bar is now 2" on the next frame
+// first logs "foo is now 1, bar is now 0"
+// then logs "foo is now 1, bar is now 2"
 ```
+
+In many cases you may want to apply `@reactive()` to methods decorated with
+[@debounce()](#reactiveoptions) to prevent excessive calls.
 
 #### Options for `@reactive()`
 
@@ -591,6 +563,68 @@ handlers are obviously not global - they can only be used on the components that
 explicitly implement them.
 
 ## Cookbook
+
+### Debounced reactive
+
+`@reactive()` causes its decorated method to get called for once for *every*
+attribute change. This is sometimes useful, but sometimes you will want to batch
+method calls for increased efficiency. This is easy if you combine `@reactive()`
+with `@debounce()`:
+
+```javascript
+import { define, prop, reactive, debounce int } from "@sirpepe/schleifchen";
+
+@define("test-element")
+export class TestElement extends HTMLElement {
+  @prop(int()) accessor value = 0;
+
+  @reactive({ initial: false }) @debounce() #log() {
+    console.log("Value is now", this.value);
+  }
+}
+
+let el = new TestElement();
+el.value = 1;
+el.value = 2;
+el.value = 2;
+
+// Only logs "Value is now 3"
+```
+
+The order of the decorators im important here: the method needs to be
+`@reactive()` needs to be applied to a method decorated with `@debounce()` for
+everything to work properly. The initial method call of a `reactive()` method is
+not debounced.
+
+### Rendering shadow DOM
+
+Schleifchen does not concern itself with rendering Shadow DOM, but you can
+combine Schleifchen with suitable libraries such as
+[uhtml](https://github.com/WebReflection/uhtml):
+
+```javascript
+import { render, html } from "uhtml";
+import { define, prop, reactive, debounce int } from "@sirpepe/schleifchen";
+
+@define("counter-element")
+export class CounterElement extends HTMLElement {
+  @prop(int()) accessor value = 0;
+
+  @reactive() @debounce() #render() {
+    render(
+      this.shadowRoot ?? this.attachShadow({ mode: "open" }),
+      html`
+        Current value: ${this.value}
+        <button .click={() => ++this.value}>Add 1</button>
+      `
+    );
+  }
+}
+```
+
+This component uses an event handler to update the decorated accessor `value`,
+which in turn causes the `@reactive()` method `#render()` to update the UI
+accordingly - debounced with `@debounce()` for batched updated.
 
 ### Read-only property
 
