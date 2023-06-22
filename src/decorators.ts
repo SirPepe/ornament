@@ -32,10 +32,10 @@ export function define<T extends CustomElementConstructor>(
 }
 
 // The method decorator @reactive calls the method is was applied onto every
-// time a property defined with @prop or an attribute defined with @attr changes
-// its value. @reactive methods should in many cases perform an initial run with
-// the reactive property's default values. This can obviously only be done once
-// the reactive properties have initialized, but this is surprisingly hard to
+// time an attribute defined with @prop() or @attr() changes its value.
+// @reactive() methods should in many cases perform an initial run with the
+// reactive property's default values. This can obviously only be done once
+// the reactive attributes have initialized, but this is surprisingly hard to
 // get working properly. The approach chosen is as follows. Reactive properties
 // announce their existence when their decorators initializers run by calling
 // registerReactiveProperty(). The number of reactive properties on each
@@ -149,46 +149,27 @@ function registerReactivityInitialCallCallback(
 // Reactivity notifications for @reactive
 class ReactivityEvent extends Event {
   #source: HTMLElement;
-  #keys: Set<string | symbol>;
+  #key: string | symbol;
 
-  constructor(source: HTMLElement, keys: Set<string | symbol>) {
+  constructor(source: HTMLElement, key: string | symbol) {
     super("reactivity");
     this.#source = source;
-    this.#keys = keys;
+    this.#key = key;
   }
 
   get source(): HTMLElement {
     return this.#source;
   }
 
-  get keys(): Set<string | symbol> {
-    return this.#keys;
+  get key(): string | symbol {
+    return this.#key;
   }
 }
 
 // All elements that use @reactive share an event bus to keep things simple.
 const reactivityEventBus = new EventTarget();
-let reactivityDispatchHandle: number | null = null;
-const reactivityTargetsWithKeys = new Map<HTMLElement, Set<string | symbol>>();
-function enqueueReactivityEvent(
-  target: HTMLElement,
-  key: string | symbol
-): void {
-  const keys = reactivityTargetsWithKeys.get(target);
-  if (keys) {
-    keys.add(key);
-  } else {
-    reactivityTargetsWithKeys.set(target, new Set([key]));
-  }
-  if (reactivityDispatchHandle === null) {
-    reactivityDispatchHandle = requestAnimationFrame(() => {
-      for (const targetAndKeys of reactivityTargetsWithKeys) {
-        reactivityEventBus.dispatchEvent(new ReactivityEvent(...targetAndKeys));
-      }
-      reactivityDispatchHandle = null;
-      reactivityTargetsWithKeys.clear();
-    });
-  }
+function triggerReactive(target: HTMLElement, key: string | symbol): void {
+  reactivityEventBus.dispatchEvent(new ReactivityEvent(target, key));
 }
 
 type ReactiveOptions<T extends HTMLElement> = {
@@ -204,7 +185,7 @@ type ReactiveDecorator<T extends HTMLElement> = (
 
 function getPredicate<T extends HTMLElement>(
   options: ReactiveOptions<T> = {}
-): (this: T, keys: Set<string | symbol> | "*") => boolean {
+): (this: T, key: string | symbol) => boolean {
   const predicate = options.predicate ?? (() => true);
   const selectKeys = options.keys ?? [];
   if (selectKeys.length === 0) {
@@ -212,12 +193,12 @@ function getPredicate<T extends HTMLElement>(
   }
   return function reactivityPredicate(
     this: T,
-    keys: Set<string | symbol> | "*"
+    evtKey: string | symbol
   ): boolean {
-    if (keys === "*") {
+    if (evtKey === "*") {
       return predicate.call(this);
     }
-    return predicate.call(this) && selectKeys.some((key) => keys.has(key));
+    return predicate.call(this) && selectKeys.some((key) => key === evtKey);
   };
 }
 
@@ -236,13 +217,15 @@ export function reactive<T extends HTMLElement>(
       // accessors initialize *after* this method decorator initializes, the
       // initial call needs to be delayed.
       if (initial) {
+        // Initial calls of debounced methods must not be delayed
+        const target = originalMethodMap.get(value) ?? value;
         registerReactivityInitialCallCallback(this, () => {
-          predicate.call(this, "*") && value.call(this);
+          predicate.call(this, "*") && target.call(this);
         });
       }
       // Start listening for subsequent reactivity events
       reactivityEventBus.addEventListener("reactivity", (evt: any) => {
-        if (evt.source === this && predicate.call(this, evt.keys)) {
+        if (evt.source === this && predicate.call(this, evt.key)) {
           value.call(this);
         }
       });
@@ -308,7 +291,7 @@ export function attr<T extends HTMLElement, V>(
               const value = parse.call(this, newValue);
               transformer.beforeSetCallback?.call(this, value, context);
               set.call(this, value);
-              enqueueReactivityEvent(this, context.name);
+              triggerReactive(this, context.name);
             }
           }
         }).observe(this, {
@@ -345,7 +328,7 @@ export function attr<T extends HTMLElement, V>(
             this.setAttribute(attrName, stringify.call(this, newValue));
           }
         }
-        enqueueReactivityEvent(this, context.name);
+        triggerReactive(this, context.name);
       },
       get() {
         return get.call(this);
@@ -380,7 +363,7 @@ export function prop<T extends HTMLElement, V>(
         initReactivePropertyUnlessAlreadyInitialized(this);
         const newValue = validate.call(this, input);
         set.call(this, newValue);
-        enqueueReactivityEvent(this, context.name);
+        triggerReactive(this, context.name);
       },
       get() {
         return get.call(this);
@@ -395,62 +378,64 @@ type DebounceOptions = {
   fn?: (cb: () => void) => () => void;
 };
 
-type InFunc<T, A extends unknown[]> = (this: T, ...args: A) => any;
+const originalMethodMap = new WeakMap();
+
+type Func<T, A extends unknown[]> = (this: T, ...args: A) => any;
 
 type FieldOrMethodContext<T, A extends unknown[]> =
-  | ClassMethodDecoratorContext<T, InFunc<T, A>>
-  | ClassFieldDecoratorContext<T, InFunc<T, A>>;
+  | ClassMethodDecoratorContext<T, Func<T, A>>
+  | ClassFieldDecoratorContext<T, Func<T, A>>;
+
+function createDebouncedMethod<T, A extends unknown[]>(
+  method: Func<T, A>,
+  wait: (cb: () => void) => () => void
+): Func<T, A> {
+  let cancelWait: null | (() => void) = null;
+  function debouncedMethod(this: T, ...args: A): any {
+    if (cancelWait) {
+      cancelWait();
+    }
+    cancelWait = wait(() => {
+      method.call(this, ...args);
+      cancelWait = null;
+    });
+  }
+  originalMethodMap.set(debouncedMethod, method);
+  return debouncedMethod;
+}
 
 export function debounce<T extends HTMLElement, A extends unknown[]>(
   options: DebounceOptions = {}
 ) {
   const fn = options.fn ?? debounce.raf();
   function decorator(
-    value: InFunc<T, A>,
-    ctx: ClassMethodDecoratorContext<T, InFunc<T, A>>
-  ): InFunc<T, A>;
+    value: Func<T, A>,
+    ctx: ClassMethodDecoratorContext<T, Func<T, A>>
+  ): Func<T, A>;
   function decorator(
     value: undefined,
-    ctx: ClassFieldDecoratorContext<T, InFunc<unknown, A>>
-  ): (init: InFunc<unknown, A>) => InFunc<unknown, A>;
+    ctx: ClassFieldDecoratorContext<T, Func<unknown, A>>
+  ): (init: Func<unknown, A>) => Func<unknown, A>;
   function decorator(
-    value: InFunc<T, A> | undefined,
+    value: Func<T, A> | undefined,
     ctx: FieldOrMethodContext<T, A>
-  ): InFunc<T, A> | ((init: InFunc<unknown, A>) => InFunc<unknown, A>) {
+  ): Func<T, A> | ((init: Func<unknown, A>) => Func<unknown, A>) {
     if (ctx.kind === "field") {
       // Field decorator (bound methods)
-      return function init(func: InFunc<unknown, A>): InFunc<unknown, A> {
+      return function init(func: Func<unknown, A>): Func<unknown, A> {
         if (typeof func !== "function") {
           throw new TypeError(
             "@debounce() can only be applied to function class fields"
           );
         }
-        let cancel: null | (() => void) = null;
-        return function method(...args: A): void {
-          if (cancel) {
-            cancel();
-          }
-          cancel = fn(() => {
-            func(...args);
-            cancel = null;
-          });
-        };
+        return createDebouncedMethod(func, fn);
       };
     } else {
       // Method decorator
       if (typeof value === "undefined") {
         throw new Error("This should never happen");
       }
-      let cancel: null | (() => void) = null;
-      return function (this: T, ...args: A): void {
-        if (cancel) {
-          cancel();
-        }
-        cancel = fn(() => {
-          value.call(this, ...args);
-          cancel = null;
-        });
-      };
+      return createDebouncedMethod(value, fn);
     }
   }
   return decorator;
