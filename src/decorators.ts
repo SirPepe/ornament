@@ -32,10 +32,10 @@ export function define<T extends CustomElementConstructor>(
 }
 
 // The method decorator @reactive calls the method is was applied onto every
-// time a property defined with @prop or an attribute defined with @attr changes
-// its value. @reactive methods should in many cases perform an initial run with
-// the reactive property's default values. This can obviously only be done once
-// the reactive properties have initialized, but this is surprisingly hard to
+// time an attribute defined with @prop() or @attr() changes its value.
+// @reactive() methods should in many cases perform an initial run with the
+// reactive property's default values. This can obviously only be done once
+// the reactive attributes have initialized, but this is surprisingly hard to
 // get working properly. The approach chosen is as follows. Reactive properties
 // announce their existence when their decorators initializers run by calling
 // registerReactiveProperty(). The number of reactive properties on each
