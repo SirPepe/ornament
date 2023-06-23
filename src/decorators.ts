@@ -29,20 +29,31 @@ const OBSERVER_CALLBACKS_BY_INSTANCE = new WeakMap<HTMLElement, CallbackMap>();
 // @reactive() method's initial calls (for methods that need such a call)
 const REACTIVE_INIT = new WeakMap<CustomElementConstructor, (() => any)[]>();
 
+// Set of instance that have had their reactivity initialize. Only elements in
+// this set receive reactivity events.
+const REACTIVE_INIT_DONE = new WeakSet<object>();
+
 // Maps debounced methods to original methods. Needed for initial calls of
 // @reactive() methods, which are not supposed to be async.
 const DEBOUNCED_METHOD_MAP = new WeakMap<Method<any, any>, Method<any, any>>();
 
-// Patches a custom element constructor's prototype to add custom attribute
-// observation logic. Unfortunately this appears to be the only way to make this
-// work, as using a proxy on ctor.prototype is impossible according to the
-// specs: https://262.ecma-international.org/#sec-proxy-object-internal-methods-and-internal-slots-get-p-receiver
-function patchPrototype(ctor: any): void {
-  const originalObservedAttributes = ctor.observedAttributes ?? [];
-  const originalCallback = ctor.prototype.attributeChangedCallback;
-  Object.defineProperty(ctor.prototype, "attributeChangedCallback", {
-    configurable: true,
-    value: function attributeChangedCallback(
+// Installs a mixin class that deals with attribute observation and reactive
+// init callback handling
+function installMixin(Ctor: any): any {
+  const originalObservedAttributes = Ctor.observedAttributes ?? [];
+  const originalCallback = Ctor.prototype.attributeChangedCallback;
+  return class SchleifchenMixin extends Ctor {
+    constructor(...args: any[]) {
+      super(...args);
+      REACTIVE_INIT.get(this.constructor as any)?.forEach((method) =>
+        method.call(this)
+      );
+      REACTIVE_INIT_DONE.add(this);
+    }
+    static get observedAttributes(): string[] {
+      return [...originalObservedAttributes, ...ALL_OBSERVABLE_ATTRIBUTES];
+    }
+    attributeChangedCallback(
       this: HTMLElement,
       name: string,
       oldVal: string | null,
@@ -60,36 +71,8 @@ function patchPrototype(ctor: any): void {
         return;
       }
       callback.call(this, name, oldVal, newVal);
-    },
-  });
-}
-
-// Patches a CustomElementConstructor's prototype and proxies the constructor
-// itself To setup reactivity and attribute observability.
-function setupConstructor(target: any): any {
-  patchPrototype(target);
-  return new Proxy(target, {
-    // Hook into element instantiation to perform the initial calls to @reactive
-    // methods asap.
-    construct(target, args, newTarget) {
-      const result = Reflect.construct(target, args, newTarget);
-      REACTIVE_INIT.get(result.constructor)?.forEach((method) =>
-        method.call(this)
-      );
-      return result;
-    },
-    // Extend the observed attributes with the reflective attributes
-    // declared with @attr(). This get trap does not handle the prototype for
-    // the reasons outlined above.
-    get(target, prop, receiver) {
-      if (prop === "observedAttributes") {
-        const originalObserved = (Reflect.get(target, prop, receiver) ??
-          []) as string[];
-        return [...originalObserved, ...ALL_OBSERVABLE_ATTRIBUTES];
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
+    }
+  };
 }
 
 // All elements that use @reactive share an event bus to keep things simple.
@@ -131,8 +114,9 @@ export function define<T extends CustomElementConstructor>(
       window.customElements.get(tagName) ??
         window.customElements.define(tagName, this);
     });
-    REACTIVE_INIT.set(target, []);
-    return setupConstructor(target);
+    const constructor = installMixin(target);
+    REACTIVE_INIT.set(constructor, []);
+    return constructor;
   };
 }
 
@@ -146,8 +130,9 @@ export function enhance<T extends CustomElementConstructor>() {
     if (context.kind !== "class") {
       throw new TypeError(`Class decorator @enhance() used on ${context.kind}`);
     }
-    REACTIVE_INIT.set(target, []);
-    return setupConstructor(target);
+    const constructor = installMixin(target);
+    REACTIVE_INIT.set(constructor, []);
+    return constructor;
   };
 }
 
@@ -209,9 +194,13 @@ export function reactive<T extends HTMLElement>(
           }
         });
       }
-      // Start listening for subsequent reactivity events
+      // Start listening for reactivity events that happen after reactive init
       eventBus.addEventListener("reactivity", (evt: any) => {
-        if (evt.source === this && predicate.call(this, evt.key)) {
+        if (
+          evt.source === this &&
+          REACTIVE_INIT_DONE.has(this) &&
+          predicate.call(this, evt.key)
+        ) {
           value.call(this);
         }
       });

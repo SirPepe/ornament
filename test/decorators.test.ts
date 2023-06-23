@@ -241,6 +241,25 @@ describe("Decorators", () => {
       expect(spy.mock.calls).toEqual([["A"], ["B"]]);
     });
 
+    test("prop changes in the constructor cause no reaction", async () => {
+      const spy = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        constructor() {
+          super();
+          this.x = "B";
+        }
+        @reactive() test() {
+          spy(this.x);
+        }
+      }
+      const el = new Test();
+      el.x = "C";
+      expect(spy).toBeCalledTimes(2); // initial + one update
+      expect(spy.mock.calls).toEqual([["B"], ["C"]]);
+    });
+
     test("two prop changes", async () => {
       const spy = jest.fn();
       @define(generateTagName())
