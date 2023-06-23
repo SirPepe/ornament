@@ -4,7 +4,7 @@
 
 import { attr, debounce, define, prop, reactive } from "../src/decorators";
 import { href, string } from "../src/transformers";
-import { generateTagName, noop, tick, wait } from "./helpers";
+import { generateTagName, wait } from "./helpers";
 
 describe("Decorators", () => {
   describe("@define", () => {
@@ -87,7 +87,7 @@ describe("Decorators", () => {
         attributeChangedCallback(name: string): void {
           userDefinedCallback(this, name);
         }
-        @reactive() test() {
+        @reactive({ initial: false }) test() {
           reactiveCallback(this);
         }
       }
@@ -222,12 +222,11 @@ describe("Decorators", () => {
         }
       }
       new Test();
-      await tick(); // Await initial invocation
       expect(spy).toBeCalledTimes(1);
       expect(spy.mock.calls).toEqual([["A"]]);
     });
 
-    test("prop changes trigger @reactive immediately", async () => {
+    test("prop change", async () => {
       const spy = jest.fn();
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -237,24 +236,9 @@ describe("Decorators", () => {
         }
       }
       const el = new Test();
-      el.x = "B"; // no await required, setter preempts initial call
+      el.x = "B";
       expect(spy).toBeCalledTimes(2); // initial + one update
       expect(spy.mock.calls).toEqual([["A"], ["B"]]);
-    });
-
-    test("prop reads trigger @reactive immediately", async () => {
-      const spy = jest.fn();
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        @prop(string()) accessor x = "A";
-        @reactive() test() {
-          spy(this.x);
-        }
-      }
-      const el = new Test();
-      noop(el.x); // no await required, getter preempts initial call
-      expect(spy).toBeCalledTimes(1); // initial
-      expect(spy.mock.calls).toEqual([["A"]]);
     });
 
     test("two prop changes", async () => {
@@ -358,7 +342,6 @@ describe("Decorators", () => {
         }
       }
       const el = new Test();
-      await tick(); // Await initial invocation
       el.setAttribute("x", "B");
       expect(spy).toBeCalledTimes(2); // initial + one update
       expect(spy.mock.calls).toEqual([["A"], ["B"]]);
@@ -374,11 +357,25 @@ describe("Decorators", () => {
         }
       }
       const el = new Test();
-      await tick(); // Await initial invocation (that should NOT happen here)
       el.x = "B";
       expect(spy).toBeCalledTimes(1); // one update
       expect(spy.mock.calls).toEqual([["B"]]);
     });
+
+    /*test("use on class fields", async () => {
+      const spy = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive() test = () => {
+          spy(this.x);
+        };
+      }
+      const el = new Test();
+      el.x = "B";
+      expect(spy).toBeCalledTimes(2);
+      expect(spy.mock.calls).toEqual([["A"], ["B"]]);
+    });*/
   });
 
   describe("@reactive + @debounce", () => {
@@ -395,6 +392,8 @@ describe("Decorators", () => {
       el.x = "B";
       el.x = "C";
       el.x = "D";
+      expect(spy).toBeCalledTimes(1); // initial
+      expect(spy.mock.calls).toEqual([["A"]]);
       await wait(25);
       expect(spy).toBeCalledTimes(2); // initial + one update
       expect(spy.mock.calls).toEqual([["A"], ["D"]]);

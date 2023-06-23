@@ -13,7 +13,7 @@ import {
   record,
   string,
 } from "../src/transformers";
-import { generateTagName, tick } from "./helpers";
+import { generateTagName, wait } from "./helpers";
 
 describe("Transformers", () => {
   describe("string()", () => {
@@ -562,7 +562,7 @@ describe("Transformers", () => {
       el.setAttribute("onnormalevent", "return 42");
       el.dispatchEvent(new MyEvent("specialevent"));
       el.dispatchEvent(new MyEvent("normalevent"));
-      await tick();
+      await wait();
       expect(spy).toHaveBeenCalledTimes(1);
     });
   });

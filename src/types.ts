@@ -43,15 +43,20 @@ export type Transformer<T extends HTMLElement, V> = {
 };
 
 /* eslint-disable */
-export type ClassAccessorDecorator<
-  T,
-  V,
-  R extends ClassAccessorDecoratorResult<
-    unknown,
-    unknown
-  > | void = ClassAccessorDecoratorResult<T, V>
-> = (
-  target: ClassAccessorDecoratorTarget<T, V>,
-  context: ClassAccessorDecoratorContext<T, V>
-) => R;
+export type ClassAccessorDecorator<T extends HTMLElement, V, R extends ClassAccessorDecoratorResult<unknown, unknown> | void = ClassAccessorDecoratorResult<T, V>>
+  = (target: ClassAccessorDecoratorTarget<T, V>, context: ClassAccessorDecoratorContext<T, V>) => R;
+
+export type Method<T, A extends unknown[]> = (this: T, ...args: A) => any;
+export type FunctionFieldOrMethodContext<T, A extends unknown[]> =
+  | ClassMethodDecoratorContext<T, Method<T, A>>
+  | ClassFieldDecoratorContext<T, Method<T, A>>;
+
+export interface FunctionFieldOrMethodDecorator<T extends HTMLElement, A extends unknown[]> {
+  (value: Method<T, A>, context: ClassMethodDecoratorContext<T, Method<T, A>>): Method<T, A>;
+  (value: undefined, context: ClassFieldDecoratorContext<T, Method<unknown, A>>): (init: Method<unknown, A>) => Method<unknown, A>;
+}
+
+export type FunctionFieldOrMethodDecorator_<T extends HTMLElement, A extends unknown[]> =
+  & ((value: Method<T, A>, context: ClassMethodDecoratorContext<T, Method<T, A>>) => Method<T, A>)
+  & ((value: undefined, context: ClassFieldDecoratorContext<T, Method<unknown, A>>) => (init: Method<unknown, A>) => Method<unknown, A>);
 /* eslint-enable */

@@ -283,12 +283,9 @@ testEl.bar = 2;
 ```
 
 Unless the `initial` option is set to `false` the decorated method will run once
-on initialization of all accessors that it depends upon. This happens
-synchronously if any of the relevant accessors are read or set, or on the next
-microtask of none of the accessors get touched.
-
-In many cases you may want to apply `@reactive()` to methods decorated with
-[@debounce()](#reactiveoptions) to prevent excessive calls.
+the element initializes. In many cases you may want to apply `@reactive()` to
+methods decorated with [@debounce()](#reactiveoptions) to prevent excessive
+calls.
 
 #### Options for `@reactive()`
 
