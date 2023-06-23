@@ -1,150 +1,99 @@
-import type { ClassAccessorDecorator, Transformer } from "./types";
+import type {
+  ClassAccessorDecorator,
+  FunctionFieldOrMethodDecorator,
+  FunctionFieldOrMethodContext,
+  Method,
+  Transformer,
+} from "./types";
 
-const asap = (callback: (...args: any[]) => any): (() => void) => {
-  let canceled = false;
-  Promise.resolve().then(() => {
-    if (!canceled) {
-      callback();
-    }
-  });
-  return () => {
-    canceled = true;
-  };
-};
+// Accessor decorators initialize *after* custom elements access their
+// observedAttributes getter, so there is no way to associate observed
+// attributes with specific elements or constructors from inside the @attr()
+// decorator. All we can do is to track *all* attributes defined by @attr() and
+// decide in the attribute changed callback whether they are *actually* observed
+// by a given element.
+const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 
-// The class decorator @define defines a custom element with a given tag name
-// *once* and only *after* other decorators have been applied.
-export function define<T extends CustomElementConstructor>(
-  tagName: string
-): (target: T, context: ClassDecoratorContext<T>) => void {
-  if (!/[a-z]+-[a-z]+/i.test(tagName)) {
-    throw new Error(`Invalid custom element tag name "${tagName}"`);
-  }
-  return function (_: T, context: ClassDecoratorContext<T>): void {
-    if (context.kind !== "class") {
-      throw new TypeError(`Class decorator @define used on ${context.kind}`);
-    }
-    context.addInitializer(function () {
-      window.customElements.get(tagName) ??
-        window.customElements.define(tagName, this);
-    });
-  };
-}
+// Map of attribute to handling callbacks mapped by element. This can be used in
+// the actual attributeChangedCallback to decide whether an attribute reaction
+// must run an effect defined by @attr().
+type AttributeChangedCallback = (
+  name: string,
+  oldValue: string | null,
+  newValue: string | null
+) => void;
+type CallbackMap = Map<string, AttributeChangedCallback>;
+const OBSERVER_CALLBACKS_BY_INSTANCE = new WeakMap<HTMLElement, CallbackMap>();
 
-// The method decorator @reactive calls the method is was applied onto every
-// time an attribute defined with @prop() or @attr() changes its value.
-// @reactive() methods should in many cases perform an initial run with the
-// reactive property's default values. This can obviously only be done once
-// the reactive attributes have initialized, but this is surprisingly hard to
-// get working properly. The approach chosen is as follows. Reactive properties
-// announce their existence when their decorators initializers run by calling
-// registerReactiveProperty(). The number of reactive properties on each
-// element is stored in reactiveInitCountdowns. When a reactive property
-// initializes, this number gets decremented until it reaches 0 when all
-// properties have initialized. This initialization of the property's values
-// happens *after* the decorators call the callbacks added by addInitializer().
-// Unfortunately, property initialization only really finalizes after the init()
-// method returned by the accessor decorators - at a point where a decorator
-// can't really inject any logic. To summarize:
-//
-//   1. accessor decorator's initializer called
-//   2. accessor decorator's return value's init() called
-//   3. accessor value initialized
-//   4. initial call of @reactive methods should happen here
-//
-// Properties register with step 1, the initial call of @reactive methods should
-// happen in step 4, but there is no way to hook into that. We can only add code
-// in init(), essentially between steps 1 and 2. The closest we can get to
-// step 4 is to take the initial call of an @reactive method for a spin across
-// the microtask queue using asap(). This works great unless something changes
-// before the initial call comes back from the microtask queue, like in this
-// case:
-//
-// @define("test-element")
-// class TestElement extends HTMLElement {
-//   @prop(string()) accessor x = "A";
-//   @reactive() test() {
-//     console.log(this.x);
-//   }
-// }
-// const el = new TestElement();
-// el.x = "B";
-//
-// "el" initializes with "A" on "x", then "x" gets set to "B" immediately.
-// Nevertheless "A" (or, in the case of @attr, the initial attribute value) is
-// the initial value of "x" and "@reactive test()" should be called at a time
-// when "x" is still "A". But when "@reactive test()" comes back from the
-// microtask queue, "x" is "B". To fix this, any use of the setter for a
-// reactive property must cause the initial call of of any methods marked as
-// @reactive, unless this initial call has already happened.
+// Maps custom element classes to a list of callbacks that trigger their
+// @reactive() method's initial calls (for methods that need such a call)
+const REACTIVE_INIT = new WeakMap<CustomElementConstructor, (() => any)[]>();
 
-const reactiveInitCountdowns = new WeakMap<HTMLElement, number>();
-const reactiveInitCallbacks = new WeakMap<HTMLElement, (() => void)[]>();
-const cancelReactiveInitCallbacks = new WeakMap<HTMLElement, () => void>();
+// Maps debounced methods to original methods. Needed for initial calls of
+// @reactive() methods, which are not supposed to be async.
+const DEBOUNCED_METHOD_MAP = new WeakMap<Method<any, any>, Method<any, any>>();
 
-function registerReactiveProperty(instance: HTMLElement): void {
-  let value = reactiveInitCountdowns.get(instance) ?? 0;
-  value++;
-  reactiveInitCountdowns.set(instance, value);
-}
-
-// used in accessor decorator's init() to schedule initial calls of reactive
-// methods asap.
-function initReactiveProperty(instance: HTMLElement): void {
-  let value = reactiveInitCountdowns.get(instance);
-  if (typeof value === "number") {
-    value--;
-    if (value > 0) {
-      reactiveInitCountdowns.set(instance, value);
-    } else {
-      reactiveInitCountdowns.delete(instance);
-      const callbacks = reactiveInitCallbacks.get(instance);
-      if (callbacks) {
-        const cancelInitCallbacks = asap(() => {
-          for (const callback of callbacks) {
-            callback();
-          }
-          reactiveInitCallbacks.delete(instance);
-          cancelReactiveInitCallbacks.delete(instance);
-        });
-        cancelReactiveInitCallbacks.set(instance, cancelInitCallbacks);
+// Patches a custom element constructor's prototype to add custom attribute
+// observation logic. Unfortunately this appears to be the only way to make this
+// work, as using a proxy on ctor.prototype is impossible according to the
+// specs: https://262.ecma-international.org/#sec-proxy-object-internal-methods-and-internal-slots-get-p-receiver
+function patchPrototype(ctor: any): void {
+  const originalObservedAttributes = ctor.observedAttributes ?? [];
+  const originalCallback = ctor.prototype.attributeChangedCallback;
+  Object.defineProperty(ctor.prototype, "attributeChangedCallback", {
+    configurable: true,
+    value: function attributeChangedCallback(
+      this: HTMLElement,
+      name: string,
+      oldVal: string | null,
+      newVal: string | null
+    ): void {
+      if (originalCallback && originalObservedAttributes.includes(name)) {
+        originalCallback.call?.(this, name, oldVal, newVal);
       }
-    }
-  }
+      const callbacks = OBSERVER_CALLBACKS_BY_INSTANCE.get(this);
+      if (!callbacks) {
+        return;
+      }
+      const callback = callbacks.get(name);
+      if (!callback) {
+        return;
+      }
+      callback.call(this, name, oldVal, newVal);
+    },
+  });
 }
 
-// used in accessor decorator's set() to schedule initial calls of reactive
-// methods unless this has already happened, and cancel any pending initial
-// calls.
-function initReactivePropertyUnlessAlreadyInitialized(
-  instance: HTMLElement
-): void {
-  const cancelPending = cancelReactiveInitCallbacks.get(instance);
-  if (cancelPending) {
-    cancelPending();
-    const callbacks = reactiveInitCallbacks.get(instance);
-    if (!callbacks) {
-      throw new Error();
-    }
-    for (const callback of callbacks) {
-      callback();
-    }
-    reactiveInitCallbacks.delete(instance);
-    cancelReactiveInitCallbacks.delete(instance);
-  }
+// Patches a CustomElementConstructor's prototype and proxies the constructor
+// itself To setup reactivity and attribute observability.
+function setupConstructor(target: any): any {
+  patchPrototype(target);
+  return new Proxy(target, {
+    // Hook into element instantiation to perform the initial calls to @reactive
+    // methods asap.
+    construct(target, args, newTarget) {
+      const result = Reflect.construct(target, args, newTarget);
+      REACTIVE_INIT.get(result.constructor)?.forEach((method) =>
+        method.call(this)
+      );
+      return result;
+    },
+    // Extend the observed attributes with the reflective attributes
+    // declared with @attr(). This get trap does not handle the prototype for
+    // the reasons outlined above.
+    get(target, prop, receiver) {
+      if (prop === "observedAttributes") {
+        const originalObserved = (Reflect.get(target, prop, receiver) ??
+          []) as string[];
+        return [...originalObserved, ...ALL_OBSERVABLE_ATTRIBUTES];
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
 }
 
-function registerReactivityInitialCallCallback(
-  instance: HTMLElement,
-  callback: () => void
-): void {
-  const callbacks = reactiveInitCallbacks.get(instance);
-  if (callbacks) {
-    callbacks.push(callback);
-  } else {
-    reactiveInitCallbacks.set(instance, [callback]);
-  }
-}
+// All elements that use @reactive share an event bus to keep things simple.
+const eventBus = new EventTarget();
 
 // Reactivity notifications for @reactive
 class ReactivityEvent extends Event {
@@ -166,10 +115,40 @@ class ReactivityEvent extends Event {
   }
 }
 
-// All elements that use @reactive share an event bus to keep things simple.
-const reactivityEventBus = new EventTarget();
-function triggerReactive(target: HTMLElement, key: string | symbol): void {
-  reactivityEventBus.dispatchEvent(new ReactivityEvent(target, key));
+// The class decorator @define defines a custom element with a given tag name
+// and also patches the base class to make attribute observation possible.
+export function define<T extends CustomElementConstructor>(
+  tagName: string
+): (target: T, context: ClassDecoratorContext<T>) => T {
+  if (!/[a-z]+-[a-z]+/i.test(tagName)) {
+    throw new Error(`Invalid custom element tag name "${tagName}"`);
+  }
+  return function (target: T, context: ClassDecoratorContext<T>): T {
+    if (context.kind !== "class") {
+      throw new TypeError(`Class decorator @define() used on ${context.kind}`);
+    }
+    context.addInitializer(function () {
+      window.customElements.get(tagName) ??
+        window.customElements.define(tagName, this);
+    });
+    REACTIVE_INIT.set(target, []);
+    return setupConstructor(target);
+  };
+}
+
+// Only proxy the target class to enable attribute observation and setup
+// reactivity initialization callbacks.
+export function enhance<T extends CustomElementConstructor>() {
+  return function enhanceDecorator(
+    target: T,
+    context: ClassDecoratorContext<T>
+  ): void {
+    if (context.kind !== "class") {
+      throw new TypeError(`Class decorator @enhance() used on ${context.kind}`);
+    }
+    REACTIVE_INIT.set(target, []);
+    return setupConstructor(target);
+  };
 }
 
 type ReactiveOptions<T extends HTMLElement> = {
@@ -183,7 +162,7 @@ type ReactiveDecorator<T extends HTMLElement> = (
   context: ClassMethodDecoratorContext<T, () => any>
 ) => void;
 
-function getPredicate<T extends HTMLElement>(
+function createReactivePredicate<T extends HTMLElement>(
   options: ReactiveOptions<T> = {}
 ): (this: T, key: string | symbol) => boolean {
   const predicate = options.predicate ?? (() => true);
@@ -206,25 +185,32 @@ export function reactive<T extends HTMLElement>(
   options: ReactiveOptions<T> = {}
 ): ReactiveDecorator<T> {
   const initial = options.initial ?? true;
-  const predicate = getPredicate(options);
+  const predicate = createReactivePredicate(options);
   return function (value, context): void {
     if (context.kind !== "method") {
-      throw new TypeError(`Method decorator @reactive used on ${context.kind}`);
+      throw new TypeError(
+        `Method decorator @reactive() used on ${context.kind}`
+      );
     }
     context.addInitializer(function () {
-      // Call the reactive function once after everything else has initialized,
-      // unless the options passed to the decorator say otherwise. Since
-      // accessors initialize *after* this method decorator initializes, the
-      // initial call needs to be delayed.
+      // Register the callback that performs the initial method call
       if (initial) {
-        // Initial calls of debounced methods must not be delayed
-        const target = originalMethodMap.get(value) ?? value;
-        registerReactivityInitialCallCallback(this, () => {
-          predicate.call(this, "*") && target.call(this);
+        const ctor = this.constructor as CustomElementConstructor;
+        const callbacks = REACTIVE_INIT.get(ctor);
+        if (!callbacks) {
+          throw new Error(
+            "Unable to register initial method calls for @reactive() method. Did you forget to apply @define() or @enhance() to the component class?"
+          );
+        }
+        const method = DEBOUNCED_METHOD_MAP.get(value) ?? value;
+        callbacks.push(() => {
+          if (predicate.call(this, "*")) {
+            method.call(this);
+          }
         });
       }
       // Start listening for subsequent reactivity events
-      reactivityEventBus.addEventListener("reactivity", (evt: any) => {
+      eventBus.addEventListener("reactivity", (evt: any) => {
         if (evt.source === this && predicate.call(this, evt.key)) {
           value.call(this);
         }
@@ -256,8 +242,8 @@ export function attr<T extends HTMLElement, V>(
       throw new TypeError(`Accessor decorator @attr used on ${context.kind}`);
     }
 
-    // Accessor decorators can be applied to private fields, but DOM APIs must
-    // be public.
+    // Accessor decorators can be applied to private fields, but the APIs for
+    // IDL attributes must be public.
     if (context.private) {
       throw new TypeError("Attributes defined by @attr must not be private");
     }
@@ -272,39 +258,48 @@ export function attr<T extends HTMLElement, V>(
 
     const attrName = options.as ?? context.name;
 
-    context.addInitializer(function () {
-      registerReactiveProperty(this);
-    });
+    // If the attribute needs to be observed, add the name to the set of all
+    // observed attributes.
+    if (isReflectiveAttribute) {
+      ALL_OBSERVABLE_ATTRIBUTES.add(attrName);
+    }
 
-    // The following initializer makes the property update when its attribute
-    // changes, all made possible via via MutationObserver. Unfortunately this
-    // makes the attribute reactions observably asynchronous (in contrast to
-    // attributeChangedCallback(), which is usually not *observably*
-    // asynchronous), but this is the only way to attach attribute reactivity in
-    // a non-intrusive and simple way.
+    // If the attribute needs to be observed and the accessor initializes,
+    // register the attribute handler callback with the current element
+    // instance - this initializer is earliest we have access to the instance.
     if (isReflectiveAttribute) {
       context.addInitializer(function () {
-        new MutationObserver((records) => {
-          for (const record of records) {
-            const newValue = this.getAttribute(attrName);
-            if (newValue !== record.oldValue) {
-              const value = parse.call(this, newValue);
-              transformer.beforeSetCallback?.call(this, value, context);
-              set.call(this, value);
-              triggerReactive(this, context.name);
-            }
+        const attributeChangedCallback = function (
+          this: T,
+          name: string,
+          oldValue: string | null,
+          newValue: string | null
+        ): void {
+          if (name !== attrName || newValue === oldValue) {
+            return; // skip irrelevant invocations
           }
-        }).observe(this, {
-          attributes: true,
-          attributeOldValue: true,
-          attributeFilter: [attrName],
-        });
+          const value = parse.call(this, newValue);
+          if (value === get.call(this)) {
+            return; // skip if new parsed value is equal to the old parsed value
+          }
+          transformer.beforeSetCallback?.call(this, value, context);
+          set.call(this, value);
+          eventBus.dispatchEvent(new ReactivityEvent(this, context.name));
+        };
+        const instanceCallbacks = OBSERVER_CALLBACKS_BY_INSTANCE.get(this);
+        if (instanceCallbacks) {
+          instanceCallbacks.set(attrName, attributeChangedCallback);
+        } else {
+          OBSERVER_CALLBACKS_BY_INSTANCE.set(
+            this,
+            new Map([[attrName, attributeChangedCallback]])
+          );
+        }
       });
     }
 
     return {
       init(input) {
-        initReactiveProperty(this);
         const attrValue = this.getAttribute(attrName);
         if (attrValue !== null) {
           const value = parse.call(this, attrValue);
@@ -316,7 +311,6 @@ export function attr<T extends HTMLElement, V>(
         return value;
       },
       set(input) {
-        initReactivePropertyUnlessAlreadyInitialized(this);
         const newValue = validate.call(this, input);
         transformer.beforeSetCallback?.call(this, newValue, context);
         set.call(this, newValue);
@@ -328,7 +322,7 @@ export function attr<T extends HTMLElement, V>(
             this.setAttribute(attrName, stringify.call(this, newValue));
           }
         }
-        triggerReactive(this, context.name);
+        eventBus.dispatchEvent(new ReactivityEvent(this, context.name));
       },
       get() {
         return get.call(this);
@@ -348,22 +342,15 @@ export function prop<T extends HTMLElement, V>(
     if (context.kind !== "accessor") {
       throw new TypeError(`Accessor decorator @prop used on ${context.kind}`);
     }
-
-    context.addInitializer(function () {
-      registerReactiveProperty(this);
-    });
-
     return {
       init(input) {
-        initReactiveProperty(this);
         transformer.beforeInitCallback?.call(this, input, input, context);
         return validate.call(this, input);
       },
       set(input) {
-        initReactivePropertyUnlessAlreadyInitialized(this);
         const newValue = validate.call(this, input);
         set.call(this, newValue);
-        triggerReactive(this, context.name);
+        eventBus.dispatchEvent(new ReactivityEvent(this, context.name));
       },
       get() {
         return get.call(this);
@@ -378,18 +365,10 @@ type DebounceOptions = {
   fn?: (cb: () => void) => () => void;
 };
 
-const originalMethodMap = new WeakMap();
-
-type Func<T, A extends unknown[]> = (this: T, ...args: A) => any;
-
-type FieldOrMethodContext<T, A extends unknown[]> =
-  | ClassMethodDecoratorContext<T, Func<T, A>>
-  | ClassFieldDecoratorContext<T, Func<T, A>>;
-
 function createDebouncedMethod<T, A extends unknown[]>(
-  method: Func<T, A>,
+  method: Method<T, A>,
   wait: (cb: () => void) => () => void
-): Func<T, A> {
+): Method<T, A> {
   let cancelWait: null | (() => void) = null;
   function debouncedMethod(this: T, ...args: A): any {
     if (cancelWait) {
@@ -400,29 +379,29 @@ function createDebouncedMethod<T, A extends unknown[]>(
       cancelWait = null;
     });
   }
-  originalMethodMap.set(debouncedMethod, method);
+  DEBOUNCED_METHOD_MAP.set(debouncedMethod, method);
   return debouncedMethod;
 }
 
 export function debounce<T extends HTMLElement, A extends unknown[]>(
   options: DebounceOptions = {}
-) {
+): FunctionFieldOrMethodDecorator<T, A> {
   const fn = options.fn ?? debounce.raf();
   function decorator(
-    value: Func<T, A>,
-    ctx: ClassMethodDecoratorContext<T, Func<T, A>>
-  ): Func<T, A>;
+    value: Method<T, A>,
+    context: ClassMethodDecoratorContext<T, Method<T, A>>
+  ): Method<T, A>;
   function decorator(
     value: undefined,
-    ctx: ClassFieldDecoratorContext<T, Func<unknown, A>>
-  ): (init: Func<unknown, A>) => Func<unknown, A>;
+    context: ClassFieldDecoratorContext<T, Method<unknown, A>>
+  ): (init: Method<unknown, A>) => Method<unknown, A>;
   function decorator(
-    value: Func<T, A> | undefined,
-    ctx: FieldOrMethodContext<T, A>
-  ): Func<T, A> | ((init: Func<unknown, A>) => Func<unknown, A>) {
-    if (ctx.kind === "field") {
+    value: Method<T, A> | undefined,
+    context: FunctionFieldOrMethodContext<T, A>
+  ): Method<T, A> | ((init: Method<unknown, A>) => Method<unknown, A>) {
+    if (context.kind === "field") {
       // Field decorator (bound methods)
-      return function init(func: Func<unknown, A>): Func<unknown, A> {
+      return function init(func: Method<unknown, A>): Method<unknown, A> {
         if (typeof func !== "function") {
           throw new TypeError(
             "@debounce() can only be applied to function class fields"
@@ -430,19 +409,35 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
         }
         return createDebouncedMethod(func, fn);
       };
-    } else {
+    } else if (context.kind === "method") {
       // Method decorator
       if (typeof value === "undefined") {
         throw new Error("This should never happen");
       }
       return createDebouncedMethod(value, fn);
+    } else {
+      throw new TypeError(
+        `Method/class field decorator @debounce() used on ${
+          (context as any).kind
+        }`
+      );
     }
   }
   return decorator;
 }
 
 debounce.asap = function (): (cb: () => void) => () => void {
-  return (cb: () => void): (() => void) => asap(cb);
+  return function (cb: () => void): () => void {
+    let canceled = false;
+    Promise.resolve().then(() => {
+      if (!canceled) {
+        cb();
+      }
+    });
+    return () => {
+      canceled = true;
+    };
+  };
 };
 
 debounce.raf = function (): (cb: () => void) => () => void {

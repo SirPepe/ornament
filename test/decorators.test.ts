@@ -4,7 +4,7 @@
 
 import { attr, debounce, define, prop, reactive } from "../src/decorators";
 import { href, string } from "../src/transformers";
-import { generateTagName, tick, wait } from "./helpers";
+import { generateTagName, wait } from "./helpers";
 
 describe("Decorators", () => {
   describe("@define", () => {
@@ -71,9 +71,33 @@ describe("Decorators", () => {
       expect(el.x).toBe("B");
       expect(el.getAttribute("x")).toBe("B");
       el.setAttribute("x", "C");
-      await tick(); // Attribute reactions are async
       expect(el.x).toBe("C");
       expect(el.getAttribute("x")).toBe("C");
+    });
+
+    test("user-defined attribute handling keeps working", async () => {
+      const userDefinedCallback = jest.fn();
+      const reactiveCallback = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(string()) accessor x = "A";
+        static get observedAttributes(): string[] {
+          return ["y"];
+        }
+        attributeChangedCallback(name: string): void {
+          userDefinedCallback(this, name);
+        }
+        @reactive({ initial: false }) test() {
+          reactiveCallback(this);
+        }
+      }
+      const el = new Test();
+      el.setAttribute("x", "B");
+      el.setAttribute("y", "B");
+      expect(userDefinedCallback).toBeCalledTimes(1);
+      expect(userDefinedCallback.mock.calls).toEqual([[el, "y"]]);
+      expect(reactiveCallback).toBeCalledTimes(1);
+      expect(reactiveCallback.mock.calls).toEqual([[el]]);
     });
 
     test("no cross-instance effects", async () => {
@@ -113,7 +137,6 @@ describe("Decorators", () => {
       expect(el.x).toBe("B");
       expect(el.getAttribute("x")).toBe(null);
       el.setAttribute("x", "C");
-      await tick(); // Attribute reactions are async
       expect(el.x).toBe("B");
       expect(el.getAttribute("x")).toBe("C");
     });
@@ -130,7 +153,6 @@ describe("Decorators", () => {
       expect(el.x).toBe("B");
       expect(el.getAttribute("y")).toBe("B");
       el.setAttribute("y", "C");
-      await tick(); // Attribute reactions are async
       expect(el.x).toBe("C");
       expect(el.getAttribute("y")).toBe("C");
     });
@@ -200,12 +222,11 @@ describe("Decorators", () => {
         }
       }
       new Test();
-      await tick(); // Initial call must be delayed
       expect(spy).toBeCalledTimes(1);
       expect(spy.mock.calls).toEqual([["A"]]);
     });
 
-    test("prop changes trigger @reactive", async () => {
+    test("prop change", async () => {
       const spy = jest.fn();
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -322,7 +343,6 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.setAttribute("x", "B");
-      await tick(); // Attribute reactions are async
       expect(spy).toBeCalledTimes(2); // initial + one update
       expect(spy.mock.calls).toEqual([["A"], ["B"]]);
     });
@@ -341,6 +361,21 @@ describe("Decorators", () => {
       expect(spy).toBeCalledTimes(1); // one update
       expect(spy.mock.calls).toEqual([["B"]]);
     });
+
+    /*test("use on class fields", async () => {
+      const spy = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive() test = () => {
+          spy(this.x);
+        };
+      }
+      const el = new Test();
+      el.x = "B";
+      expect(spy).toBeCalledTimes(2);
+      expect(spy.mock.calls).toEqual([["A"], ["B"]]);
+    });*/
   });
 
   describe("@reactive + @debounce", () => {
@@ -357,6 +392,8 @@ describe("Decorators", () => {
       el.x = "B";
       el.x = "C";
       el.x = "D";
+      expect(spy).toBeCalledTimes(1); // initial
+      expect(spy.mock.calls).toEqual([["A"]]);
       await wait(25);
       expect(spy).toBeCalledTimes(2); // initial + one update
       expect(spy.mock.calls).toEqual([["A"], ["D"]]);

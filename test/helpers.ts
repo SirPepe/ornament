@@ -1,5 +1,3 @@
-export const tick = () => new Promise<unknown>((r) => requestAnimationFrame(r));
-
 export const wait = (t = 0) => new Promise<unknown>((r) => setTimeout(r, t));
 
 // Classes that extend HTMLElement must be registered as custom elements in
