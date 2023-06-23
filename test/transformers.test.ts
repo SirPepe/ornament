@@ -29,11 +29,9 @@ describe("Transformers", () => {
       expect(el.foo).toBe("A");
       expect(el.getAttribute("foo")).toBe("A");
       el.setAttribute("foo", "B");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe("B");
       expect(el.getAttribute("foo")).toBe("B");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe("");
       expect(el.getAttribute("foo")).toBe(null);
       el.foo = "A";
@@ -57,7 +55,6 @@ describe("Transformers", () => {
       el.foo = "Hello";
       expect(el.getAttribute("foo")).toBe("Hello");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe("default");
     });
 
@@ -71,7 +68,6 @@ describe("Transformers", () => {
       el.foo = "Hello";
       expect(el.getAttribute("foo")).toBe("Hello");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe("");
       el.foo = "Hello";
       expect(el.foo).toBe("Hello");
@@ -91,10 +87,8 @@ describe("Transformers", () => {
       el.foo = "";
       expect(el.foo).toBe("http://localhost/");
       el.setAttribute("foo", "asdf");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe("http://localhost/asdf");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe("");
       el.foo = "https://example.com/asdf/";
       expect(el.foo).toBe("https://example.com/asdf/");
@@ -149,18 +143,14 @@ describe("Transformers", () => {
       expect(el.foo).toBe(1);
       expect(el.getAttribute("foo")).toBe("1");
       el.setAttribute("foo", "2");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(2);
       el.setAttribute("foo", "2.22");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(2.22);
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(0);
       expect(el.getAttribute("foo")).toBe(null);
       el.foo = 3;
       el.setAttribute("foo", "asdf");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(0);
     });
 
@@ -174,7 +164,6 @@ describe("Transformers", () => {
         el.foo = -1;
       }).toThrow();
       el.setAttribute("foo", "22");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(10);
     });
 
@@ -187,7 +176,6 @@ describe("Transformers", () => {
       el.foo = 8;
       expect(el.getAttribute("foo")).toBe("8");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(7);
     });
 
@@ -201,7 +189,6 @@ describe("Transformers", () => {
       el.foo = 7;
       expect(el.getAttribute("foo")).toBe("7");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(0);
       el.foo = 7;
       expect(el.foo).toBe(7);
@@ -223,16 +210,12 @@ describe("Transformers", () => {
       expect(el.foo).toBe(1n);
       expect(el.getAttribute("foo")).toBe("1");
       el.setAttribute("foo", "2");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(2n);
       el.setAttribute("foo", "2.75");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(0n);
       el.setAttribute("foo", "3");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(3n);
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(0n);
     });
 
@@ -246,7 +229,6 @@ describe("Transformers", () => {
         el.foo = -1n;
       }).toThrow();
       el.setAttribute("foo", "22");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(10n);
     });
 
@@ -259,7 +241,6 @@ describe("Transformers", () => {
       el.foo = 8n;
       expect(el.getAttribute("foo")).toBe("8");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(7n);
     });
 
@@ -273,7 +254,6 @@ describe("Transformers", () => {
       el.foo = 7n;
       expect(el.getAttribute("foo")).toBe("7");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(0n);
       el.foo = 7n;
       expect(el.foo).toBe(7n);
@@ -295,13 +275,10 @@ describe("Transformers", () => {
       expect(el.foo).toBe(true);
       expect(el.getAttribute("foo")).toBe("");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(false);
       el.setAttribute("foo", "whatever");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(true);
       el.setAttribute("foo", "");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe(true);
       el.foo = 0 as any;
       expect(el.foo).toBe(false);
@@ -345,15 +322,12 @@ describe("Transformers", () => {
         el.foo = "C";
       }).toThrow();
       el.setAttribute("foo", "A");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe("A");
       expect(el.getAttribute("foo")).toBe("A");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe("A");
       expect(el.getAttribute("foo")).toBe(null);
       el.setAttribute("foo", "C");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe("A");
       expect(el.getAttribute("foo")).toBe("C");
     });
@@ -368,7 +342,6 @@ describe("Transformers", () => {
       el.foo = "B";
       expect(el.getAttribute("foo")).toBe("B");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe("C");
     });
 
@@ -383,7 +356,6 @@ describe("Transformers", () => {
       el.foo = "C";
       expect(el.getAttribute("foo")).toBe("C");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toBe("A");
       el.foo = "B";
       expect(el.foo).toBe("B");
@@ -409,15 +381,12 @@ describe("Transformers", () => {
         el.foo = "Hello" as any;
       }).toThrow(TypeError);
       el.setAttribute("foo", "whatever");
-      await tick(); // attribute reactions are async
       expect(el.foo).toEqual({ user: "", email: "" });
       expect(el.getAttribute("foo")).toBe("whatever");
       el.removeAttribute("foo");
-      await tick(); // attribute reactions are async
       expect(el.foo).toEqual({ user: "", email: "" });
       expect(el.getAttribute("foo")).toBe(null);
       el.setAttribute("foo", `{ "foo": 42 }`);
-      await tick(); // attribute reactions are async
       expect(el.foo).toEqual({ foo: 42 });
       expect(el.getAttribute("foo")).toBe(`{ "foo": 42 }`);
     });
@@ -491,7 +460,6 @@ describe("Transformers", () => {
       }
       const el = new Test();
       el.setAttribute("onfoo", "globalThis.fnForEventHandlerAttrTest(event)");
-      await tick(); // attribute reactions are async
       expect(el.onfoo?.toString()).toContain(
         "globalThis.fnForEventHandlerAttrTest(event)"
       );
@@ -499,7 +467,6 @@ describe("Transformers", () => {
       el.dispatchEvent(evt1);
       expect(spy.mock.calls).toEqual([[evt1]]);
       el.removeAttribute("onfoo");
-      await tick(); // attribute reactions are async
       expect(el.onfoo).toBe(null);
       el.dispatchEvent(new Event("foo"));
       expect(spy.mock.calls).toEqual([[evt1]]);
@@ -518,7 +485,6 @@ describe("Transformers", () => {
         "onfoo",
         "globalThis.fnForEventHandlerAttrAndPropTest(event)"
       );
-      await tick(); // attribute reactions are async
       expect(el.onfoo?.toString()).toContain(
         "globalThis.fnForEventHandlerAttrAndPropTest(event)"
       );
@@ -533,7 +499,6 @@ describe("Transformers", () => {
       el.dispatchEvent(evt2);
       expect(spy.mock.calls).toEqual([[evt1], [evt2]]);
       el.removeAttribute("onfoo");
-      await tick(); // attribute reactions are async
       expect(el.onfoo).toBe(null);
     });
 
@@ -595,7 +560,6 @@ describe("Transformers", () => {
       const el = new Test();
       el.setAttribute("onspecialevent", "return false");
       el.setAttribute("onnormalevent", "return 42");
-      await tick(); // attribute reactions are async
       el.dispatchEvent(new MyEvent("specialevent"));
       el.dispatchEvent(new MyEvent("normalevent"));
       await tick();

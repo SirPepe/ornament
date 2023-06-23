@@ -4,7 +4,7 @@
 
 import { attr, debounce, define, prop, reactive } from "../src/decorators";
 import { href, string } from "../src/transformers";
-import { generateTagName, tick, wait } from "./helpers";
+import { generateTagName, noop, tick, wait } from "./helpers";
 
 describe("Decorators", () => {
   describe("@define", () => {
@@ -71,9 +71,33 @@ describe("Decorators", () => {
       expect(el.x).toBe("B");
       expect(el.getAttribute("x")).toBe("B");
       el.setAttribute("x", "C");
-      await tick(); // Attribute reactions are async
       expect(el.x).toBe("C");
       expect(el.getAttribute("x")).toBe("C");
+    });
+
+    test("user-defined attribute handling keeps working", async () => {
+      const userDefinedCallback = jest.fn();
+      const reactiveCallback = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(string()) accessor x = "A";
+        static get observedAttributes(): string[] {
+          return ["y"];
+        }
+        attributeChangedCallback(name: string): void {
+          userDefinedCallback(this, name);
+        }
+        @reactive() test() {
+          reactiveCallback(this);
+        }
+      }
+      const el = new Test();
+      el.setAttribute("x", "B");
+      el.setAttribute("y", "B");
+      expect(userDefinedCallback).toBeCalledTimes(1);
+      expect(userDefinedCallback.mock.calls).toEqual([[el, "y"]]);
+      expect(reactiveCallback).toBeCalledTimes(1);
+      expect(reactiveCallback.mock.calls).toEqual([[el]]);
     });
 
     test("no cross-instance effects", async () => {
@@ -113,7 +137,6 @@ describe("Decorators", () => {
       expect(el.x).toBe("B");
       expect(el.getAttribute("x")).toBe(null);
       el.setAttribute("x", "C");
-      await tick(); // Attribute reactions are async
       expect(el.x).toBe("B");
       expect(el.getAttribute("x")).toBe("C");
     });
@@ -130,7 +153,6 @@ describe("Decorators", () => {
       expect(el.x).toBe("B");
       expect(el.getAttribute("y")).toBe("B");
       el.setAttribute("y", "C");
-      await tick(); // Attribute reactions are async
       expect(el.x).toBe("C");
       expect(el.getAttribute("y")).toBe("C");
     });
@@ -200,12 +222,12 @@ describe("Decorators", () => {
         }
       }
       new Test();
-      await tick(); // Initial call must be delayed
+      await tick(); // Await initial invocation
       expect(spy).toBeCalledTimes(1);
       expect(spy.mock.calls).toEqual([["A"]]);
     });
 
-    test("prop changes trigger @reactive", async () => {
+    test("prop changes trigger @reactive immediately", async () => {
       const spy = jest.fn();
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -215,9 +237,24 @@ describe("Decorators", () => {
         }
       }
       const el = new Test();
-      el.x = "B";
+      el.x = "B"; // no await required, setter preempts initial call
       expect(spy).toBeCalledTimes(2); // initial + one update
       expect(spy.mock.calls).toEqual([["A"], ["B"]]);
+    });
+
+    test("prop reads trigger @reactive immediately", async () => {
+      const spy = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive() test() {
+          spy(this.x);
+        }
+      }
+      const el = new Test();
+      noop(el.x); // no await required, getter preempts initial call
+      expect(spy).toBeCalledTimes(1); // initial
+      expect(spy.mock.calls).toEqual([["A"]]);
     });
 
     test("two prop changes", async () => {
@@ -321,8 +358,8 @@ describe("Decorators", () => {
         }
       }
       const el = new Test();
+      await tick(); // Await initial invocation
       el.setAttribute("x", "B");
-      await tick(); // Attribute reactions are async
       expect(spy).toBeCalledTimes(2); // initial + one update
       expect(spy.mock.calls).toEqual([["A"], ["B"]]);
     });
@@ -337,6 +374,7 @@ describe("Decorators", () => {
         }
       }
       const el = new Test();
+      await tick(); // Await initial invocation (that should NOT happen here)
       el.x = "B";
       expect(spy).toBeCalledTimes(1); // one update
       expect(spy.mock.calls).toEqual([["B"]]);

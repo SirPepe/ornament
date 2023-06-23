@@ -125,32 +125,42 @@ are better off with a true framework like [lit](https://lit.dev/).
 
 ## Notable deviations from standard behavior
 
-1. Schleifchen implements attribute change handling via MutationObservers and
-   not via the usual `attributeChangedCallback()`. This means that attribute
-   updates are noticeably asynchronous, which is very different from how
-   build-in elements behave. This is due to the fact that it is hard (and
-   probably a bad idea) to have accessor decorators modify other class members
-   such as the `attributeChangedCallback()`. MutationObservers are a simpler and
-   much more elegant solution, but one with observable differences from the
-   standard behavior.
-2. Schleifchen's built-in transformers perform a little bit more opinionated
-   handholding that is usual for built-in elements. For example, the
-   [number transformer](#transformernumberoptions) never returns NaN, but
-   instead falls back to the accessor's initial value if it encounters an
-   invalid value. If this bothers you, don't worry: building your own
-   transformers is (somewhat) easy!
+Schleifchen's built-in transformers perform a little bit more opinionated
+handholding that is usual for built-in elements. For example, the
+[number transformer](#transformer-numberoptions) never returns NaN, but instead
+falls back to the accessor's initial value if it encounters an invalid value. If
+this bothers you, don't worry: building your own transformers is easy!
 
 ## Decorators
 
 ### `@define(tagName)`
 
-Class decorator to register a class as a custom element:
+Class decorator to register a class as a custom element. This also sets up
+attribute observation for use with [@attr()](#attrtransformer-options);
 
 ```javascript
 import { define } from "@sirpepe/schleifchen"
 
 @define("test-element")
 class Test extends HTMLElement {}
+```
+
+### `@enhance()`
+
+Class decorator to sets up attribute observation for use with
+[@attr()](#attrtransformer-options), but without also registering the class as
+a custom element. Use this in place of [@define()](#definetagname) in case you
+want to deal with the custom element registry yourself and only need to get
+`@attr()` working.
+
+```javascript
+import { enhance } from "@sirpepe/schleifchen"
+
+@enhance()
+class Test extends HTMLElement {}
+
+// manually register the element
+window.customElements.define("test-element", Test);
 ```
 
 ### `@prop(transformer)`
@@ -169,7 +179,7 @@ import { define, prop, number } from "@sirpepe/schleifchen"
 
 @define("test-element")
 class Test extends HTMLElement {
-  // Applies the number transformer to ensure that new values are always numbers
+  // Applies the number transformer to ensure that foo is always a number
   @prop(number()) accessor foo = 23;
 
   // Automatically runs when "foo" (or any accessor decorated with @prop() or
@@ -189,6 +199,10 @@ testEl.foo = "asdf"; // throw exception (thanks to the number transformer)
 Accessors defined with `@prop()` wor as a JavaScript-only API. Values can only
 be accessed through the accessor's getter, invalid values are rejected with
 exceptions. `@prop()` can be used on private accessors.
+
+Note that you can still define your own accessors, getters, setters etc. as you
+would usually do. They will still work as expected, but they will not cause
+`@reactive()` methods to run.
 
 ### `@attr(transformer, options?)`
 
@@ -232,6 +246,11 @@ way (ie without throwing exceptions). Values can also be accessed through the
 IDL property's accessor, where invalid values *are* rejected with exceptions.
 `@attr()` can *not* be used on private accessors or symbols.
 
+Note that you can still define your own attribute handling with
+`attributeChangedCallback()` and `static get observedAttributes()` as you would
+usually do. This will keep working work as expected, but changes to such
+attributes will not cause `@reactive()` methods to run.
+
 #### Options for `@attr()`
 
 - **`as` (string, optional)**: Sets an attribute name different from the accessor's name, similar to how the `class` content attribute works for the `className` IDL attribute on built-in elements. If `as` is not set, the content attribute's name will be equal to the accessor's name.
@@ -263,6 +282,11 @@ testEl.bar = 2;
 // then logs "foo is now 1, bar is now 2"
 ```
 
+Unless the `initial` option is set to `false` the decorated method will run once
+on initialization of all accessors that it depends upon. This happens
+synchronously if any of the relevant accessors are read or set, or on the next
+microtask of none of the accessors get touched.
+
 In many cases you may want to apply `@reactive()` to methods decorated with
 [@debounce()](#reactiveoptions) to prevent excessive calls.
 
@@ -292,7 +316,7 @@ el.test(3);
 
 **Note for TypeScript:** Debouncing a method or class field function makes it
 impossible for the method/function to return anything but `undefined`.
-TypeScript does currently not allow decorators to modify its targets type, so
+TypeScript does currently not allow decorators to modify its target's type, so
 `@debounce()` can't do that. If you apply `@debounce()` to a method
 `(x: number) => number`, TypeScript will keep using this signature, even though
 the decorated method will no longer be able to return anything but `undefined`.
@@ -445,8 +469,8 @@ attribute is set to `undefined`.
 
 #### Options for `int()`
 
-- **`min` (bigint, optional)**: Smallest possible value. Defaults to the maximum possible bigint value. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception.
-- **`max` (bigint, optional)**: Largest possible value. Defaults to the minimum possible bigint value. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception.
+- **`min` (bigint, optional)**: Smallest possible value. Defaults to the minimum possible bigint value. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception.
+- **`max` (bigint, optional)**: Largest possible value. Defaults to the maximum possible bigint value. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception.
 
 ### Transformer `boolean()`
 
@@ -486,7 +510,7 @@ class Test extends HTMLElement {
 
 In this case, the content attribute can be set to any value (as is usual in
 HTML), but if the content attribute gets set to a value other than `A` or `B`,
-the IDL attribute's  value will remain unchanged. Any attempt at setting the
+the IDL attribute's value will remain unchanged. Any attempt at setting the
 IDL attribute to values other than `A` or `B` will result in an exception.
 
 The default value is either the value the accessor was initialized with or, if
@@ -598,8 +622,8 @@ not debounced.
 
 ### Rendering shadow DOM
 
-Schleifchen does not concern itself with rendering Shadow DOM, but you can
-combine Schleifchen with suitable libraries such as
+Schleifchen does not directly concern itself with rendering Shadow DOM, but you
+can combine Schleifchen with suitable libraries such as
 [uhtml](https://github.com/WebReflection/uhtml):
 
 ```javascript
