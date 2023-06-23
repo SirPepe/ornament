@@ -42,11 +42,5 @@
   },
   "dependencies": {
     "zod": "^3.21.4"
-  },
-  "release-it": {
-    "github": {
-      "release": true,
-      "autoGenerate": true
-    }
   }
 }
