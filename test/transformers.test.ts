@@ -5,7 +5,7 @@
 import { attr, define, prop } from "../src/decorators";
 import {
   boolean,
-  eventHandler,
+  event,
   href,
   int,
   literal,
@@ -421,7 +421,7 @@ describe("Transformers", () => {
       expect(() => {
         @define(generateTagName())
         class Test extends HTMLElement {
-          @attr(eventHandler())
+          @attr(event())
           accessor foo: ((evt: Event) => void) | null = null;
         }
         new Test();
@@ -432,14 +432,14 @@ describe("Transformers", () => {
       const spy = jest.fn();
       @define(generateTagName())
       class Test extends HTMLElement {
-        @attr(eventHandler())
+        @attr(event())
         accessor onfoo: ((evt: Event) => void) | null = null;
       }
       const el = new Test();
       expect(el.onfoo).toBe(null);
-      const handler = (evt: Event) => spy(evt);
-      el.onfoo = handler;
-      expect(el.onfoo).toBe(handler);
+      const eventHandler = (evt: Event) => spy(evt);
+      el.onfoo = eventHandler;
+      expect(el.onfoo).toBe(eventHandler);
       expect(el.getAttribute("onfoo")).toBe(null);
       el.dispatchEvent(new Event("foo"));
       expect(spy).toHaveBeenCalledTimes(1);
@@ -455,7 +455,7 @@ describe("Transformers", () => {
       (globalThis as any).fnForEventHandlerAttrTest = spy;
       @define(generateTagName())
       class Test extends HTMLElement {
-        @attr(eventHandler())
+        @attr(event())
         accessor onfoo: ((evt: Event) => void) | null = null;
       }
       const el = new Test();
@@ -477,7 +477,7 @@ describe("Transformers", () => {
       (globalThis as any).fnForEventHandlerAttrAndPropTest = spy;
       @define(generateTagName())
       class Test extends HTMLElement {
-        @attr(eventHandler())
+        @attr(event())
         accessor onfoo: ((evt: Event) => void) | null = null;
       }
       const el = new Test();
@@ -509,7 +509,7 @@ describe("Transformers", () => {
       (globalThis as any).fnForEventHandlerOrderTest = e2;
       @define(generateTagName())
       class Test extends HTMLElement {
-        @attr(eventHandler())
+        @attr(event())
         accessor onfoo: ((evt: Event) => void) | null = null;
       }
       const el = new Test();
@@ -553,7 +553,7 @@ describe("Transformers", () => {
       }
       @define(generateTagName())
       class Test extends HTMLElement {
-        @attr(eventHandler())
+        @attr(event())
         accessor onspecialevent: ((evt: MyEvent) => void) | null = null;
         accessor onnormalevent: ((evt: MyEvent) => void) | null = null;
       }

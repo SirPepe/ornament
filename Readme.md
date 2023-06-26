@@ -540,7 +540,7 @@ non-objects throws TypeErrors. Note that this transformer is really just a
 wrapper around `JSON.parse()` and `JSON.stringify()` without any object
 validation.
 
-### Transformer `eventHandler()`
+### Transformer `event()`
 
 Implements old-school inline event handler attributes in the style of
 `onclick="console.log(42)"`. To work properly, this should only be used in
@@ -552,7 +552,7 @@ import { define, attr, eventHandler } from "@sirpepe/schleifchen";
 
 @define("test-element")
 class Test extends HTMLElement {
-  @attr(eventHandler()) accessor onfoo: ((evt: Event) => void) | null = null;
+  @attr(event()) accessor onfoo: ((evt: Event) => void) | null = null;
 }
 ```
 
@@ -577,7 +577,7 @@ testEl.dispatchEvent(new Event("foo"));
 
 Regular "proper" `addEventListener()` is obviously also always available.
 
-It should be noted that for build-in events that bubble, inline event handlers
+It should be noted that for built-in events that bubble, inline event handlers
 can be added to *any* element in order to facilitate event delegation. These
 event handlers are considered global event handlers, and all custom inline event
 handlers are obviously not global - they can only be used on the components that

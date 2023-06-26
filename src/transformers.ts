@@ -325,7 +325,7 @@ type HandlerTransform<T extends HTMLElement, E extends Event> = Transformer<
 >;
 /* eslint-enable */
 
-export function eventHandler<
+export function event<
   T extends HTMLElement,
   E extends Event
 >(): HandlerTransform<T, E> {

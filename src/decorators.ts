@@ -14,45 +14,51 @@ import type {
 // by a given element.
 const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 
-// Map of attribute to handling callbacks mapped by element. This can be used in
-// the actual attributeChangedCallback to decide whether an attribute reaction
+// Map of attribute to handling callbacks mapped by element. The mixin classes
+// actual attributeChangedCallback to decide whether an attribute reaction
 // must run an effect defined by @attr().
 type AttributeChangedCallback = (
   name: string,
   oldValue: string | null,
   newValue: string | null
 ) => void;
-type CallbackMap = Map<string, AttributeChangedCallback>;
+type CallbackMap = Map<string, AttributeChangedCallback>; // attr name -> cb
 const OBSERVER_CALLBACKS_BY_INSTANCE = new WeakMap<HTMLElement, CallbackMap>();
 
-// Maps custom element classes to a list of callbacks that trigger their
-// @reactive() method's initial calls (for methods that need such a call)
-const REACTIVE_INIT = new WeakMap<CustomElementConstructor, (() => any)[]>();
+// Maps custom elements to a list of callbacks that trigger their @reactive()
+// method's initial calls (for methods that need such a call)
+const REACTIVE_INIT_CALLBACKS = new WeakMap<HTMLElement, (() => any)[]>();
 
-// Set of instance that have had their reactivity initialize. Only elements in
-// this set receive reactivity events.
-const REACTIVE_INIT_DONE = new WeakSet<object>();
+// Set of instance that have had their reactivity initialize (by running their
+// constructor to completion). Only elements in this set receive reactivity
+// events. This enables setting properties in the constructor without triggering
+// @reactive()
+const REACTIVE_READY = new WeakSet<object>();
 
 // Maps debounced methods to original methods. Needed for initial calls of
 // @reactive() methods, which are not supposed to be async.
 const DEBOUNCED_METHOD_MAP = new WeakMap<Method<any, any>, Method<any, any>>();
 
 // Installs a mixin class that deals with attribute observation and reactive
-// init callback handling
-function installMixin(Ctor: any): any {
-  const originalObservedAttributes = Ctor.observedAttributes ?? [];
+// init callback handling.
+function mixin<T extends CustomElementConstructor>(Ctor: T): T {
+  const originalObservedAttributes = (Ctor as any).observedAttributes ?? [];
   const originalCallback = Ctor.prototype.attributeChangedCallback;
+
   return class SchleifchenMixin extends Ctor {
     constructor(...args: any[]) {
       super(...args);
-      REACTIVE_INIT.get(this.constructor as any)?.forEach((method) =>
-        method.call(this)
-      );
-      REACTIVE_INIT_DONE.add(this);
+      for (const callback of REACTIVE_INIT_CALLBACKS.get(this) ?? []) {
+        callback.call(this);
+      }
+      REACTIVE_INIT_CALLBACKS.delete(this);
+      REACTIVE_READY.add(this);
     }
+
     static get observedAttributes(): string[] {
       return [...originalObservedAttributes, ...ALL_OBSERVABLE_ATTRIBUTES];
     }
+
     attributeChangedCallback(
       this: HTMLElement,
       name: string,
@@ -80,26 +86,19 @@ const eventBus = new EventTarget();
 
 // Reactivity notifications for @reactive
 class ReactivityEvent extends Event {
-  #source: HTMLElement;
-  #key: string | symbol;
-
+  readonly source: HTMLElement;
+  readonly key: string | symbol;
   constructor(source: HTMLElement, key: string | symbol) {
     super("reactivity");
-    this.#source = source;
-    this.#key = key;
-  }
-
-  get source(): HTMLElement {
-    return this.#source;
-  }
-
-  get key(): string | symbol {
-    return this.#key;
+    this.source = source;
+    this.key = key;
   }
 }
 
 // The class decorator @define defines a custom element with a given tag name
-// and also patches the base class to make attribute observation possible.
+// and also injects the mixin class. This obviously changes this instance type
+// of the CustomElementConstructor T, but TS can't currently model this:
+// https://github.com/microsoft/TypeScript/issues/51347
 export function define<T extends CustomElementConstructor>(
   tagName: string
 ): (target: T, context: ClassDecoratorContext<T>) => T {
@@ -114,25 +113,24 @@ export function define<T extends CustomElementConstructor>(
       window.customElements.get(tagName) ??
         window.customElements.define(tagName, this);
     });
-    const constructor = installMixin(target);
-    REACTIVE_INIT.set(constructor, []);
-    return constructor;
+    return mixin(target);
   };
 }
 
-// Only proxy the target class to enable attribute observation and setup
-// reactivity initialization callbacks.
-export function enhance<T extends CustomElementConstructor>() {
+// Only add the mixin class to enable attribute observation and setup
+// reactivity initialization callbacks, without registering a tag name.
+export function enhance<T extends CustomElementConstructor>(): (
+  target: T,
+  context: ClassDecoratorContext<T>
+) => T {
   return function enhanceDecorator(
     target: T,
     context: ClassDecoratorContext<T>
-  ): void {
+  ): T {
     if (context.kind !== "class") {
       throw new TypeError(`Class decorator @enhance() used on ${context.kind}`);
     }
-    const constructor = installMixin(target);
-    REACTIVE_INIT.set(constructor, []);
-    return constructor;
+    return mixin(target);
   };
 }
 
@@ -180,25 +178,24 @@ export function reactive<T extends HTMLElement>(
     context.addInitializer(function () {
       // Register the callback that performs the initial method call
       if (initial) {
-        const ctor = this.constructor as CustomElementConstructor;
-        const callbacks = REACTIVE_INIT.get(ctor);
-        if (!callbacks) {
-          throw new Error(
-            "Unable to register initial method calls for @reactive() method. Did you forget to apply @define() or @enhance() to the component class?"
-          );
-        }
         const method = DEBOUNCED_METHOD_MAP.get(value) ?? value;
-        callbacks.push(() => {
+        const cb = () => {
           if (predicate.call(this, "*")) {
             method.call(this);
           }
-        });
+        };
+        const callbacks = REACTIVE_INIT_CALLBACKS.get(this);
+        if (callbacks) {
+          callbacks.push(cb);
+        } else {
+          REACTIVE_INIT_CALLBACKS.set(this, [cb]);
+        }
       }
       // Start listening for reactivity events that happen after reactive init
       eventBus.addEventListener("reactivity", (evt: any) => {
         if (
           evt.source === this &&
-          REACTIVE_INIT_DONE.has(this) &&
+          REACTIVE_READY.has(this) &&
           predicate.call(this, evt.key)
         ) {
           value.call(this);
