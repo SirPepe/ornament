@@ -1,18 +1,40 @@
 # Schleifchen 🎀
 
 A set of decorators and associated functions to make building vanilla web
-components a little less painful. Where you would previously have had to write
-the following boilerplate monstrosity:
+components a little less painful:
 
 ```javascript
-// The following code is *required* to create a new element with a single string
-// attribute that behaves like other string attributes on built-in elements (eg.
-// the id attribute)
+import { define, attr, string, reactive } from "@sirpepe/schleifchen"
 
+// Register the element with the specified tag name
+@define("greeter-element")
+class GreeterElement extends HTMLElement {
+
+  // Define a content attribute (eg. an attribute that works from HTML and via
+  // `setAttribute()` / `getAttribute()`) alongside a corresponding
+  // getter/setter pair for a JS api
+  @attr(string()) accessor name = "Anonymous";
+
+  // Mark the method as reactive to have it run every time the attribute "name"
+  // changes
+  @reactive() greet() {
+    console.log(`Hello ${this.name}`);
+  }
+}
+```
+
+The code above translates to the following boilerplate monstrosity:
+
+```javascript
 class GreeterElement extends HTMLElement {
   // Internal "name" state, initialized from the element's content attributes,
   // with a default value in case the content attribute is not set
-  #name = this.getAttribute("name") || "";
+  #name = this.getAttribute("name") || "Anonymous";
+
+  // Method to run each time `#name` changes
+  greet() {
+    console.log(`Hello ${this.name}`);
+  }
 
   // DOM getter for the IDL property, required to make JS operations like
   // `console.log(el.name)` work
@@ -22,24 +44,34 @@ class GreeterElement extends HTMLElement {
 
   // DOM setter for the IDL property with type checking and/or conversion *and*
   // attribute updates, required to make JS operations like `el.name = "Alice"`
-  // work
+  // work.
   set name(value) {
-    value = String(value);
+    value = String(value); // Remember to convert/check the type!
     this.#name = value;
-    this.setAttribute("name", value);
+    this.setAttribute("name", value); // Remember to sync the content attribute!
+    this.greet(); // Remember to run the method!
   }
 
   // Attribute change handling, required to make JS operations like
   // `el.setAttribute("name", "Bob")` update the internal element state
   attributeChangedCallback(name, oldValue, newValue) {
-    if (name === "name" && newValue !== this.#name) {
+    if (name === "name") {
+      // Because `#name` is a string, and attribute values are always strings as
+      // well we don't need to convert the types at this stage, but we still
+      // need to manually make sure that we fall back to "Anonymous" if the new
+      // value is null (if the attribute got removed) or if the value is
+      // (essentially) an empty string
+      if (newValue === null || newValue.trim() === "") {
+        newValue = "Anonymous";
+      }
       this.#name = newValue;
+      this.greet(); // Remember to run the method!
     }
   }
 
   // Required for attribute change monitoring to work
   static get observedAttributes() {
-    return ["name"];
+    return ["name"]; // remember to always keep this up to date
   }
 }
 
@@ -50,20 +82,11 @@ if (!window.customElements.has("greeter-element")) {
 }
 ```
 
-... you can now get away with just this:
-
-```javascript
-import { define, attr, string } from "@sirpepe/schleifchen"
-
-// Register the element
-@define("greeter-element")
-class GreeterElement extends HTMLElement {
-  // Define an accessor with an attribute decorator to get content attributes
-  // handling as well as IDL getter and setter creation for (in this case)
-  // arbitrary strings
-  @attr(string()) accessor name = "Anonymous";
-}
-```
+Depending on your use case, some of the above operations may not be strictly
+necessary but it all works together to create custom elements that behave
+*exactly* like built-in HTML elements. Such standards-compliant behavior ensures
+that the elements work with every software, framework and content management
+system - now and in the future.
 
 Schleifchen uses [the latest ECMAScript Decorators API](https://2ality.com/2022/10/javascript-decorators.html)
 as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
@@ -73,19 +96,20 @@ as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babe
 
 ## Scope
 
-Schleifchen is decidedly not a framework and its scope is strictly limited to
-only the most tedious bits of building standards-compliant web components:
-attribute and property handling.
+Schleifchen is *not* a framework and its scope is strictly limited to only the
+most tedious bits of building standards-compliant web components: attribute
+handling and reactions to attribute handling.
 
-Attributes have two faces: the *content attribute* and the *IDL attribute*.
-Content attributes are always strings and are defined either via HTML or via
-JavaScript methods like `setAttribute()`. IDL attributes (aka JavaScript
-properties) can be accessed via properties such as `someElement.foo` and may be
-of any type. Both faces of attributes need to be implemented for it to be truly
-compatible with any software out there - a JS frontend framework may work
-primarily with IDL attributes, while HTML authors or server-side rendering
-software will work with content attributes. Content and IDL attributes need to
-be synchronized, which can entail any of the following tasks:
+[To paraphrase MDN:](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes?retiredLocale=de#content_versus_idl_attributes)
+Attributes have two faces: the *content attribute* and the *IDL attribute* (also
+known as "JavaScript properties"). Content attributes are always strings and are
+defined either via HTML or via JavaScript methods like `setAttribute()`. IDL
+attributes can be accessed via properties such as `someElement.foo` and may be
+of any type. Both faces of attributes need to be implemented and properly synced
+up for an element to be truly compatible with any software out there - a JS
+frontend framework may work primarily with IDL attributes, while HTML authors or
+server-side rendering software will work with content attributes. Keeping
+content and IDL attributes in sync can entail any of the following tasks:
 
 - Updating the content attribute when the IDL attribute gets changed (eg. update the HTML attribute `id` when running `element.id = "foo"` in JS)
 - Updating the IDL attribute when the content attribute gets changed (eg. `element.id` should return `"bar"` after `element.setAttribute("id", "bar")`)
@@ -93,8 +117,9 @@ be synchronized, which can entail any of the following tasks:
 - Rejecting invalid types on the IDL setter (as opposed to converting types from content to IDL attributes which, like all of HTML, never throws an error)
 - Connecting IDL and content attributes with different names (like how the content attribute `class` maps to the IDL attribute `className`)
 - Fine-tuning the synchronization behavior depending on circumstances (see the interaction between the `value` content and IDL attributes on `<input>`)
+- Remembering to execute side effects (like updating Shadow DOM) when any IDL and/or content attribute changes
 
-This is all very annoying to write by hand, but because the above behavior is
+This is all *very* annoying to write by hand, but because the above behavior is
 more or less the same for all attributes, it is possible to to simplify the
 syntax quite a bit:
 
@@ -103,29 +128,35 @@ import { attr, number } from "@sirpepe/schleifchen"
 
 class MyElement extends HTMLElement {
   @attr(number({ min: -100, max: 100 })) accessor value = 0;
+  @reactive log() {
+    console.log(this.value);
+  }
 }
 ```
 
-The line starting with with `@attr` gets you a content and IDL attribute named
-`value`, which...
+The line starting with with `@attr` gets you a content and a matching IDL
+attribute named `value`, which...
 
 - Always reflects a number between `-100` and `100`
-- Initializes from the content attribute and falls back to the initializer value `0` if the attribute is missing
+- Initializes from the content attribute and falls back to the initializer value `0` if the attribute is missing or can't be interpreted as a number
 - Automatically updates the content attribute with the stringified value of the IDL attribute when the IDL attribute is updated
 - Automatically updates the IDL attribute when the content attribute is updated (it parses the attribute value into a number and clamps it to the specified range)
-- Implements getters and setters for the IDL attributes, with the getter always returning a number and the setter rejecting invalid values (non-numbers or numbers outside the specified range)
-- Causes @reactive() class methods to run on update (see [@reactive()](#reactiveoptions))
+- Implements getters and setters for the IDL attributes, with the getter always returning a number and the setter rejecting invalid values (non-numbers or numbers outside the specified range of `[-100, 100]`)
+- Causes the method marked @reactive() to run on update
 
 Schleifchen's decorators are meant to be easy to add, easy to extend, but also
-*very* easy to remove or replace with more complicated hand-written logic.
-Schleifchen still wants you to have full control over your components' behavior,
-just with less boilerplate. If you just want to turn off your brain, churn out
-components and keep praying for continued support of third-party software, you
-are better off with a true framework like [lit](https://lit.dev/).
+*very* easy to remove or replace with more complicated hand-written logic. They
+co-exist with eg. custom attribute change handling logic just fine. Schleifchen
+still wants you to have full control over your components' behavior, just with
+less *mandatory* boilerplate.
+
+If you just want to turn off your brain, churn out components and don't mind
+praying for continued support of third-party software that, you are better off
+with a true framework like [lit](https://lit.dev/).
 
 ## Notable deviations from standard behavior
 
-Schleifchen's built-in transformers perform a little bit more opinionated
+Schleifchen's built-in transformers perform a *tiny* bit more opinionated
 handholding that is usual for built-in elements. For example, the
 [number transformer](#transformer-numberoptions) never returns NaN, but instead
 falls back to the accessor's initial value if it encounters an invalid value. If
@@ -148,7 +179,7 @@ class Test extends HTMLElement {}
 ### `@enhance()`
 
 Class decorator to sets up attribute observation for use with
-[@attr()](#attrtransformer-options), but without also registering the class as
+[@attr()](#attrtransformer-options), but *without* also registering the class as
 a custom element. Use this in place of [@define()](#definetagname) in case you
 want to deal with the custom element registry yourself and only need to get
 `@attr()` working.
@@ -196,9 +227,10 @@ console.log(testEl.foo); // logs 42
 testEl.foo = "asdf"; // throw exception (thanks to the number transformer)
 ```
 
-Accessors defined with `@prop()` wor as a JavaScript-only API. Values can only
-be accessed through the accessor's getter, invalid values are rejected with
-exceptions. `@prop()` can be used on private accessors.
+Accessors defined with `@prop()` work as a *JavaScript-only API*. Values can
+only be accessed through the accessor's getter, invalid values are rejected by
+the setter with exceptions. `@prop()` can be used on private accessors or
+symbols.
 
 Note that you can still define your own accessors, getters, setters etc. as you
 would usually do. They will still work as expected, but they will not cause
@@ -206,9 +238,10 @@ would usually do. They will still work as expected, but they will not cause
 
 ### `@attr(transformer, options?)`
 
-The accessor decorator `@attr()` defines a IDL attribute with a matching content
-attribute on the custom element class. This results in something very similar to
-properties defined with `@prop()`, but with the following additional features:
+The accessor decorator `@attr()` defines an IDL attribute with a matching
+content attribute on the custom element class. This results in something very
+similar to accessors decorated with `@prop()`, but with the following additional
+features:
 
 - Its value can be initialized from a content attribute, if the attribute is present
 - Changes to the content attribute's value update the value of the IDL attribute to match (depending on the options and the transformer)
@@ -221,7 +254,7 @@ class Test extends HTMLElement {
   // Applies the number transformer to ensure that content attribute values get
   // parsed into numbers and that new non-number values passed to the IDL
   // attribute's setter get rejected
-  @attr(number()) accessor foo = 23;
+  @attr(number()) accessor foo = 23; // 23 = fallback value
 
   // Automatically runs when "foo" (or any accessor decorated with @prop() or
   // @attr()) changes
@@ -231,12 +264,14 @@ class Test extends HTMLElement {
 }
 
 document.body.innerHTML = `<test-element foo="42"></test-element>`;
-let testEl = document.body.children[0];
+let testEl = document.querySelector("test-element");
 console.log(testEl.foo); // logs 42 (initialized from the attribute)
 testEl.foo = 1337; // logs "Foo changed to 1337"
 console.log(testEl.foo); // logs 1337
 console.log(testEl.getAttribute("foo")); // logs "1337"
 testEl.foo = "asdf"; // throw exception (thanks to the number transformer)
+testEl.setAttribute("foo", "asdf") // works, content attributes can be any string
+console.log(testEl.foo); // logs 23 (fallback value)
 ```
 
 Accessors defined with `@attr()` works like all other supported attributes on
@@ -269,7 +304,7 @@ class Test extends HTMLElement {
   @prop(number()) accessor foo = 0;
   @prop(number()) accessor bar = 0;
 
-  @reactive({ initial: false }) log() {
+  @reactive({ initial: false }) log() { // note initial: false
     console.log(`foo is now ${this.foo}, bar is now ${this.bar}`);
   }
 }
@@ -283,9 +318,9 @@ testEl.bar = 2;
 ```
 
 Unless the `initial` option is set to `false` the decorated method will run once
-the element initializes. In many cases you may want to apply `@reactive()` to
-methods decorated with [@debounce()](#reactiveoptions) to prevent excessive
-calls.
+the element's constructor finishes. In many cases you may want to apply
+`@reactive()` to methods decorated with [@debounce()](#reactiveoptions) to
+prevent excessive calls.
 
 #### Options for `@reactive()`
 
@@ -299,16 +334,28 @@ Method and class field decorator for debouncing method/function invocation:
 
 ```javascript
 class Test extends HTMLElement {
-  @debounce() test(x) {
+  // Debounce a class method
+  @debounce() test1(x) {
+    console.log(x);
+  }
+  // Debounce a class field function
+  @debounce() test2 = (x) => {
     console.log(x);
   }
 }
-const el = new Test();
-el.test(1);
-el.test(2);
-el.test(3);
 
+const el = new Test();
+
+el.test1(1);
+el.test1(2);
+el.test1(3);
 // only logs "3"
+
+
+el.test2("a");
+el.test2("b");
+el.test2("c");
+// only logs "c"
 ```
 
 **Note for TypeScript:** Debouncing a method or class field function makes it
@@ -328,7 +375,11 @@ the decorated method will no longer be able to return anything but `undefined`.
 ## Transformers
 
 Transformers define how the accessor decorators `@attr()` and `@prop()`
-implement attribute and property handling. Their type signature is as follows:
+implement attribute and property handling. This includes converting content
+attributes from and to IDL attributes, type checks on IDL setters, and running
+side effects.
+
+A transformers's type signature is as follows:
 
 ```typescript
 export type Transformer<T extends HTMLElement, V> = {
@@ -343,9 +394,10 @@ export type Transformer<T extends HTMLElement, V> = {
   // the attribute representation of an accessor together with
   // updateAttrPredicate(). Must never throw.
   stringify: (this: T, value?: V | null) => string;
-  // Decides if, based on a new value, an attribute gets updated to match the
-  // new value (true/false) or removed (null). Defaults to a function that
-  // always returns true.
+  // Decides if, based on a new value, the content attribute gets updated to
+  // match the IDL attribute's new value (true/false) or if the content
+  // attribute gets removed (null). Defaults to a function that always returns
+  // true.
   updateAttrPredicate?: (this: T, value: V) => boolean | null;
   // Runs before accessor initialization and can be used to perform side effects
   // or to grab the accessors initial value as defined in the class.
@@ -356,7 +408,7 @@ export type Transformer<T extends HTMLElement, V> = {
     context: ClassAccessorDecoratorContext<T, V>
   ) => void;
   // Runs before an accessor's setter sets a new value and can be used to
-  // perform side effects
+  // perform side effects.
   beforeSetCallback?: (
     this: T,
     value: V,
@@ -365,8 +417,11 @@ export type Transformer<T extends HTMLElement, V> = {
 };
 ```
 
-If you want to extend Schleifchen, you should simply clone one of the built-in
-transformers and modify it to your liking!
+Because transformers need to potentially do a lot of type juggling and
+bookkeeping, they are somewhat tricky to get right, but they are also always
+only a few self-contained lines of code. If you want to extend Schleifchen, you
+should simply clone one of the built-in transformers and modify it to your
+liking!
 
 ### Transformer `string()`
 
@@ -383,11 +438,11 @@ class Test extends HTMLElement {
 ```
 
 In this case, the property `foo` always represents a string. Any non-string
-value gets converted to strings. When used with `@attr()`, if the content
-attribute gets removed, the value that was used to initialize the accessor (in
-this case `"default value"`) is returned. The same happens when the IDL
-attribute is set to `undefined`. If the accessor was not initialized with a
-value, the empty string is used.
+value gets converted to strings by the accessor's getter. When used with
+`@attr()`, if the content attribute gets removed, the value that was used to
+initialize the accessor (in this case `"default value"`) is returned. The same
+happens when the IDL attribute is set to `undefined`. If the accessor was not
+initialized with a value, the empty string is used.
 
 ### Transformer `href()`
 
@@ -405,7 +460,7 @@ class Test extends HTMLElement {
 let testEl = new Test();
 
 // Assuming that the page is served from localhost:
-console.log(testEl.foo); // > "http://localhost"
+console.log(testEl.foo); // > ""
 testEl.foo = "asdf"
 console.log(testEl.foo); // > "http://localhost/asdf"
 testEl.foo = "https://example.com/foo/bar/"
@@ -414,7 +469,7 @@ console.log(testEl.foo); // > "https://example.com/foo/bar/"
 
 ### Transformer `number(options?)`
 
-Implements a number attribute.
+Implements a number attribute with optional range constraints.
 
 ```javascript
 import { define, attr, number } from "@sirpepe/schleifchen"
@@ -612,10 +667,10 @@ el.value = 2;
 // Only logs "Value is now 3"
 ```
 
-The order of the decorators im important here: the method needs to be
-`@reactive()` needs to be applied to a method decorated with `@debounce()` for
-everything to work properly. The initial method call of a `reactive()` method is
-not debounced.
+The order of the decorators im important here: `@reactive()` *must* be applied
+to a method decorated with `@debounce()` for everything to work properly. The
+initial method call of a `reactive()` method is not debounced and will keep
+happening once the element's constructor runs to completion.
 
 ### Rendering shadow DOM
 
@@ -645,7 +700,7 @@ export class CounterElement extends HTMLElement {
 
 This component uses an event handler to update the decorated accessor `value`,
 which in turn causes the `@reactive()` method `#render()` to update the UI
-accordingly - debounced with `@debounce()` for batched updated.
+accordingly - debounced with `@debounce()` for batched updates.
 
 ### Read-only property
 
