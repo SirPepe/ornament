@@ -394,6 +394,9 @@ export type Transformer<T extends HTMLElement, V> = {
   // the attribute representation of an accessor together with
   // updateAttrPredicate(). Must never throw.
   stringify: (this: T, value?: V | null) => string;
+  // Optionally transforms a value before returned from the getter. Defaults to
+  // the identity function.
+  get?: (this: T, value: V) => V;
   // Decides if, based on a new value, the content attribute gets updated to
   // match the IDL attribute's new value (true/false) or if the content
   // attribute gets removed (null). Defaults to a function that always returns
