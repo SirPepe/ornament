@@ -1,7 +1,7 @@
 {
   "name": "@sirpepe/schleifchen",
   "version": "0.8.1",
-  "description": "",
+  "description": "A set of decorators and associated functions to make building vanilla web components a little less painful",
   "main": "dist/esm/index.js",
   "browser": "dist/min/index.min.js",
   "types": "dist/types",
@@ -13,8 +13,14 @@
     "prepareRelease": "rm -rf dist && npm run types && npm run lint && npm run test && npm run build",
     "release": "npm run prepareRelease && release-it"
   },
-  "author": "",
-  "license": "ISC",
+  "directories": {
+    "test": "test"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "peter@peterkroener.de",
+  "license": "MIT",
   "devDependencies": {
     "@babel/cli": "^7.22.5",
     "@babel/core": "^7.22.1",
