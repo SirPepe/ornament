@@ -1,6 +1,6 @@
 {
   "name": "@sirpepe/schleifchen",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "A set of decorators and associated functions to make building vanilla web components a little less painful",
   "main": "dist/esm/index.js",
   "browser": "dist/min/index.min.js",
