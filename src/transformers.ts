@@ -1,5 +1,9 @@
-import { transformerSchema, type Transformer } from "./types";
-import z from "zod";
+import {
+  type Transformer,
+  assertRecord,
+  assertTransformer,
+  assertType,
+} from "./types";
 
 export function string(): Transformer<HTMLElement, string> {
   const fallbackValues = new WeakMap<HTMLElement, string>();
@@ -32,19 +36,22 @@ export function href(): Transformer<HTMLElement, string> {
       if (value === null) {
         return "";
       }
-      const tmp = document.createElement("a");
-      tmp.href = String(value);
-      return tmp.href;
+      return String(value);
     },
     validate(value) {
-      const tmp = document.createElement("a");
-      if (valueInitialized.get(this)) {
-        tmp.href = String(value);
+      return String(value);
+    },
+    get(value) {
+      if (!valueInitialized.get(this)) {
+        return value;
       }
+      const tmp = document.createElement("a");
+      tmp.href = value;
       return tmp.href;
     },
-    beforeInitCallback() {
-      valueInitialized.set(this, true);
+    beforeSetCallback(_, rawValue) {
+      const setAsInit = rawValue !== null && typeof rawValue !== "undefined";
+      valueInitialized.set(this, setAsInit);
     },
     stringify: String,
   };
@@ -68,35 +75,27 @@ export function boolean(): Transformer<HTMLElement, boolean> {
   };
 }
 
-const numberOptionsSchema = z
-  .object({
-    min: z.number().optional(),
-    max: z.number().optional(),
-  })
-  .refine(
-    (value) => {
-      if (
-        typeof value.min === "number" &&
-        typeof value.max === "number" &&
-        value.min >= value.max
-      ) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "'Min' should be less than 'max'",
-    }
-  );
+type NumberOptions<T extends number | bigint | undefined> = {
+  min: T;
+  max: T;
+};
 
-type NumberOptions = z.infer<typeof numberOptionsSchema>;
+function numberOptions(input: unknown): NumberOptions<number> {
+  assertRecord(input, "options");
+  const { min = -Infinity, max = Infinity } = input as Record<any, any>;
+  assertType(min, "min", "number");
+  assertType(max, "max", "number");
+  if (min >= max) {
+    throw new RangeError(`Expected min to be be less than max`);
+  }
+  return { min, max };
+}
 
 export function number(
-  options: NumberOptions = {}
+  options: Partial<NumberOptions<number>> = {}
 ): Transformer<HTMLElement, number> {
   const fallbackValues = new WeakMap<HTMLElement, number>();
-  const { min = -Infinity, max = Infinity } =
-    numberOptionsSchema.parse(options);
+  const { min, max } = numberOptions(options);
   return {
     parse(value) {
       if (value === null) {
@@ -147,34 +146,22 @@ function isBigIntConvertible(
   );
 }
 
-const bigintOptionsSchema = z
-  .object({
-    min: z.bigint().optional(),
-    max: z.bigint().optional(),
-  })
-  .refine(
-    (value) => {
-      if (
-        typeof value.min === "bigint" &&
-        typeof value.max === "bigint" &&
-        value.min >= value.max
-      ) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "'min' should be less than 'max'",
-    }
-  );
-
-type BigIntOptions = z.infer<typeof bigintOptionsSchema>;
+function bigintOptions(input: unknown): NumberOptions<bigint | undefined> {
+  assertRecord(input, "options");
+  const { min, max } = input;
+  assertType(min, "min", "bigint", "undefined");
+  assertType(max, "max", "bigint", "undefined");
+  if (typeof min === "bigint" && typeof max === "bigint" && min >= max) {
+    throw new RangeError(`Expected "min" to be be less than "max"`);
+  }
+  return { min, max };
+}
 
 export function int(
-  options: BigIntOptions = {}
+  options: Partial<NumberOptions<bigint>> = {}
 ): Transformer<HTMLElement, bigint> {
   const fallbackValues = new WeakMap<HTMLElement, bigint>();
-  const { min, max } = bigintOptionsSchema.parse(options);
+  const { min, max } = bigintOptions(options);
   return {
     parse(value) {
       if (isBigIntConvertible(value)) {
@@ -215,26 +202,7 @@ export function int(
   };
 }
 
-function reportImmutable(): never {
-  throw new Error("Unable to perform update, object is immutable");
-}
-
-function immutable<T>(target: T): T {
-  if (typeof target === "object" && target !== null) {
-    return new Proxy(target, {
-      setPrototypeOf: reportImmutable,
-      preventExtensions: reportImmutable,
-      defineProperty: reportImmutable,
-      deleteProperty: reportImmutable,
-      set: reportImmutable,
-      get(target, property, receiver) {
-        return immutable(Reflect.get(target, property, receiver));
-      },
-    });
-  }
-  return target;
-}
-
+// TODO: any ersetzen
 export function record(): Transformer<HTMLElement, any> {
   const fallbackValues = new WeakMap<HTMLElement, any>();
   return {
@@ -242,45 +210,59 @@ export function record(): Transformer<HTMLElement, any> {
       try {
         const obj = JSON.parse(String(value));
         if (obj === null || typeof obj !== "object") {
-          return fallbackValues.get(this) ?? immutable({});
+          return fallbackValues.get(this);
         }
-        return immutable(obj);
+        return obj;
       } catch {
-        return fallbackValues.get(this) ?? immutable({});
+        return fallbackValues.get(this);
       }
     },
     validate(value) {
-      if (value === null || typeof value !== "object") {
-        throw new TypeError(`Expected object, got ${value || typeof value}`);
+      if (value === null) {
+        throw new TypeError(`Expected object, got "null"`);
       }
-      return immutable(value);
+      if (typeof value !== "object") {
+        throw new TypeError(`Expected object, got "${typeof value}"`);
+      }
+      return value;
     },
     stringify: JSON.stringify,
     beforeInitCallback(_, defaultValue) {
       if (typeof defaultValue === "object" && defaultValue !== null) {
-        fallbackValues.set(this, immutable(defaultValue));
+        fallbackValues.set(this, defaultValue);
       }
     },
   };
 }
-
-const literalOptionsSchema = z.object({
-  values: z.array(z.any()).nonempty(),
-  transformer: transformerSchema,
-});
 
 type LiteralOptions<T extends HTMLElement, V> = {
   values: V[];
   transformer: Transformer<T, V>;
 };
 
+function literalOptions<T extends HTMLElement, V>(
+  input: unknown
+): LiteralOptions<T, V> {
+  input = input ?? {};
+  assertRecord(input, "options");
+  const { values, transformer } = input as Record<any, any>;
+  assertTransformer<T, V>(transformer);
+  if (!Array.isArray(values)) {
+    throw new TypeError(
+      `Expected "values" to be array, got "${typeof values}".`
+    );
+  }
+  if (values.length === 0) {
+    throw new TypeError(`Expected "values" to not be empty`);
+  }
+  return { transformer, values };
+}
+
 export function literal<T extends HTMLElement, V>(
   inputOptions: LiteralOptions<T, V>
 ): Transformer<T, V> {
   const fallbackValues = new WeakMap<HTMLElement, V>();
-  const options = literalOptionsSchema.parse(inputOptions);
-  const validate = options.transformer.validate ?? options.transformer.parse;
-  const stringify = options.transformer.stringify ?? String;
+  const options = literalOptions<T, V>(inputOptions);
   return {
     parse(value) {
       const parsed = options.transformer.parse.call(this, value);
@@ -293,13 +275,15 @@ export function literal<T extends HTMLElement, V>(
       if (typeof value === "undefined") {
         return fallbackValues.get(this) ?? options.values[0];
       }
-      const validated = validate.call(this, value);
+      const validated = options.transformer.validate.call(this, value);
       if (options.values.includes(validated)) {
         return validated;
       }
-      throw new Error(`Invalid value: ${stringify.call(this, validated)}`);
+      throw new Error(
+        `Invalid value: ${options.transformer.stringify.call(this, validated)}`
+      );
     },
-    stringify,
+    stringify: options.transformer.stringify,
     beforeInitCallback(_, defaultValue) {
       if (options.values.includes(defaultValue)) {
         return fallbackValues.set(this, defaultValue);
@@ -372,7 +356,7 @@ export function event<
         this.addEventListener(context.name.slice(2), handler as any);
       }
     },
-    beforeSetCallback(value, context) {
+    beforeSetCallback(value, _, context) {
       // If either the new handler or the old handler are falsy, the event
       // handler must be detached and then re-attached to reflect the new firing
       // order of event handlers. If both the new and old handlers are

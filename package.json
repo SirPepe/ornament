@@ -39,8 +39,5 @@
     "release-it": "^15.11.0",
     "rollup": "^3.25.1",
     "typescript": "^5.0.4"
-  },
-  "dependencies": {
-    "zod": "^3.21.4"
   }
 }

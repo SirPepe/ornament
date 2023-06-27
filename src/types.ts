@@ -1,14 +1,3 @@
-import z from "zod";
-
-export const transformerSchema = z.object({
-  parse: z.function().args(z.unknown()),
-  validate: z.function().args(z.unknown()),
-  stringify: z.function().args(z.unknown()).returns(z.string()),
-  updateAttrPredicate: z.function().optional(),
-  beforeInitCallback: z.function().optional(),
-  beforeSetCallback: z.function().optional(),
-});
-
 export type Transformer<T extends HTMLElement, V> = {
   // parse() turns attribute values (usually string | null) into property
   // values. Must *never* throw exceptions, but always deal with its input in a
@@ -21,6 +10,9 @@ export type Transformer<T extends HTMLElement, V> = {
   // the attribute representation of an accessor together with
   // updateAttrPredicate(). Must never throw.
   stringify: (this: T, value?: V | null) => string;
+  // Optionally transforms a value before returned from the getter. Defaults to
+  // the identity function.
+  get?: (this: T, value: V) => V;
   // Decides if, based on a new value, an attribute gets updated to match the
   // new value (true/false) or removed (null). Defaults to a function that
   // always returns true.
@@ -38,6 +30,7 @@ export type Transformer<T extends HTMLElement, V> = {
   beforeSetCallback?: (
     this: T,
     value: V,
+    rawValue: unknown,
     context: ClassAccessorDecoratorContext<T, V>
   ) => void;
 };
@@ -60,3 +53,71 @@ export type FunctionFieldOrMethodDecorator_<T extends HTMLElement, A extends unk
   & ((value: Method<T, A>, context: ClassMethodDecoratorContext<T, Method<T, A>>) => Method<T, A>)
   & ((value: undefined, context: ClassFieldDecoratorContext<T, Method<unknown, A>>) => (init: Method<unknown, A>) => Method<unknown, A>);
 /* eslint-enable */
+
+type Types = {
+  string: string;
+  number: number;
+  bigint: bigint;
+  boolean: boolean;
+  symbol: symbol;
+  undefined: undefined;
+  object: object;
+  null: null;
+  function: (...args: any[]) => any;
+};
+
+export function assertRecord(
+  input: unknown,
+  name: string
+): asserts input is Record<any, any> {
+  if (typeof input !== "object") {
+    throw new TypeError(
+      `Expected "${name}" to be an object, got ${typeof input}`
+    );
+  }
+  if (input === null) {
+    throw new TypeError(`Expected "${name}" to be an object, got ${null}`);
+  }
+}
+
+export function assertType<K extends keyof Types>(
+  value: unknown,
+  name: string,
+  ...types: K[]
+): asserts value is Types[K] {
+  for (const type of types) {
+    if ((type === "null" && value === null) || typeof value === type) {
+      return;
+    }
+  }
+  throw new TypeError(
+    `Expected "${name}" to "${types.join("/")}" but got ${typeof value}`
+  );
+}
+
+export function assertPropType<K extends keyof Types>(
+  obj: any,
+  prop: string,
+  ...types: K[]
+): void {
+  for (const type of types) {
+    if ((type === "null" && obj[prop] === null) || typeof obj[prop] === type) {
+      return;
+    }
+  }
+  throw new TypeError(
+    `Expected "${prop}" to be "${types.join("/")}" but got ${typeof obj[prop]}`
+  );
+}
+
+export function assertTransformer<T extends HTMLElement, V>(
+  input: unknown
+): asserts input is Transformer<T, V> {
+  assertRecord(input, "transformer");
+  assertPropType(input, "parse", "function");
+  assertPropType(input, "validate", "function");
+  assertPropType(input, "validate", "function");
+  assertPropType(input, "updateAttrPredicate", "function", "undefined");
+  assertPropType(input, "beforeInitCallback", "function", "undefined");
+  assertPropType(input, "beforeSetCallback", "function", "undefined");
+}

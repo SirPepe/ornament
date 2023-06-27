@@ -218,9 +218,7 @@ export function attr<T extends HTMLElement, V>(
   transformer: Transformer<T, V>,
   options: AttrOptions = {}
 ): ClassAccessorDecorator<T, V> {
-  const parse = transformer.parse;
-  const validate = transformer.validate ?? transformer.parse;
-  const stringify = transformer.stringify ?? String;
+  const getTransform = transformer.get ?? ((x: V) => x);
   const isReflectiveAttribute = options.reflective !== false;
   const updateAttrPredicate = transformer.updateAttrPredicate ?? (() => true);
   return function ({ get, set }, context): ClassAccessorDecoratorResult<T, V> {
@@ -264,11 +262,11 @@ export function attr<T extends HTMLElement, V>(
           if (name !== attrName || newValue === oldValue) {
             return; // skip irrelevant invocations
           }
-          const value = parse.call(this, newValue);
+          const value = transformer.parse.call(this, newValue);
           if (value === get.call(this)) {
             return; // skip if new parsed value is equal to the old parsed value
           }
-          transformer.beforeSetCallback?.call(this, value, context);
+          transformer.beforeSetCallback?.call(this, value, newValue, context);
           set.call(this, value);
           eventBus.dispatchEvent(new ReactivityEvent(this, context.name));
         };
@@ -288,30 +286,33 @@ export function attr<T extends HTMLElement, V>(
       init(input) {
         const attrValue = this.getAttribute(attrName);
         if (attrValue !== null) {
-          const value = parse.call(this, attrValue);
+          const value = transformer.parse.call(this, attrValue);
           transformer.beforeInitCallback?.call(this, value, input, context);
           return value;
         }
-        const value = validate.call(this, input);
+        const value = transformer.validate.call(this, input);
         transformer.beforeInitCallback?.call(this, value, input, context);
         return value;
       },
       set(input) {
-        const newValue = validate.call(this, input);
-        transformer.beforeSetCallback?.call(this, newValue, context);
+        const newValue = transformer.validate.call(this, input);
+        transformer.beforeSetCallback?.call(this, newValue, input, context);
         set.call(this, newValue);
         if (isReflectiveAttribute) {
           const shouldUpdateAttr = updateAttrPredicate.call(this, newValue);
           if (shouldUpdateAttr === null) {
             this.removeAttribute(attrName);
           } else if (shouldUpdateAttr === true) {
-            this.setAttribute(attrName, stringify.call(this, newValue));
+            this.setAttribute(
+              attrName,
+              transformer.stringify.call(this, newValue)
+            );
           }
         }
         eventBus.dispatchEvent(new ReactivityEvent(this, context.name));
       },
       get() {
-        return get.call(this);
+        return getTransform.call(this, get.call(this));
       },
     };
   };
@@ -323,7 +324,7 @@ export function attr<T extends HTMLElement, V>(
 export function prop<T extends HTMLElement, V>(
   transformer: Transformer<T, V>
 ): ClassAccessorDecorator<T, V> {
-  const validate = transformer.validate ?? transformer.parse;
+  const getTransform = transformer.get ?? ((x: V) => x);
   return function ({ get, set }, context): ClassAccessorDecoratorResult<T, V> {
     if (context.kind !== "accessor") {
       throw new TypeError(`Accessor decorator @prop used on ${context.kind}`);
@@ -331,15 +332,15 @@ export function prop<T extends HTMLElement, V>(
     return {
       init(input) {
         transformer.beforeInitCallback?.call(this, input, input, context);
-        return validate.call(this, input);
+        return transformer.validate.call(this, input);
       },
       set(input) {
-        const newValue = validate.call(this, input);
+        const newValue = transformer.validate.call(this, input);
         set.call(this, newValue);
         eventBus.dispatchEvent(new ReactivityEvent(this, context.name));
       },
       get() {
-        return get.call(this);
+        return getTransform.call(this, get.call(this));
       },
     };
   };

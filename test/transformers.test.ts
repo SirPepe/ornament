@@ -84,10 +84,13 @@ describe("Transformers", () => {
       }
       const el = new Test();
       expect(el.foo).toBe("");
+      expect(el.getAttribute("foo")).toBe(null);
       el.foo = "";
       expect(el.foo).toBe("http://localhost/");
+      expect(el.getAttribute("foo")).toBe("");
       el.setAttribute("foo", "asdf");
       expect(el.foo).toBe("http://localhost/asdf");
+      expect(el.getAttribute("foo")).toBe("asdf");
       el.removeAttribute("foo");
       expect(el.foo).toBe("");
       el.foo = "https://example.com/asdf/";
@@ -390,33 +393,9 @@ describe("Transformers", () => {
       expect(el.foo).toEqual({ foo: 42 });
       expect(el.getAttribute("foo")).toBe(`{ "foo": 42 }`);
     });
-
-    test("top-level immutability", async () => {
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        @prop(record())
-        accessor foo = { user: "", email: "" };
-      }
-      const el = new Test();
-      expect(() => {
-        el.foo.user = "asdf";
-      }).toThrow();
-    });
-
-    test("deep-level immutability", async () => {
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        @prop(record())
-        accessor foo = { user: { email: "" } };
-      }
-      const el = new Test();
-      expect(() => {
-        el.foo.user.email = "asdf";
-      }).toThrow();
-    });
   });
 
-  describe("eventHandler()", () => {
+  describe("event()", () => {
     test("throw when used with an name without 'on' prefix", async () => {
       expect(() => {
         @define(generateTagName())
