@@ -56,6 +56,16 @@ function mixin<T extends CustomElementConstructor>(Ctor: T): T {
       REACTIVE_READY.add(this);
     }
 
+    get [Symbol.toStringTag](): string {
+      const stringTag = this.tagName
+        .split("-")
+        .map(
+          (part) => part.slice(0, 1).toUpperCase() + part.slice(1).toLowerCase()
+        )
+        .join("");
+      return "HTML" + stringTag + "Element";
+    }
+
     static get observedAttributes(): string[] {
       return [...originalObservedAttributes, ...ALL_OBSERVABLE_ATTRIBUTES];
     }

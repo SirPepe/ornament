@@ -166,9 +166,8 @@ this bothers you, don't worry: building your own transformers is easy!
 
 ### `@define(tagName?: string)`
 
-Class decorator to register a class as a custom element. This decorator also
-sets up attribute observation for use with [@attr()](#attrtransformer-options).
-The tag name can be derived from the classes name or can be passed manually.
+Class decorator to register a class as a custom element. The tag name for the
+custom element can be derived from the classes name or can be passed manually.
 
 ```javascript
 import { define } from "@sirpepe/schleifchen"
@@ -185,6 +184,21 @@ class TestElementBar extends HTMLElement {}
 Automatic tag names are created by turning the class name from camel case into
 kebab case. `TestElement` turns into `test-element`, `components4tThe_win` into
 `components-4-the-win` and so on.
+
+This decorator also sets up attribute observation for use with the
+[@attr()](#attrtransformer-options) decorator and it installs an automatic
+[string tag getter](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/toStringTag):
+
+```javascript
+import { define } from "@sirpepe/schleifchen"
+
+// Automatically derived tag name "myTest"
+@define()
+class MyTest extends HTMLElement {}
+const element = document.createElement("my-test");
+console.log(element.toString()); // "[object HTMLMyTestElement]"
+
+```
 
 ### `@prop(transformer)`
 

@@ -10,8 +10,11 @@ describe("Decorators", () => {
   describe("@define", () => {
     test("register element with automatically derived tag name", () => {
       @define()
-      class TestElement extends HTMLElement {}
-      expect(window.customElements.get("test-element")).toBe(TestElement);
+      class MyTest extends HTMLElement {}
+      expect(window.customElements.get("my-test")).toBe(MyTest);
+      expect(document.createElement("my-test").toString()).toEqual(
+        "[object HTMLMyTestElement]"
+      );
     });
 
     test("reject an invalid automatically derived tag name", () => {
