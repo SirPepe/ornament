@@ -176,24 +176,6 @@ import { define } from "@sirpepe/schleifchen"
 class Test extends HTMLElement {}
 ```
 
-### `@enhance()`
-
-Class decorator to sets up attribute observation for use with
-[@attr()](#attrtransformer-options), but *without* also registering the class as
-a custom element. Use this in place of [@define()](#definetagname) in case you
-want to deal with the custom element registry yourself and only need to get
-`@attr()` working.
-
-```javascript
-import { enhance } from "@sirpepe/schleifchen"
-
-@enhance()
-class Test extends HTMLElement {}
-
-// manually register the element
-window.customElements.define("test-element", Test);
-```
-
 ### `@prop(transformer)`
 
 The accessor decorator `@prop()` defines a IDL property on the custom element

@@ -117,23 +117,6 @@ export function define<T extends CustomElementConstructor>(
   };
 }
 
-// Only add the mixin class to enable attribute observation and setup
-// reactivity initialization callbacks, without registering a tag name.
-export function enhance<T extends CustomElementConstructor>(): (
-  target: T,
-  context: ClassDecoratorContext<T>
-) => T {
-  return function enhanceDecorator(
-    target: T,
-    context: ClassDecoratorContext<T>
-  ): T {
-    if (context.kind !== "class") {
-      throw new TypeError(`Class decorator @enhance() used on ${context.kind}`);
-    }
-    return mixin(target);
-  };
-}
-
 type ReactiveOptions<T extends HTMLElement> = {
   initial?: boolean;
   keys?: (string | symbol)[];
