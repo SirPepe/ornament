@@ -8,11 +8,31 @@ import { generateTagName, wait } from "./helpers";
 
 describe("Decorators", () => {
   describe("@define", () => {
-    test("register element", () => {
+    test("register element with automatically derived tag name", () => {
+      @define()
+      class TestElement extends HTMLElement {}
+      expect(window.customElements.get("test-element")).toBe(TestElement);
+    });
+
+    test("reject an invalid automatically derived tag name", () => {
+      expect(() => {
+        @define()
+        class asdf extends HTMLElement {}
+      }).toThrow();
+    });
+
+    test("register element with a manually provided tag name", () => {
       const tagName = generateTagName();
       @define(tagName)
       class Test extends HTMLElement {}
       expect(window.customElements.get(tagName)).toBe(Test);
+    });
+
+    test("reject an invalid manually provided tag name", () => {
+      expect(() => {
+        @define("invalid")
+        class Test extends HTMLElement {}
+      }).toThrow();
     });
   });
 

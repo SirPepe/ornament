@@ -164,17 +164,27 @@ this bothers you, don't worry: building your own transformers is easy!
 
 ## Decorators
 
-### `@define(tagName)`
+### `@define(tagName?: string)`
 
-Class decorator to register a class as a custom element. This also sets up
-attribute observation for use with [@attr()](#attrtransformer-options);
+Class decorator to register a class as a custom element. This decorator also
+sets up attribute observation for use with [@attr()](#attrtransformer-options).
+The tag name can be derived from the classes name or can be passed manually.
 
 ```javascript
 import { define } from "@sirpepe/schleifchen"
 
-@define("test-element")
-class Test extends HTMLElement {}
+// Automatically derived tag name "test-element-foo"
+@define()
+class TestElementFoo extends HTMLElement {}
+
+// Manually provided tag name
+@define("test-element-bar")
+class TestElementBar extends HTMLElement {}
 ```
+
+Automatic tag names are created by turning the class name from camel case into
+kebab case. `TestElement` turns into `test-element`, `components4tThe_win` into
+`components-4-the-win` and so on.
 
 ### `@prop(transformer)`
 

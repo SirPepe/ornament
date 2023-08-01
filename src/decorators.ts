@@ -5,6 +5,7 @@ import type {
   Method,
   Transformer,
 } from "./types";
+import { tagNameFromConstructor } from "./lib";
 
 // Accessor decorators initialize *after* custom elements access their
 // observedAttributes getter, so there is no way to associate observed
@@ -95,23 +96,33 @@ class ReactivityEvent extends Event {
   }
 }
 
-// The class decorator @define defines a custom element with a given tag name
-// and also injects the mixin class. This obviously changes this instance type
-// of the CustomElementConstructor T, but TS can't currently model this:
-// https://github.com/microsoft/TypeScript/issues/51347
+// The class decorator @define() defines a custom element. The tag name can
+// either be automatically derived from the class name or overridden manually.
+// The decorator also injects the mixin class. This obviously changes this
+// instance type of the CustomElementConstructor T, but TS can't currently model
+// this: https://github.com/microsoft/TypeScript/issues/51347
 export function define<T extends CustomElementConstructor>(
-  tagName: string
+  tagName?: string
 ): (target: T, context: ClassDecoratorContext<T>) => T {
-  if (!/[a-z]+-[a-z]+/i.test(tagName)) {
-    throw new Error(`Invalid custom element tag name "${tagName}"`);
-  }
   return function (target: T, context: ClassDecoratorContext<T>): T {
     if (context.kind !== "class") {
       throw new TypeError(`Class decorator @define() used on ${context.kind}`);
     }
+    if (!tagName) {
+      const fromConstructor = tagNameFromConstructor(target);
+      if (!fromConstructor) {
+        throw new Error(
+          "Failed to derive custom element tag name from class name. Explicitly pass a tag name to @define() to fix this error"
+        );
+      }
+      tagName = fromConstructor;
+    }
+    if (!/[a-z]+-[a-z]+/i.test(tagName)) {
+      throw new Error(`Invalid custom element tag name "${tagName}"`);
+    }
     context.addInitializer(function () {
-      window.customElements.get(tagName) ??
-        window.customElements.define(tagName, this);
+      window.customElements.get(tagName as string) ??
+        window.customElements.define(tagName as string, this);
     });
     return mixin(target);
   };
