@@ -10,13 +10,13 @@ import { tagNameFromConstructor } from "./lib";
 // Accessor decorators initialize *after* custom elements access their
 // observedAttributes getter, so there is no way to associate observed
 // attributes with specific elements or constructors from inside the @attr()
-// decorator. All we can do is to track *all* attributes defined by @attr() and
-// decide in the attribute changed callback whether they are *actually* observed
-// by a given element.
+// decorator. Instead we simply track *all* attributes defined by @attr() (on
+// any class) and decide *inside the attribute changed callback* whether they
+// are *actually* observed by a given element.
 const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 
-// Map of attribute to handling callbacks mapped by element. The mixin classes
-// actual attributeChangedCallback to decide whether an attribute reaction
+// Map of attribute to handling callbacks mapped by element. The mixin classes'
+// actual attributeChangedCallback() to decide whether an attribute reaction
 // must run an effect defined by @attr().
 type AttributeChangedCallback = (
   name: string,
@@ -30,33 +30,48 @@ const OBSERVER_CALLBACKS_BY_INSTANCE = new WeakMap<HTMLElement, CallbackMap>();
 // method's initial calls (for methods that need such a call)
 const REACTIVE_INIT_CALLBACKS = new WeakMap<HTMLElement, (() => any)[]>();
 
-// Set of instance that have had their reactivity initialize (by running their
-// constructor to completion). Only elements in this set receive reactivity
-// events. This enables setting properties in the constructor without triggering
-// @reactive()
-const REACTIVE_READY = new WeakSet<object>();
+// A developer might want to initialize properties decorated with @prop() in
+// their custom element constructors. This should NOT trigger reactivity events,
+// as this is initialization and not a *change*. To make sure that reactivity
+// events only happen once an element's constructor has run to completion, the
+// following set tracks all elements where this has happened. Only elements in
+// this set receive reactivity events.
+const REACTIVE_READY = new WeakSet<HTMLElement>();
 
 // Maps debounced methods to original methods. Needed for initial calls of
 // @reactive() methods, which are not supposed to be async.
 const DEBOUNCED_METHOD_MAP = new WeakMap<Method<any, any>, Method<any, any>>();
 
 // Installs a mixin class that deals with attribute observation and reactive
-// init callback handling.
-function mixin<T extends CustomElementConstructor>(Ctor: T): T {
-  const originalObservedAttributes = (Ctor as any).observedAttributes ?? [];
-  const originalCallback = Ctor.prototype.attributeChangedCallback;
+// init callback handling. This obviously changes the type of the input
+// constructor, but as TypeScript can currently not use class decorators to
+// change the type, we don't bother.
+function mixin<T extends CustomElementConstructor>(Target: T): T {
+  const originalObservedAttributes = (Target as any).observedAttributes ?? [];
+  const originalCallback = Target.prototype.attributeChangedCallback;
+  const originalToStringTag = Object.getOwnPropertyDescriptor(
+    Target.prototype,
+    Symbol.toStringTag
+  );
 
-  return class SchleifchenMixin extends Ctor {
+  return class Mixin extends Target {
     constructor(...args: any[]) {
       super(...args);
+      // Call all init callbacks for this instance
       for (const callback of REACTIVE_INIT_CALLBACKS.get(this) ?? []) {
         callback.call(this);
       }
       REACTIVE_INIT_CALLBACKS.delete(this);
+      // Mark the end of the constructor, allow the element to receive
+      // reactivity events
       REACTIVE_READY.add(this);
     }
 
+    // Automatic string tag, unless the base class provides an implementation
     get [Symbol.toStringTag](): string {
+      if (originalToStringTag && originalToStringTag.get) {
+        return originalToStringTag.get.call(this);
+      }
       const stringTag = this.tagName
         .split("-")
         .map(

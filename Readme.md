@@ -187,7 +187,8 @@ kebab case. `TestElement` turns into `test-element`, `components4tThe_win` into
 
 This decorator also sets up attribute observation for use with the
 [@attr()](#attrtransformer-options) decorator and it installs an automatic
-[string tag getter](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/toStringTag):
+[string tag getter](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/toStringTag)
+(unless your component has its own string tag getter).
 
 ```javascript
 import { define } from "@sirpepe/schleifchen"

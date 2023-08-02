@@ -17,6 +17,17 @@ describe("Decorators", () => {
       );
     });
 
+    test("respect built-in toStringTags", () => {
+      const tagName = generateTagName();
+      @define(tagName)
+      class Test extends HTMLElement {
+        get [Symbol.toStringTag]() {
+          return "A";
+        }
+      }
+      expect(document.createElement(tagName).toString()).toEqual("[object A]");
+    });
+
     test("reject an invalid automatically derived tag name", () => {
       expect(() => {
         @define()
