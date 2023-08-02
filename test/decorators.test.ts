@@ -315,6 +315,23 @@ describe("Decorators", () => {
       ]);
     });
 
+    test("multiple prop changes with the same value only cause one effect to run", async () => {
+      const spy = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive() test() {
+          spy(this.x);
+        }
+      }
+      const el = new Test();
+      el.x = "B";
+      el.x = "B";
+      el.x = "B";
+      expect(spy).toBeCalledTimes(2); // initial + one update
+      expect(spy.mock.calls).toEqual([["A"], ["B"]]);
+    });
+
     test("select option", async () => {
       const spyX = jest.fn();
       const spyY = jest.fn();

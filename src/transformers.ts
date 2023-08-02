@@ -5,6 +5,12 @@ import {
   assertType,
 } from "./types";
 
+function eql(a: unknown, b: unknown): boolean {
+  return a === b;
+}
+
+const stringify = String;
+
 export function string(): Transformer<HTMLElement, string> {
   const fallbackValues = new WeakMap<HTMLElement, string>();
   return {
@@ -20,7 +26,8 @@ export function string(): Transformer<HTMLElement, string> {
       }
       return String(value);
     },
-    stringify: String,
+    stringify,
+    eql,
     beforeInitCallback(_, defaultValue) {
       if (typeof defaultValue === "string") {
         fallbackValues.set(this, defaultValue);
@@ -41,6 +48,13 @@ export function href(): Transformer<HTMLElement, string> {
     validate(value) {
       return String(value);
     },
+    stringify: String,
+    eql(oldValue, newValue) {
+      if (!valueInitialized.get(this)) {
+        return false;
+      }
+      return eql(oldValue, newValue);
+    },
     get(value) {
       if (!valueInitialized.get(this)) {
         return value;
@@ -53,7 +67,6 @@ export function href(): Transformer<HTMLElement, string> {
       const setAsInit = rawValue !== null && typeof rawValue !== "undefined";
       valueInitialized.set(this, setAsInit);
     },
-    stringify: String,
   };
 }
 
@@ -66,8 +79,9 @@ export function boolean(): Transformer<HTMLElement, boolean> {
     stringify() {
       return "";
     },
-    updateAttrPredicate(value) {
-      if (value === false) {
+    eql,
+    updateAttrPredicate(_, newValue) {
+      if (newValue === false) {
         return null;
       }
       return true;
@@ -127,6 +141,7 @@ export function number(
       return asNumber;
     },
     stringify: String,
+    eql,
     beforeInitCallback(_, defaultValue) {
       if (typeof defaultValue === "number") {
         fallbackValues.set(this, defaultValue);
@@ -193,7 +208,8 @@ export function int(
       }
       return asInt;
     },
-    stringify: String,
+    stringify,
+    eql,
     beforeInitCallback(_, defaultValue) {
       if (typeof defaultValue === "bigint") {
         fallbackValues.set(this, defaultValue);
@@ -227,6 +243,7 @@ export function record(): Transformer<HTMLElement, any> {
       return value;
     },
     stringify: JSON.stringify,
+    eql,
     beforeInitCallback(_, defaultValue) {
       if (typeof defaultValue === "object" && defaultValue !== null) {
         fallbackValues.set(this, defaultValue);
@@ -284,15 +301,16 @@ export function literal<T extends HTMLElement, V>(
       );
     },
     stringify: options.transformer.stringify,
+    eql: options.transformer.eql,
     beforeInitCallback(_, defaultValue) {
       if (options.values.includes(defaultValue)) {
         return fallbackValues.set(this, defaultValue);
       }
     },
-    updateAttrPredicate(value: V) {
+    updateAttrPredicate(_, newValue: V | null) {
       if (
         "removeAttributeOnValue" in options &&
-        value === options.removeAttributeOnValue
+        newValue === options.removeAttributeOnValue
       ) {
         return null;
       }
@@ -344,6 +362,7 @@ export function event<
         "This function should never be called, updating event handler properties does not change the attribute value!"
       );
     },
+    eql,
     beforeInitCallback(value, defaultValue, context) {
       if (context.private || typeof context.name === "symbol") {
         throw new Error("Event handler name must be a non-private non-symbol");

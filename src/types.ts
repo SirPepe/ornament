@@ -10,13 +10,21 @@ export type Transformer<T extends HTMLElement, V> = {
   // the attribute representation of an accessor together with
   // updateAttrPredicate(). Must never throw.
   stringify: (this: T, value?: V | null) => string;
+  // Determines whether two values are equal. If this method returns true,
+  // reactive callbacks will not be triggered.
+  eql: (this: T, oldValue: V | null, newValue: V | null) => boolean;
   // Optionally transforms a value before returned from the getter. Defaults to
   // the identity function.
   get?: (this: T, value: V) => V;
   // Decides if, based on a new value, an attribute gets updated to match the
-  // new value (true/false) or removed (null). Defaults to a function that
+  // new value (true/false) or removed (null). Only gets called when the
+  // transformer's eql() method returns false. Defaults to a function that
   // always returns true.
-  updateAttrPredicate?: (this: T, value: V) => boolean | null;
+  updateAttrPredicate?: (
+    this: T,
+    oldValue: V | null,
+    newValue: V | null
+  ) => boolean | null;
   // Runs before accessor initialization and can be used to perform side effects
   // or to grab the accessors initial value as defined in the class.
   beforeInitCallback?: (

@@ -193,10 +193,13 @@ This decorator also sets up attribute observation for use with the
 ```javascript
 import { define } from "@sirpepe/schleifchen"
 
-// Automatically derived tag name "myTest"
+// Automatically derived tag name "my-test"
 @define()
 class MyTest extends HTMLElement {}
+
 const element = document.createElement("my-test");
+
+// Automatically derived string tag "HTMLMyTestElement"
 console.log(element.toString()); // "[object HTMLMyTestElement]"
 
 ```
@@ -236,7 +239,7 @@ testEl.foo = "asdf"; // throw exception (thanks to the number transformer)
 
 Accessors defined with `@prop()` work as a *JavaScript-only API*. Values can
 only be accessed through the accessor's getter, invalid values are rejected by
-the setter with exceptions. `@prop()` can be used on private accessors or
+the setter with exceptions. `@prop()` *can* be used on private accessors or
 symbols.
 
 Note that you can still define your own accessors, getters, setters etc. as you
@@ -281,7 +284,7 @@ testEl.setAttribute("foo", "asdf") // works, content attributes can be any strin
 console.log(testEl.foo); // logs 23 (fallback value)
 ```
 
-Accessors defined with `@attr()` works like all other supported attributes on
+Accessors defined with `@attr()` work like all other supported attributes on
 built-in elements. Content attribute values (which are always strings) get
 parsed by the transformer, which also deals with invalid values in a graceful
 way (ie without throwing exceptions). Values can also be accessed through the
@@ -401,14 +404,21 @@ export type Transformer<T extends HTMLElement, V> = {
   // the attribute representation of an accessor together with
   // updateAttrPredicate(). Must never throw.
   stringify: (this: T, value?: V | null) => string;
+  // Determines whether two values are equal. If this method returns true,
+  // reactive callbacks will not be triggered.
+  eql: (this: T, oldValue: V | null, newValue: V | null) => boolean;
   // Optionally transforms a value before returned from the getter. Defaults to
   // the identity function.
   get?: (this: T, value: V) => V;
-  // Decides if, based on a new value, the content attribute gets updated to
-  // match the IDL attribute's new value (true/false) or if the content
-  // attribute gets removed (null). Defaults to a function that always returns
-  // true.
-  updateAttrPredicate?: (this: T, value: V) => boolean | null;
+  // Decides if, based on a new value, an attribute gets updated to match the
+  // new value (true/false) or removed (null). Only gets called when the
+  // transformer's eql() method returns false. Defaults to a function that
+  // always returns true.
+  updateAttrPredicate?: (
+    this: T,
+    oldValue: V | null,
+    newValue: V | null
+  ) => boolean | null;
   // Runs before accessor initialization and can be used to perform side effects
   // or to grab the accessors initial value as defined in the class.
   beforeInitCallback?: (
@@ -418,10 +428,11 @@ export type Transformer<T extends HTMLElement, V> = {
     context: ClassAccessorDecoratorContext<T, V>
   ) => void;
   // Runs before an accessor's setter sets a new value and can be used to
-  // perform side effects.
+  // perform side effects
   beforeSetCallback?: (
     this: T,
     value: V,
+    rawValue: unknown,
     context: ClassAccessorDecoratorContext<T, V>
   ) => void;
 };

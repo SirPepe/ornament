@@ -107,16 +107,11 @@ function mixin<T extends CustomElementConstructor>(Target: T): T {
   };
 }
 
-// All elements that use @reactive share an event bus to keep things simple.
-const eventBus = new EventTarget();
-
 // Reactivity notifications for @reactive
 class ReactivityEvent extends Event {
-  readonly source: HTMLElement;
   readonly key: string | symbol;
-  constructor(source: HTMLElement, key: string | symbol) {
+  constructor(key: string | symbol) {
     super("reactivity");
-    this.source = source;
     this.key = key;
   }
 }
@@ -211,12 +206,8 @@ export function reactive<T extends HTMLElement>(
         }
       }
       // Start listening for reactivity events that happen after reactive init
-      eventBus.addEventListener("reactivity", (evt: any) => {
-        if (
-          evt.source === this &&
-          REACTIVE_READY.has(this) &&
-          predicate.call(this, evt.key)
-        ) {
+      this.addEventListener("reactivity", (evt: any) => {
+        if (REACTIVE_READY.has(this) && predicate.call(this, evt.key)) {
           value.call(this);
         }
       });
@@ -275,19 +266,25 @@ export function attr<T extends HTMLElement, V>(
         const attributeChangedCallback = function (
           this: T,
           name: string,
-          oldValue: string | null,
-          newValue: string | null
+          oldAttrValue: string | null,
+          newAttrValue: string | null
         ): void {
-          if (name !== attrName || newValue === oldValue) {
+          if (name !== attrName || newAttrValue === oldAttrValue) {
             return; // skip irrelevant invocations
           }
-          const value = transformer.parse.call(this, newValue);
-          if (value === get.call(this)) {
-            return; // skip if new parsed value is equal to the old parsed value
+          const oldValue = get.call(this);
+          const newValue = transformer.parse.call(this, newAttrValue);
+          if (transformer.eql.call(this, oldValue, newValue)) {
+            return;
           }
-          transformer.beforeSetCallback?.call(this, value, newValue, context);
-          set.call(this, value);
-          eventBus.dispatchEvent(new ReactivityEvent(this, context.name));
+          transformer.beforeSetCallback?.call(
+            this,
+            newValue,
+            newAttrValue,
+            context
+          );
+          set.call(this, newValue);
+          this.dispatchEvent(new ReactivityEvent(context.name));
         };
         const instanceCallbacks = OBSERVER_CALLBACKS_BY_INSTANCE.get(this);
         if (instanceCallbacks) {
@@ -314,21 +311,25 @@ export function attr<T extends HTMLElement, V>(
         return value;
       },
       set(input) {
+        const oldValue = get.call(this);
         const newValue = transformer.validate.call(this, input);
+        if (transformer.eql.call(this, oldValue, newValue)) {
+          return;
+        }
         transformer.beforeSetCallback?.call(this, newValue, input, context);
         set.call(this, newValue);
         if (isReflectiveAttribute) {
-          const shouldUpdateAttr = updateAttrPredicate.call(this, newValue);
-          if (shouldUpdateAttr === null) {
+          const updateAttr = updateAttrPredicate.call(this, oldValue, newValue);
+          if (updateAttr === null) {
             this.removeAttribute(attrName);
-          } else if (shouldUpdateAttr === true) {
+          } else if (updateAttr === true) {
             this.setAttribute(
               attrName,
               transformer.stringify.call(this, newValue)
             );
           }
         }
-        eventBus.dispatchEvent(new ReactivityEvent(this, context.name));
+        this.dispatchEvent(new ReactivityEvent(context.name));
       },
       get() {
         return getTransform.call(this, get.call(this));
@@ -354,9 +355,13 @@ export function prop<T extends HTMLElement, V>(
         return transformer.validate.call(this, input);
       },
       set(input) {
+        const oldValue = get.call(this);
         const newValue = transformer.validate.call(this, input);
+        if (transformer.eql.call(this, oldValue, newValue)) {
+          return;
+        }
         set.call(this, newValue);
-        eventBus.dispatchEvent(new ReactivityEvent(this, context.name));
+        this.dispatchEvent(new ReactivityEvent(context.name));
       },
       get() {
         return getTransform.call(this, get.call(this));
