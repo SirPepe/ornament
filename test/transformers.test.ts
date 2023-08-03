@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { attr, define, prop } from "../src/decorators";
+import { attr, define } from "../src/decorators";
 import {
   boolean,
   event,

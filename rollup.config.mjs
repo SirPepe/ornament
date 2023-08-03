@@ -36,7 +36,7 @@ export default [
     output: {
       file: "dist/min/index.min.js",
       format: "umd",
-      name: "Schleifchen",
+      name: "Ornament",
       plugins: [terser()],
     },
     ...commonConfig,

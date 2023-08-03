@@ -94,9 +94,27 @@ as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babe
 The native APIs for web components are verbose and imperative. This is not
 really a problem, but lends itself to quite a bit of streamlining.
 
+### General philosophy
+
+Ornament is not a framework. Its decorators are meant to be easy to add (either
+to existing components or greenfield projects), easy to extend, but also *very*
+easy to remove or replace with more complicated hand-written logic. They
+co-exist with eg. custom attribute change handling logic just fine. Ornament
+still wants you to have full control over your components' behavior, just with
+less *mandatory* boilerplate.
+
 ### Component registration
 
+Using [`customElements.define()`](https://developer.mozilla.org/en-US/docs/Web/API/CustomElementRegistry/define)
+is no too bad, but setting a custom element's tag name should really be part of
+the class declaration. The `@define()` decorator provides just that:
 
+```javascript
+import { define } from "@sirpepe/ornament"
+
+@define("my-test")
+class MyTest extends HTMLElement {}
+```
 
 ### Attribute handling
 
@@ -147,45 +165,29 @@ attribute named `value`, which...
 - Implements getters and setters for the IDL attributes, with the getter always returning a number and the setter rejecting invalid values (non-numbers or numbers outside the specified range of `[-100, 100]`)
 - Causes the method marked @reactive() to run on update
 
-Schleifchen's decorators are meant to be easy to add, easy to extend, but also
-*very* easy to remove or replace with more complicated hand-written logic. They
-co-exist with eg. custom attribute change handling logic just fine. Schleifchen
-still wants you to have full control over your components' behavior, just with
-less *mandatory* boilerplate.
-
-If you just want to turn off your brain, churn out components and don't mind
-praying for continued support of third-party software that, you are better off
-with a true framework like [lit](https://lit.dev/).
-
-## Notable deviations from standard behavior
-
-Schleifchen's built-in transformers perform a *tiny* bit more opinionated
-handholding that is usual for built-in elements. For example, the
-[number transformer](#transformer-numberoptions) never returns NaN, but instead
-falls back to the accessor's initial value if it encounters an invalid value. If
-this bothers you, don't worry: building your own transformers is easy!
+You can use `@prop()` for standalone IDL attribute (that is, DOM properties
+without an associated content attributes), swap out the `number()` transformer
+for something else, or combine any of the above with hand-written logic.
 
 ## Decorators
 
 ### `@define(tagName: string)`
 
-Class decorator to register a class as a custom element.
+Class decorator to register a class as a custom element. This also sets up
+attribute observation for use with the [@attr()](#attrtransformer-options)
+decorator and installs an automatic
+[string tag getter](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/toStringTag)
+(unless your component has its own string tag getter).
 
 ```javascript
-import { define } from "@sirpepe/schleifchen"
+import { define } from "@sirpepe/ornament"
 
 @define("my-test")
 class MyTest extends HTMLElement {}
 
-// Automatically derived string tag "HTMLMyTestElement"
 console.log(document.createElement("my-test").toString());
 // > "[object HTMLMyTestElement]"
 ```
-
-This decorator also sets up attribute observation for use with the
-[@attr()](#attrtransformer-options) decorator and it installs an automatic
-[string tag getter](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/toStringTag)
-(unless your component has its own string tag getter).
 
 **Note for TypeScript:** you should add your custom element's interface to
 `HTMLElementTagNameMap` to make it work with native DOM APIs:
@@ -203,14 +205,14 @@ declare global {
 }
 
 let test = document.createElement("my-test");
-console.log(test.foo); // only works in TS with the above interface declaration
+console.log(test.foo); // only type checks with the above interface declaration
 ```
 
 ### `@prop(transformer)`
 
-The accessor decorator `@prop()` defines a IDL property on the custom element
-class *without* an associated content attribute. Such a property is more or less
-a regular accessor with two additional features:
+Accessor decorator to define a IDL property on the custom element class
+*without* an associated content attribute. Such a property is more or less a
+regular accessor with two additional features:
 
 - it uses [transformers](#transformers) for type checking and validation
 - changes cause [@reactive()](#reactiveoptions) methods to run
@@ -218,9 +220,9 @@ a regular accessor with two additional features:
 Example:
 
 ```javascript
-import { define, prop, number } from "@sirpepe/schleifchen"
+import { define, prop, number } from "@sirpepe/ornament"
 
-@define("test-element")
+@define("my-test")
 class Test extends HTMLElement {
   // Applies the number transformer to ensure that foo is always a number
   @prop(number()) accessor foo = 23;
@@ -232,7 +234,7 @@ class Test extends HTMLElement {
   }
 }
 
-let testEl = document.createElement("test-element");
+let testEl = document.createElement("my-test");
 console.log(testEl.foo); // logs 23
 testEl.foo = 42; // logs "Foo changed to 42"
 console.log(testEl.foo); // logs 42
@@ -250,33 +252,32 @@ would usually do. They will still work as expected, but they will not cause
 
 ### `@attr(transformer, options?)`
 
-The accessor decorator `@attr()` defines an IDL attribute with a matching
-content attribute on the custom element class. This results in something very
-similar to accessors decorated with `@prop()`, but with the following additional
-features:
+Accessor decorator to define an IDL attribute with a matching content attribute
+on the custom element class. This results in something very similar to accessors
+decorated with `@prop()`, but with the following additional features:
 
 - Its value can be initialized from a content attribute, if the attribute is present
 - Changes to the content attribute's value update the value of the IDL attribute to match (depending on the options and the transformer)
 
 ```javascript
-import { define, attr, number } from "@sirpepe/schleifchen"
+import { define, attr, number } from "@sirpepe/ornament"
 
-@define("test-element")
+@define("my-test")
 class Test extends HTMLElement {
   // Applies the number transformer to ensure that content attribute values get
   // parsed into numbers and that new non-number values passed to the IDL
   // attribute's setter get rejected
   @attr(number()) accessor foo = 23; // 23 = fallback value
 
-  // Automatically runs when "foo" (or any accessor decorated with @prop() or
-  // @attr()) changes
+  // Automatically runs when "foo", or any accessor decorated with @prop() or
+  // @attr(), changes (plus once on element initialization)
   @reactive() log() {
     console.log(`Foo changed to ${this.foo}`);
   }
 }
 
-document.body.innerHTML = `<test-element foo="42"></test-element>`;
-let testEl = document.querySelector("test-element");
+document.body.innerHTML = `<my-test foo="42"></my-test>`;
+let testEl = document.querySelector("my-test");
 console.log(testEl.foo); // logs 42 (initialized from the attribute)
 testEl.foo = 1337; // logs "Foo changed to 1337"
 console.log(testEl.foo); // logs 1337
@@ -290,8 +291,8 @@ Accessors defined with `@attr()` work like all other supported attributes on
 built-in elements. Content attribute values (which are always strings) get
 parsed by the transformer, which also deals with invalid values in a graceful
 way (ie without throwing exceptions). Values can also be accessed through the
-IDL property's accessor, where invalid values *are* rejected with exceptions.
-`@attr()` can *not* be used on private accessors or symbols.
+IDL property's accessor, where invalid values *are* rejected with exceptions by
+the setter. `@attr()` can *not* be used on private accessors or symbols.
 
 Note that you can still define your own attribute handling with
 `attributeChangedCallback()` and `static get observedAttributes()` as you would
@@ -305,23 +306,23 @@ attributes will not cause `@reactive()` methods to run.
 
 ### `@reactive(options?)`
 
-Method decorator that causes class methods to re-run when any accessor decorated
-with `@prop()` or `@attr()` changes:
+Method decorator that causes class methods to re-run when accessors decorated
+with `@prop()` or `@attr()` change:
 
 ```javascript
-import { define, prop, number } from "@sirpepe/schleifchen"
+import { define, prop, number } from "@sirpepe/ornament"
 
-@define("test-element")
+@define("my-test")
 class Test extends HTMLElement {
   @prop(number()) accessor foo = 0;
   @prop(number()) accessor bar = 0;
 
-  @reactive({ initial: false }) log() { // note initial: false
+  @reactive({ initial: false }) log() { // note "initial: false"
     console.log(`foo is now ${this.foo}, bar is now ${this.bar}`);
   }
 }
 
-let testEl = document.createElement("test-element");
+let testEl = document.createElement("my-test");
 testEl.foo = 1;
 testEl.bar = 2;
 
@@ -336,15 +337,17 @@ prevent excessive calls.
 
 #### Options for `@reactive()`
 
-- **`initial` (boolean, optional)**: Whether or not to run the function when the element initializes, before any actual changes to any decorated accessor. Defaults to `true`
-- **`keys` (Array\<string | symbol\>, optional)**: List of attributes to monitor. Defaults to monitoring all content and IDL attributes.
-- **`predicate` ((this: T) => boolean, optional)**: The predicate function, if provided, gets called each time a reactive method is scheduled to run. If the predicate function returns `false`, the function does not run. The predicate function is called with `this` set to the element instance. By default all reactive methods are called for each change of attributes listed in `options.keys`.
+- **`initial` (boolean, optional)**: Whether or not to run the function when the element's constructor finishes, before any actual changes to any decorated accessor. Defaults to `true`
+- **`keys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) to monitor. Can include private names and symbols. Defaults to monitoring all content and IDL attributes defined by `@prop()` or `@attr()`.
 
 ### `@debounce(options?)`
 
 Method and class field decorator for debouncing method/function invocation:
 
 ```javascript
+import { define, debounce } from "@sirpepe/ornament"
+
+@define("my-test")
 class Test extends HTMLElement {
   // Debounce a class method
   @debounce() test1(x) {
@@ -396,8 +399,9 @@ A transformers's type signature is as follows:
 ```typescript
 export type Transformer<T extends HTMLElement, V> = {
   // parse() turns attribute values (usually string | null) into property
-  // values. Must *never* throw exceptions, but always deal with its input in a
-  // graceful way, just like the attribute handling in built-in elements works.
+  // values. Must *never* throw exceptions, and instead always deal with its
+  // input in a graceful way, just like the attribute handling in built-in
+  // elements works.
   parse: (this: T, value: unknown) => V;
   // Validates setter inputs, which may be of absolutely any type. May throw for
   // invalid values, just like setters on built-in elements may.
@@ -442,9 +446,9 @@ export type Transformer<T extends HTMLElement, V> = {
 
 Because transformers need to potentially do a lot of type juggling and
 bookkeeping, they are somewhat tricky to get right, but they are also always
-only a few self-contained lines of code. If you want to extend Schleifchen, you
+only a few self-contained lines of code. If you want to extend Ornament, you
 should simply clone one of the built-in transformers and modify it to your
-liking!
+liking.
 
 ### Transformer `string()`
 
@@ -452,16 +456,16 @@ Implements a string attribute or property. Loosely modeled after built-in string
 attributes such as `id` and `lang`.
 
 ```javascript
-import { define, attr, string } from "@sirpepe/schleifchen"
+import { define, attr, string } from "@sirpepe/ornament"
 
-@define("test-element")
+@define("my-test")
 class Test extends HTMLElement {
   @attr(string()) accessor foo = "default value";
 }
 ```
 
 In this case, the property `foo` always represents a string. Any non-string
-value gets converted to strings by the accessor's getter. When used with
+value gets converted to strings by the accessor's setter. When used with
 `@attr()`, if the content attribute gets removed, the value that was used to
 initialize the accessor (in this case `"default value"`) is returned. The same
 happens when the IDL attribute is set to `undefined`. If the accessor was not
@@ -473,9 +477,9 @@ Implements a string attribute or property that works like `href` on `a` in that
 it automatically turns relative URLs into absolute URLs.
 
 ```javascript
-import { define, attr, href } from "@sirpepe/schleifchen"
+import { define, attr, href } from "@sirpepe/ornament"
 
-@define("test-element")
+@define("my-test")
 class Test extends HTMLElement {
   @attr(href()) accessor foo = "";
 }
@@ -495,9 +499,9 @@ console.log(testEl.foo); // > "https://example.com/foo/bar/"
 Implements a number attribute with optional range constraints.
 
 ```javascript
-import { define, attr, number } from "@sirpepe/schleifchen"
+import { define, attr, number } from "@sirpepe/ornament"
 
-@define("test-element")
+@define("my-test")
 class Test extends HTMLElement {
   // With default options (see below)
   @attr(number()) accessor foo = 0;
@@ -524,9 +528,9 @@ Implements a bigint attribute. Content attribute values are expressed as plain
 numeric strings without the tailing `n` used in JavaScript bigints.
 
 ```javascript
-import { define, attr, int } from "@sirpepe/schleifchen"
+import { define, attr, int } from "@sirpepe/ornament"
 
-@define("test-element")
+@define("my-test")
 class Test extends HTMLElement {
   // With default options (see below)
   @attr(int()) accessor foo = 0n;
@@ -554,7 +558,7 @@ as `disabled`. Changes to the IDL attribute values toggle the content attribute
 and do not just change the content attribute's value.
 
 ```javascript
-import { define, attr, boolean } from "@sirpepe/schleifchen"
+import { define, attr, boolean } from "@sirpepe/ornament"
 
 class DemoElement extends HTMLElement {
   @attr(boolean()) accessor foo = false;
@@ -566,6 +570,9 @@ non-boolean value gets coerced to booleans. If the content attribute `foo` gets
 set to any value (including the empty string), `foo` returns `true` - only a
 missing content attribute counts as `false`.
 
+If you want your content attribute to represent `"false"` as a string value,
+you can use the `literal()` transformer with the strings `"true"` and `"false"`.
+
 ### Transformer `literal(options)`
 
 Implements an attribute with a finite number of valid values. Should really be
@@ -575,9 +582,9 @@ of valid values consists of strings, then the `string()` transformer is the
 right transformer to use:
 
 ```javascript
-import { define, attr, literal, string } from "@sirpepe/schleifchen";
+import { define, attr, literal, string } from "@sirpepe/ornament";
 
-@define("test-element")
+@define("my-test")
 class Test extends HTMLElement {
   @attr(literal({ values: ["A", "B"], transformer: string() })) accessor foo = "A";
 }
@@ -603,9 +610,9 @@ attribute when used with `@attr()`. Such attributes do not exist in standard
 HTML, but may be useful nevertheless:
 
 ```javascript
-import { define, attr, record } from "@sirpepe/schleifchen";
+import { define, attr, record } from "@sirpepe/ornament";
 
-@define("test-element")
+@define("my-test")
 class Test extends HTMLElement {
   @attr(record()) accessor foo = { user: "", email: "" };
 }
@@ -626,9 +633,9 @@ conjunction with `@attr()` (with reflectivity enabled) and on an accessor that
 has a name starting with `on`:
 
 ```javascript
-import { define, attr, eventHandler } from "@sirpepe/schleifchen";
+import { define, attr, eventHandler } from "@sirpepe/ornament";
 
-@define("test-element")
+@define("my-test")
 class Test extends HTMLElement {
   @attr(event()) accessor onfoo: ((evt: Event) => void) | null = null;
 }
@@ -637,9 +644,9 @@ class Test extends HTMLElement {
 This can then be used in HTML:
 
 ```html
-<test-element onfoo="console.log('Foo event:', event)"></test-element>
+<my-test onfoo="console.log('Foo event:', event)"></my-test>
 <script>
-  document.querySelector("test-element").dispatchEvent(new Event("foo"));
+  document.querySelector("my-test").dispatchEvent(new Event("foo"));
   // Logs "'Foo event:', Event{type: "foo"}"
 </script>
 ```
@@ -647,7 +654,7 @@ This can then be used in HTML:
 Or in JavaScript:
 
 ```javascript
-const testEl = document.createElement("test-element");
+const testEl = document.createElement("my-test");
 testEl.onfoo = (event) => console.log("Foo event:", event);
 testEl.dispatchEvent(new Event("foo"));
 // Logs "'Foo event:', Event{type: "foo"}"
@@ -671,9 +678,9 @@ method calls for increased efficiency. This is easy if you combine `@reactive()`
 with `@debounce()`:
 
 ```javascript
-import { define, prop, reactive, debounce int } from "@sirpepe/schleifchen";
+import { define, prop, reactive, debounce int } from "@sirpepe/ornament";
 
-@define("test-element")
+@define("my-test")
 export class TestElement extends HTMLElement {
   @prop(int()) accessor value = 0;
 
@@ -697,13 +704,13 @@ happening once the element's constructor runs to completion.
 
 ### Rendering shadow DOM
 
-Schleifchen does not directly concern itself with rendering Shadow DOM, but you
-can combine Schleifchen with suitable libraries such as
+Ornament does not directly concern itself with rendering Shadow DOM, but you
+can combine Ornament with suitable libraries such as
 [uhtml](https://github.com/WebReflection/uhtml):
 
 ```javascript
 import { render, html } from "uhtml";
-import { define, prop, reactive, debounce int } from "@sirpepe/schleifchen";
+import { define, prop, reactive, debounce int } from "@sirpepe/ornament";
 
 @define("counter-element")
 export class CounterElement extends HTMLElement {
@@ -732,9 +739,9 @@ public getter. This keeps reactive functions working, but only allows readonly
 access from outside the component:
 
 ```javascript
-import { define, attr, string } from "@sirpepe/schleifchen";
+import { define, attr, reactive, string } from "@sirpepe/ornament";
 
-@define("test-element")
+@define("my-test")
 class Test extends HTMLElement {
   @prop(string()) accessor #foo = "Starting value";
 
@@ -753,4 +760,29 @@ class Test extends HTMLElement {
     console.log(this.#foo);
   }
 }
+```
+
+### Custom defaults
+
+If you don't like ornament's defaults, remember that decorators and transformers
+are just functions. This means that you can use partial application to change
+the default options:
+
+```javascript
+import { define, attr, reactive as baseReactive, string } from "@sirpepe/ornament";
+
+// @reactive with initial always set to false
+const reactive = baseReactive.bind(null, { initial: false });
+
+@define("my-test")
+class Test extends HTMLElement {
+  @prop(string()) accessor foo = "A";
+
+  @reactive() log() {
+    console.log(this.foo);
+  }
+}
+
+let test = new Test();
+test.foo = "B"; //  only logs "B"
 ```

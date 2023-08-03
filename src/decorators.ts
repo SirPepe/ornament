@@ -41,103 +41,113 @@ const REACTIVE_READY = new WeakSet<HTMLElement>();
 // @reactive() methods, which are not supposed to be async.
 const DEBOUNCED_METHOD_MAP = new WeakMap<Method<any, any>, Method<any, any>>();
 
-// Installs a mixin class that deals with attribute observation and reactive
-// init callback handling. This obviously changes the type of the input
-// constructor, but as TypeScript can currently not use class decorators to
-// change the type, we don't bother.
-function mixin<T extends CustomElementConstructor>(Target: T): T {
-  const originalObservedAttributes = (Target as any).observedAttributes ?? [];
-  const originalCallback = Target.prototype.attributeChangedCallback;
-  const originalToStringTag = Object.getOwnPropertyDescriptor(
-    Target.prototype,
-    Symbol.toStringTag
-  );
-
-  return class Mixin extends Target {
-    constructor(...args: any[]) {
-      super(...args);
-      // Call all init callbacks for this instance
-      for (const callback of REACTIVE_INIT_CALLBACKS.get(this) ?? []) {
-        callback.call(this);
-      }
-      REACTIVE_INIT_CALLBACKS.delete(this);
-      // Mark the end of the constructor, allow the element to receive
-      // reactivity events
-      REACTIVE_READY.add(this);
-    }
-
-    // Automatic string tag, unless the base class provides an implementation
-    get [Symbol.toStringTag](): string {
-      if (originalToStringTag && originalToStringTag.get) {
-        return originalToStringTag.get.call(this);
-      }
-      const stringTag = this.tagName
-        .split("-")
-        .map(
-          (part) => part.slice(0, 1).toUpperCase() + part.slice(1).toLowerCase()
-        )
-        .join("");
-      return "HTML" + stringTag + "Element";
-    }
-
-    static get observedAttributes(): string[] {
-      return [...originalObservedAttributes, ...ALL_OBSERVABLE_ATTRIBUTES];
-    }
-
-    attributeChangedCallback(
-      this: HTMLElement,
-      name: string,
-      oldVal: string | null,
-      newVal: string | null
-    ): void {
-      if (originalCallback && originalObservedAttributes.includes(name)) {
-        originalCallback.call?.(this, name, oldVal, newVal);
-      }
-      const callbacks = OBSERVER_CALLBACKS_BY_INSTANCE.get(this);
-      if (!callbacks) {
-        return;
-      }
-      const callback = callbacks.get(name);
-      if (!callback) {
-        return;
-      }
-      callback.call(this, name, oldVal, newVal);
-    }
-  };
-}
-
 // Reactivity notifications for @reactive
 class ReactivityEvent extends Event {
   readonly key: string | symbol;
   constructor(key: string | symbol) {
-    super("reactivity");
+    super("__ornament-reactivity");
     this.key = key;
   }
 }
 
+declare global {
+  interface ElementEventMap {
+    "__ornament-reactivity": ReactivityEvent;
+  }
+}
+
 // The class decorator @define() defines a custom element and also injects a
-// mixin class. This obviously changes this instance type of the constructor T,
-// but TS can't currently model this with decorators:
-// https://github.com/microsoft/TypeScript/issues/51347
+// mixin class that hat deals with attribute observation and reactive
+// init callback handling.
 export function define<T extends CustomElementConstructor>(
+  this: unknown,
   tagName: string
 ): (target: T, context: ClassDecoratorContext<T>) => T {
   return function (target: T, context: ClassDecoratorContext<T>): T {
     if (context.kind !== "class") {
       throw new TypeError(`Class decorator @define() used on ${context.kind}`);
     }
+
+    // Define the custom element after all other decorators have been applied
     context.addInitializer(function () {
-      window.customElements.get(tagName) ??
-        window.customElements.define(tagName, this);
+      window.customElements.define(tagName, this);
     });
-    return mixin(target);
+
+    // User-defined custom element behaviors that need to be integrated into the
+    // mixin class.
+    const originalObservedAttributes = (target as any).observedAttributes ?? [];
+    const originalCallback = target.prototype.attributeChangedCallback;
+    const originalToStringTag = Object.getOwnPropertyDescriptor(
+      target.prototype,
+      Symbol.toStringTag
+    );
+
+    // Installs the mixin class. This kindof changes the type of the input
+    // constructor T, but as TypeScript can currently not use class decorators
+    // to change the type, we don't bother. The changes are really small, too.
+    // See https://github.com/microsoft/TypeScript/issues/51347
+    return class Mixin extends target {
+      // Component set-up in the constructor (which here is the super
+      // constructor) must not trigger reactive methods. Conversely, initial
+      // calls to reactive methods must happen immediately after the (super-)
+      // constructor's set-up is completed.
+      constructor(...args: any[]) {
+        super(...args);
+        // Perform the initial calls to reactive methods for this instance
+        for (const callback of REACTIVE_INIT_CALLBACKS.get(this) ?? []) {
+          callback.call(this);
+        }
+        REACTIVE_INIT_CALLBACKS.delete(this);
+        // Mark the end of the constructor and the initial reactive calls,
+        // allow the element to receive reactivity events.
+        REACTIVE_READY.add(this);
+      }
+
+      // Automatic string tag, unless the base class provides an implementation
+      get [Symbol.toStringTag](): string {
+        if (originalToStringTag && originalToStringTag.get) {
+          return originalToStringTag.get.call(this);
+        }
+        const stringTag = this.tagName
+          .split("-")
+          .map(
+            (part) =>
+              part.slice(0, 1).toUpperCase() + part.slice(1).toLowerCase()
+          )
+          .join("");
+        return "HTML" + stringTag + "Element";
+      }
+
+      static get observedAttributes(): string[] {
+        return [...originalObservedAttributes, ...ALL_OBSERVABLE_ATTRIBUTES];
+      }
+
+      attributeChangedCallback(
+        this: HTMLElement,
+        name: string,
+        oldVal: string | null,
+        newVal: string | null
+      ): void {
+        if (originalCallback && originalObservedAttributes.includes(name)) {
+          originalCallback.call?.(this, name, oldVal, newVal);
+        }
+        const callbacks = OBSERVER_CALLBACKS_BY_INSTANCE.get(this);
+        if (!callbacks) {
+          return;
+        }
+        const callback = callbacks.get(name);
+        if (!callback) {
+          return;
+        }
+        callback.call(this, name, oldVal, newVal);
+      }
+    };
   };
 }
 
-type ReactiveOptions<T extends HTMLElement> = {
+type ReactiveOptions = {
   initial?: boolean;
   keys?: (string | symbol)[];
-  predicate?: (this: T) => boolean;
 };
 
 type ReactiveDecorator<T extends HTMLElement> = (
@@ -145,30 +155,11 @@ type ReactiveDecorator<T extends HTMLElement> = (
   context: ClassMethodDecoratorContext<T, () => any>
 ) => void;
 
-function createReactivePredicate<T extends HTMLElement>(
-  options: ReactiveOptions<T> = {}
-): (this: T, key: string | symbol) => boolean {
-  const predicate = options.predicate ?? (() => true);
-  const selectKeys = options.keys ?? [];
-  if (selectKeys.length === 0) {
-    return predicate;
-  }
-  return function reactivityPredicate(
-    this: T,
-    evtKey: string | symbol
-  ): boolean {
-    if (evtKey === "*") {
-      return predicate.call(this);
-    }
-    return predicate.call(this) && selectKeys.some((key) => key === evtKey);
-  };
-}
-
 export function reactive<T extends HTMLElement>(
-  options: ReactiveOptions<T> = {}
+  this: unknown,
+  options: ReactiveOptions = {}
 ): ReactiveDecorator<T> {
   const initial = options.initial ?? true;
-  const predicate = createReactivePredicate(options);
   return function (value, context): void {
     if (context.kind !== "method") {
       throw new TypeError(
@@ -179,21 +170,19 @@ export function reactive<T extends HTMLElement>(
       // Register the callback that performs the initial method call
       if (initial) {
         const method = DEBOUNCED_METHOD_MAP.get(value) ?? value;
-        const cb = () => {
-          if (predicate.call(this, "*")) {
-            method.call(this);
-          }
-        };
         const callbacks = REACTIVE_INIT_CALLBACKS.get(this);
         if (callbacks) {
-          callbacks.push(cb);
+          callbacks.push(method.bind(this));
         } else {
-          REACTIVE_INIT_CALLBACKS.set(this, [cb]);
+          REACTIVE_INIT_CALLBACKS.set(this, [method.bind(this)]);
         }
       }
       // Start listening for reactivity events that happen after reactive init
-      this.addEventListener("reactivity", (evt: any) => {
-        if (REACTIVE_READY.has(this) && predicate.call(this, evt.key)) {
+      this.addEventListener("__ornament-reactivity", (evt) => {
+        if (
+          REACTIVE_READY.has(this) &&
+          (!options.keys || options.keys.includes(evt.key))
+        ) {
           value.call(this);
         }
       });
@@ -211,6 +200,7 @@ type AttrOptions = {
 };
 
 export function attr<T extends HTMLElement, V>(
+  this: unknown,
   transformer: Transformer<T, V>,
   options: AttrOptions = {}
 ): ClassAccessorDecorator<T, V> {
@@ -328,6 +318,7 @@ export function attr<T extends HTMLElement, V>(
 // reactivity added.
 
 export function prop<T extends HTMLElement, V>(
+  this: unknown,
   transformer: Transformer<T, V>
 ): ClassAccessorDecorator<T, V> {
   const getTransform = transformer.get ?? ((x: V) => x);
@@ -381,6 +372,7 @@ function createDebouncedMethod<T, A extends unknown[]>(
 }
 
 export function debounce<T extends HTMLElement, A extends unknown[]>(
+  this: unknown,
   options: DebounceOptions = {}
 ): FunctionFieldOrMethodDecorator<T, A> {
   const fn = options.fn ?? debounce.raf();

@@ -307,15 +307,6 @@ export function literal<T extends HTMLElement, V>(
         return fallbackValues.set(this, defaultValue);
       }
     },
-    updateAttrPredicate(_, newValue: V | null) {
-      if (
-        "removeAttributeOnValue" in options &&
-        newValue === options.removeAttributeOnValue
-      ) {
-        return null;
-      }
-      return true;
-    },
   };
 }
 

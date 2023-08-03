@@ -1,7 +1,8 @@
 export type Transformer<T extends HTMLElement, V> = {
   // parse() turns attribute values (usually string | null) into property
-  // values. Must *never* throw exceptions, but always deal with its input in a
-  // graceful way, just like the attribute handling in built-in elements works.
+  // values. Must *never* throw exceptions, and instead always deal with its
+  // input in a graceful way, just like the attribute handling in built-in
+  // elements works.
   parse: (this: T, value: unknown) => V;
   // Validates setter inputs, which may be of absolutely any type. May throw for
   // invalid values, just like setters on built-in elements may.

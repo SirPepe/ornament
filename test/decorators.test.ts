@@ -326,7 +326,7 @@ describe("Decorators", () => {
       expect(spy.mock.calls).toEqual([["A"], ["B"]]);
     });
 
-    test("select option", async () => {
+    test("keys option", async () => {
       const spyX = jest.fn();
       const spyY = jest.fn();
       @define(generateTagName())
@@ -352,7 +352,7 @@ describe("Decorators", () => {
       expect(spyY.mock.calls).toEqual([["B", "Y"]]);
     });
 
-    test("select option with private keys", async () => {
+    test("keys option with private names", async () => {
       const spyX = jest.fn();
       const spyY = jest.fn();
       @define(generateTagName())
