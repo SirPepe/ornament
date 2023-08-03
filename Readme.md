@@ -164,44 +164,43 @@ this bothers you, don't worry: building your own transformers is easy!
 
 ## Decorators
 
-### `@define(tagName?: string)`
+### `@define(tagName: string)`
 
-Class decorator to register a class as a custom element. The tag name for the
-custom element can be derived from the classes name or can be passed manually.
+Class decorator to register a class as a custom element.
 
 ```javascript
 import { define } from "@sirpepe/schleifchen"
 
-// Automatically derived tag name "test-element-foo"
-@define()
-class TestElementFoo extends HTMLElement {}
+@define("my-test")
+class MyTest extends HTMLElement {}
 
-// Manually provided tag name
-@define("test-element-bar")
-class TestElementBar extends HTMLElement {}
+// Automatically derived string tag "HTMLMyTestElement"
+console.log(document.createElement("my-test").toString());
+// > "[object HTMLMyTestElement]"
 ```
-
-Automatic tag names are created by turning the class name from camel case into
-kebab case. `TestElement` turns into `test-element`, `components4tThe_win` into
-`components-4-the-win` and so on.
 
 This decorator also sets up attribute observation for use with the
 [@attr()](#attrtransformer-options) decorator and it installs an automatic
 [string tag getter](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/toStringTag)
 (unless your component has its own string tag getter).
 
-```javascript
-import { define } from "@sirpepe/schleifchen"
+**Note for TypeScript:** you should add your custom element's interface to
+`HTMLElementTagNameMap` to make it work with native DOM APIs:
 
-// Automatically derived tag name "my-test"
-@define()
-class MyTest extends HTMLElement {}
+```typescript
+@define("my-test")
+class MyTest extends HTMLElement {
+  foo = 1;
+}
 
-const element = document.createElement("my-test");
+declare global {
+  interface HTMLElementTagNameMap {
+    "my-test": MyTest;
+  }
+}
 
-// Automatically derived string tag "HTMLMyTestElement"
-console.log(element.toString()); // "[object HTMLMyTestElement]"
-
+let test = document.createElement("my-test");
+console.log(test.foo); // only works in TS with the above interface declaration
 ```
 
 ### `@prop(transformer)`

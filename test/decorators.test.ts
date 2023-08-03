@@ -8,12 +8,12 @@ import { generateTagName, wait } from "./helpers";
 
 describe("Decorators", () => {
   describe("@define", () => {
-    test("register element with automatically derived tag name", () => {
-      @define()
-      class MyTest extends HTMLElement {}
-      expect(window.customElements.get("my-test")).toBe(MyTest);
-      expect(document.createElement("my-test").toString()).toEqual(
-        "[object HTMLMyTestElement]"
+    test("register element and create string tag", () => {
+      @define("register-test")
+      class Test extends HTMLElement {}
+      expect(window.customElements.get("register-test")).toBe(Test);
+      expect(document.createElement("register-test").toString()).toEqual(
+        "[object HTMLRegisterTestElement]"
       );
     });
 
@@ -28,23 +28,17 @@ describe("Decorators", () => {
       expect(document.createElement(tagName).toString()).toEqual("[object A]");
     });
 
-    test("reject an invalid automatically derived tag name", () => {
+    test("reject invalid tag names", () => {
       expect(() => {
-        @define()
-        class asdf extends HTMLElement {}
+        @define("")
+        class Test extends HTMLElement {}
       }).toThrow();
-    });
-
-    test("register element with a manually provided tag name", () => {
-      const tagName = generateTagName();
-      @define(tagName)
-      class Test extends HTMLElement {}
-      expect(window.customElements.get(tagName)).toBe(Test);
-    });
-
-    test("reject an invalid manually provided tag name", () => {
       expect(() => {
         @define("invalid")
+        class Test extends HTMLElement {}
+      }).toThrow();
+      expect(() => {
+        @define(undefined as any)
         class Test extends HTMLElement {}
       }).toThrow();
     });
