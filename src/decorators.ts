@@ -126,13 +126,6 @@ export function define<T extends CustomElementConstructor>(
     if (context.kind !== "class") {
       throw new TypeError(`Class decorator @define() used on ${context.kind}`);
     }
-    if (!tagName) {
-      throw new Error(`Missing tag name in @define()`);
-    }
-    tagName = String(tagName);
-    if (!/[a-z]+-[a-z]+/i.test(tagName)) {
-      throw new Error(`Invalid custom element tag name "${tagName}"`);
-    }
     context.addInitializer(function () {
       window.customElements.get(tagName) ??
         window.customElements.define(tagName, this);

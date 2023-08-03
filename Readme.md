@@ -1,18 +1,16 @@
-# Schleifchen 🎀
+# Ornament
 
-A set of decorators and associated functions to make building vanilla web
-components a little less painful:
+Micro-library for building vanilla web components:
 
 ```javascript
-import { define, attr, string, reactive } from "@sirpepe/schleifchen"
+import { define, attr, string, reactive } from "@sirpepe/ornament"
 
 // Register the element with the specified tag name
-@define("greeter-element")
-class GreeterElement extends HTMLElement {
+@define("my-greeter")
+class MyGreeter extends HTMLElement {
 
-  // Define a content attribute (eg. an attribute that works from HTML and via
-  // `setAttribute()` / `getAttribute()`) alongside a corresponding
-  // getter/setter pair for a JS api
+  // Define a content attribute alongside a corresponding getter/setter pair
+  // for a JS api and attribute change handling
   @attr(string()) accessor name = "Anonymous";
 
   // Mark the method as reactive to have it run every time the attribute "name"
@@ -26,7 +24,7 @@ class GreeterElement extends HTMLElement {
 The code above translates to the following boilerplate monstrosity:
 
 ```javascript
-class GreeterElement extends HTMLElement {
+class MyGreeter extends HTMLElement {
   // Internal "name" state, initialized from the element's content attributes,
   // with a default value in case the content attribute is not set
   #name = this.getAttribute("name") || "Anonymous";
@@ -77,29 +75,33 @@ class GreeterElement extends HTMLElement {
 
 // Finally register the element, with an extra check to make sure that the
 // tag name has not already been registered
-if (!window.customElements.has("greeter-element")) {
-  window.customElements.define("greeter-element", GreeterElement);
+if (!window.customElements.has("my-greeter")) {
+  window.customElements.define("my-greeter", MyGreeter);
 }
 ```
 
-Depending on your use case, some of the above operations may not be strictly
-necessary but it all works together to create custom elements that behave
-*exactly* like built-in HTML elements. Such standards-compliant behavior ensures
-that the elements work with every software, framework and content management
-system - now and in the future.
-
-Schleifchen uses [the latest ECMAScript Decorators API](https://2ality.com/2022/10/javascript-decorators.html)
+Ornament aims to make the most tedious bits of building vanilla web components
+(attribute handling and reactions to attribute handling) so easy that a
+full-blown frameworks is not necessary for many use cases. Ornament uses
+[the latest ECMAScript Decorators API](https://2ality.com/2022/10/javascript-decorators.html)
 as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
 (with option `version` set to `""2023-05""`) and
 [TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
 (with the option `experimentalDecorators` turned *off*).
 
-## Scope
+## Why use Ornament?
 
-Schleifchen is *not* a framework and its scope is strictly limited to only the
-most tedious bits of building standards-compliant web components: attribute
-handling and reactions to attribute handling.
+The native APIs for web components are verbose and imperative. This is not
+really a problem, but lends itself to quite a bit of streamlining.
 
+### Component registration
+
+
+
+### Attribute handling
+
+Getting attribute handling on Web Components right is hard, because many
+different APIs and states need to interact in just the right way.
 [To paraphrase MDN:](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes?retiredLocale=de#content_versus_idl_attributes)
 Attributes have two faces: the *content attribute* and the *IDL attribute* (also
 known as "JavaScript properties"). Content attributes are always strings and are
@@ -124,9 +126,10 @@ more or less the same for all attributes, it is possible to to simplify the
 syntax quite a bit:
 
 ```javascript
-import { attr, number } from "@sirpepe/schleifchen"
+import { attr, define number } from "@sirpepe/ornament"
 
-class MyElement extends HTMLElement {
+@define("my-test")
+class MyTest extends HTMLElement {
   @attr(number({ min: -100, max: 100 })) accessor value = 0;
   @reactive log() {
     console.log(this.value);
