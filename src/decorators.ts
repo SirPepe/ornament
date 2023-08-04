@@ -1,9 +1,10 @@
-import type {
-  ClassAccessorDecorator,
-  FunctionFieldOrMethodDecorator,
-  FunctionFieldOrMethodContext,
-  Method,
-  Transformer,
+import {
+  type ClassAccessorDecorator,
+  type FunctionFieldOrMethodDecorator,
+  type FunctionFieldOrMethodContext,
+  type Method,
+  type Transformer,
+  assertContext,
 } from "./types";
 
 // Accessor decorators initialize *after* custom elements access their
@@ -64,9 +65,7 @@ export function define<T extends CustomElementConstructor>(
   tagName: string
 ): (target: T, context: ClassDecoratorContext<T>) => T {
   return function (target: T, context: ClassDecoratorContext<T>): T {
-    if (context.kind !== "class") {
-      throw new TypeError(`Class decorator @define() used on ${context.kind}`);
-    }
+    assertContext(context, "@define", "class");
 
     // Define the custom element after all other decorators have been applied
     context.addInitializer(function () {
@@ -161,11 +160,7 @@ export function reactive<T extends HTMLElement>(
 ): ReactiveDecorator<T> {
   const initial = options.initial ?? true;
   return function (value, context): void {
-    if (context.kind !== "method") {
-      throw new TypeError(
-        `Method decorator @reactive() used on ${context.kind}`
-      );
-    }
+    assertContext(context, "@reactive", "method", { private: true });
     context.addInitializer(function () {
       // Register the callback that performs the initial method call
       if (initial) {
@@ -208,15 +203,7 @@ export function attr<T extends HTMLElement, V>(
   const isReflectiveAttribute = options.reflective !== false;
   const updateAttrPredicate = transformer.updateAttrPredicate ?? (() => true);
   return function ({ get, set }, context): ClassAccessorDecoratorResult<T, V> {
-    if (context.kind !== "accessor") {
-      throw new TypeError(`Accessor decorator @attr used on ${context.kind}`);
-    }
-
-    // Accessor decorators can be applied to private fields, but the APIs for
-    // IDL attributes must be public.
-    if (context.private) {
-      throw new TypeError("Attributes defined by @attr must not be private");
-    }
+    assertContext(context, "@attr", "accessor");
 
     // Accessor decorators can be applied to symbol accessors, but DOM attribute
     // names must be strings. As attributes always go along with public getters
@@ -316,16 +303,13 @@ export function attr<T extends HTMLElement, V>(
 
 // Accessor decorator @prop() returns a normal accessor, but with validation and
 // reactivity added.
-
 export function prop<T extends HTMLElement, V>(
   this: unknown,
   transformer: Transformer<T, V>
 ): ClassAccessorDecorator<T, V> {
   const getTransform = transformer.get ?? ((x: V) => x);
   return function ({ get, set }, context): ClassAccessorDecoratorResult<T, V> {
-    if (context.kind !== "accessor") {
-      throw new TypeError(`Accessor decorator @prop used on ${context.kind}`);
-    }
+    assertContext(context, "@prop", "accessor", { private: true });
     return {
       init(input) {
         transformer.beforeInitCallback?.call(this, input, input, context);
@@ -388,6 +372,10 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
     value: Method<T, A> | undefined,
     context: FunctionFieldOrMethodContext<T, A>
   ): Method<T, A> | ((init: Method<unknown, A>) => Method<unknown, A>) {
+    assertContext(context, "@debounce", ["field", "method"], {
+      private: true,
+      static: true,
+    });
     if (context.kind === "field") {
       // Field decorator (bound methods)
       return function init(func: Method<unknown, A>): Method<unknown, A> {
@@ -404,13 +392,8 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
         throw new Error("This should never happen");
       }
       return createDebouncedMethod(value, fn);
-    } else {
-      throw new TypeError(
-        `Method/class field decorator @debounce() used on ${
-          (context as any).kind
-        }`
-      );
     }
+    throw new TypeError(); // never happens
   }
   return decorator;
 }

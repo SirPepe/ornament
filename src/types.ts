@@ -130,3 +130,32 @@ export function assertTransformer<T extends HTMLElement, V>(
   assertPropType(input, "beforeInitCallback", "function", "undefined");
   assertPropType(input, "beforeSetCallback", "function", "undefined");
 }
+
+type AcceptOptions = {
+  private?: boolean;
+  static?: boolean;
+};
+
+export function assertContext(
+  ctx: any,
+  name: string,
+  kind: DecoratorContext["kind"] | DecoratorContext["kind"][],
+  accept: Partial<AcceptOptions> = {}
+): void {
+  const kinds = Array.isArray(kind) ? kind : [kind];
+  if (!kinds.includes(ctx.kind)) {
+    const expected = kinds
+      .map((k) => k.slice(0, 1).toUpperCase() + k.slice(1))
+      .join("/");
+    throw new TypeError(`${expected} decorator ${name} used on ${ctx.kind}`);
+  }
+  if (kind === "class") {
+    return;
+  }
+  if (ctx.private && accept.private !== true) {
+    throw new TypeError(`Decorator ${name} can't be used on private members`);
+  }
+  if (ctx.static && accept.static !== true) {
+    throw new TypeError(`Decorator ${name} can't be used on static members`);
+  }
+}

@@ -84,6 +84,16 @@ describe("Decorators", () => {
       el[key] = "B";
       expect(el[key]).toBe("B");
     });
+
+    test("reject on static", () => {
+      expect(() => {
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          // @ts-expect-error for testing runtime checks
+          @prop(string()) static accessor foo = "A";
+        }
+      }).toThrow(TypeError);
+    });
   });
 
   describe("@attr", () => {
@@ -195,6 +205,15 @@ describe("Decorators", () => {
         const key = Symbol();
         class Test extends HTMLElement {
           @attr(string()) accessor [key] = "A";
+        }
+      }).toThrow(TypeError);
+    });
+
+    test("reject on static fields", async () => {
+      expect(() => {
+        class Test extends HTMLElement {
+          // @ts-expect-error for testing runtime checks
+          @attr(string()) static accessor x = "A";
         }
       }).toThrow(TypeError);
     });
@@ -424,6 +443,17 @@ describe("Decorators", () => {
       el.x = "B";
       expect(spy).toBeCalledTimes(1); // one update
       expect(spy.mock.calls).toEqual([["B"]]);
+    });
+
+    test("reject on static fields", async () => {
+      expect(() => {
+        class Test extends HTMLElement {
+          // @ts-expect-error for testing runtime checks
+          @reactive() static test() {
+            return;
+          }
+        }
+      }).toThrow(TypeError);
     });
   });
 
