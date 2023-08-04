@@ -173,13 +173,14 @@ for something else, or combine any of the above with hand-written logic.
 
 ### API overview
 
-| Decorator     | Class element       | `static` | `#private` |
-| --------------| --------------------|----------|------------|
-| `@define()`   | Class               | -        | -          |
-| `@attr()`     | Accessor            | ✕        | ✕          |
-| `@prop()`     | Accessor            | ✕        | ✓          |
-| `@reactive()` | Method              | ✕        | ✓          |
-| `@debounce()` | Method, Class Field | ✓        | ✓          |
+| Decorator      | Class element       | `static` | `#private` |
+| ---------------| --------------------|----------|------------|
+| `@define()`    | Class               | -        | -          |
+| `@attr()`      | Accessor            | ✕        | ✕          |
+| `@prop()`      | Accessor            | ✕        | ✓          |
+| `@reactive()`  | Method              | ✕        | ✓          |
+| `@subscribe()` | Method              | ✕        | ✓          |
+| `@debounce()`  | Method, Class Field | ✕        | ✓          |
 
 ### `@define(tagName: string)`
 
@@ -316,11 +317,11 @@ attributes will not cause `@reactive()` methods to run.
 
 ### `@reactive(options?)`
 
-**Method decorator** that causes class methods to re-run when accessors
-decorated with `@prop()` or `@attr()` change their values:
+**Method decorator** that causes class methods to run when accessors decorated
+with `@prop()` or `@attr()` change their values:
 
 ```javascript
-import { define, prop, number } from "@sirpepe/ornament"
+import { define, reactive, prop, number } from "@sirpepe/ornament"
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -353,6 +354,69 @@ prevent excessive calls.
 
 - **`initial` (boolean, optional)**: Whether or not to run the function when the element's constructor finishes, before any actual changes to any decorated accessor. Defaults to `true`
 - **`keys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) to monitor. Can include private names and symbols. Defaults to monitoring all content and IDL attributes defined by `@prop()` or `@attr()`.
+
+### `@subscribe(target, eventName)`
+
+**Method decorator** that causes class methods to run when an event target
+fires.
+
+```javascript
+import { define, subscribe } from "@sirpepe/ornament"
+
+const myTarget = new EventTarget();
+
+@define("my-test")
+class Test extends HTMLElement {
+  @subscribe(myTarget, "foo") log(evt) {
+    // evt = Event({ name: "foo", target: myTarget })
+    // this = Test instance
+    console.log(`'${evt.type}' event fired!`);
+  }
+}
+
+let testEl = document.createElement("my-test");
+
+myTarget.dispatchEvent(new Event("foo"));
+
+// testEl.log logs "'foo' event fired!"
+```
+
+[Event Target](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget) is
+an interface that objects such as HTMLElement, Window, Document and *many* more
+implement. You can use an an event bus that implements EventTarget together with
+`@subscribe()` to keep your various components in sync:
+
+```javascript
+class DataSource extends EventTarget {
+  #value = 0;
+  get value() {
+    return this.#value;
+  }
+  set value(newValue) {
+    this.#value = newValue;
+    this.dispatchEvent(new Event("change"));
+  }
+}
+
+const source = new DataSource();
+
+@define("my-test")
+class Test extends HTMLElement {
+  #shadow = this.attachShadow({ mode: "open" });
+
+  @subscribe(source, "change") #update() {
+    this.#shadow.innerHTML = `Value is now ${source.value}`;
+  }
+}
+
+let a = document.createElement("my-test");
+let b = document.createElement("my-test");
+
+source.value = 42;
+```
+
+Both instances of `my-test` are now subscribed to `change` events on the data
+source and their shadow DOM content stays in sync.
 
 ### `@debounce(options?)`
 

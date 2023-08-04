@@ -2,7 +2,14 @@
  * @jest-environment jsdom
  */
 
-import { attr, debounce, define, prop, reactive } from "../src/decorators";
+import {
+  attr,
+  debounce,
+  define,
+  prop,
+  reactive,
+  subscribe,
+} from "../src/decorators";
 import { href, string } from "../src/transformers";
 import { generateTagName, wait } from "./helpers";
 
@@ -450,6 +457,53 @@ describe("Decorators", () => {
         class Test extends HTMLElement {
           // @ts-expect-error for testing runtime checks
           @reactive() static test() {
+            return;
+          }
+        }
+      }).toThrow(TypeError);
+    });
+  });
+
+  describe("@subscribe", () => {
+    test("subscribe to an event target", async () => {
+      const spy = jest.fn();
+      const target = new EventTarget();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @subscribe(target, "foo")
+        test(event: Event) {
+          spy(this, event, event.target);
+        }
+      }
+      const instance = new Test();
+      const event = new Event("foo");
+      target.dispatchEvent(event);
+      expect(spy).toBeCalledTimes(1);
+      expect(spy.mock.calls).toEqual([[instance, event, target]]);
+    });
+
+    test("subscribe to an element", async () => {
+      const spy = jest.fn();
+      const target = document.createElement("div");
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @subscribe(target, "click")
+        test(event: MouseEvent) {
+          spy(this, event, event.target);
+        }
+      }
+      const instance = new Test();
+      const event = new MouseEvent("click");
+      target.dispatchEvent(event);
+      expect(spy).toBeCalledTimes(1);
+      expect(spy.mock.calls).toEqual([[instance, event, target]]);
+    });
+
+    test("reject on static fields", async () => {
+      expect(() => {
+        class Test extends HTMLElement {
+          // @ts-expect-error for testing runtime checks
+          @subscribe(new EventTarget(), "foo") static test() {
             return;
           }
         }

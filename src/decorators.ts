@@ -185,6 +185,31 @@ export function reactive<T extends HTMLElement>(
   };
 }
 
+type SubscriptionData = [EventTarget, string, (...args: any[]) => any];
+const unsubscribeRegistry = new FinalizationRegistry<SubscriptionData>(
+  ([target, event, callback]) => target.removeEventListener(event, callback)
+);
+
+type SubscribeDecorator<T, E extends Event> = (
+  value: Method<T, [E]>,
+  context: ClassMethodDecoratorContext<T>
+) => void;
+
+export function subscribe<
+  T extends HTMLElement,
+  U extends EventTarget,
+  E extends Event
+>(this: unknown, target: U, event: string): SubscribeDecorator<T, E> {
+  return function (value, context): void {
+    assertContext(context, "@subscribe", "method", { private: true });
+    context.addInitializer(function () {
+      const callback = (evt: any) => value.call(this, evt);
+      unsubscribeRegistry.register(this, [target, event, callback]);
+      target.addEventListener(event, callback);
+    });
+  };
+}
+
 // Accessor decorator @attr() defines a DOM attribute backed by an accessor.
 // Because attributes are public by definition, it can't be applied to private
 // accessors or symbol accessors.
