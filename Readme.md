@@ -171,9 +171,19 @@ for something else, or combine any of the above with hand-written logic.
 
 ## Decorators
 
+### API overview
+
+| Decorator     | Class element       | `static` | `#private` |
+| --------------| --------------------|----------|------------|
+| `@define()`   | Class               | -        | -          |
+| `@attr()`     | Accessor            | ✕        | ✕          |
+| `@prop()`     | Accessor            | ✕        | ✓          |
+| `@reactive()` | Method              | ✕        | ✓          |
+| `@debounce()` | Method, Class Field | ✓        | ✓          |
+
 ### `@define(tagName: string)`
 
-Class decorator to register a class as a custom element. This also sets up
+**Class decorator** to register a class as a custom element. This also sets up
 attribute observation for use with the [@attr()](#attrtransformer-options)
 decorator and installs an automatic
 [string tag getter](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/toStringTag)
@@ -210,7 +220,7 @@ console.log(test.foo); // only type checks with the above interface declaration
 
 ### `@prop(transformer)`
 
-Accessor decorator to define a IDL property on the custom element class
+**Accessor decorator** to define a IDL property on the custom element class
 *without* an associated content attribute. Such a property is more or less a
 regular accessor with two additional features:
 
@@ -252,9 +262,9 @@ would usually do. They will still work as expected, but they will not cause
 
 ### `@attr(transformer, options?)`
 
-Accessor decorator to define an IDL attribute with a matching content attribute
-on the custom element class. This results in something very similar to accessors
-decorated with `@prop()`, but with the following additional features:
+**Accessor decorator** to define an IDL attribute with a matching content
+attribute on the custom element class. This results in something very similar to
+accessors decorated with `@prop()`, but with the following additional features:
 
 - Its value can be initialized from a content attribute, if the attribute is present
 - Changes to the content attribute's value update the value of the IDL attribute to match (depending on the options and the transformer)
@@ -306,8 +316,8 @@ attributes will not cause `@reactive()` methods to run.
 
 ### `@reactive(options?)`
 
-Method decorator that causes class methods to re-run when accessors decorated
-with `@prop()` or `@attr()` change:
+**Method decorator** that causes class methods to re-run when accessors
+decorated with `@prop()` or `@attr()` change their values:
 
 ```javascript
 import { define, prop, number } from "@sirpepe/ornament"
@@ -330,6 +340,10 @@ testEl.bar = 2;
 // then logs "foo is now 1, bar is now 2"
 ```
 
+Reactive methods are called with no arguments. They react to changes to the
+instances' internal state and should therefore be able to access all relevant
+data through `this`.
+
 Unless the `initial` option is set to `false` the decorated method will run once
 the element's constructor finishes. In many cases you may want to apply
 `@reactive()` to methods decorated with [@debounce()](#reactiveoptions) to
@@ -342,7 +356,7 @@ prevent excessive calls.
 
 ### `@debounce(options?)`
 
-Method and class field decorator for debouncing method/function invocation:
+**Method and class field decorator** for debouncing method/function invocation:
 
 ```javascript
 import { define, debounce } from "@sirpepe/ornament"
@@ -372,6 +386,9 @@ el.test2("b");
 el.test2("c");
 // only logs "c"
 ```
+
+`@debounce()` works with class methods, static methods, and class field
+functions.
 
 **Note for TypeScript:** Debouncing a method or class field function makes it
 impossible for the method/function to return anything but `undefined`.
