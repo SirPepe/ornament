@@ -4,8 +4,10 @@
 
 import {
   attr,
+  connected,
   debounce,
   define,
+  disconnected,
   prop,
   reactive,
   subscribe,
@@ -265,6 +267,29 @@ describe("Decorators", () => {
     });
   });
 
+  describe("@connected/@disconnected", () => {
+    test("fire on (dis)connect", async () => {
+      const connectSpy = jest.fn();
+      const disconnectSpy = jest.fn();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @connected() connected() {
+          connectSpy(this);
+        }
+        @disconnected() disconnected() {
+          disconnectSpy(this);
+        }
+      }
+      const instance = new Test();
+      document.body.append(instance);
+      instance.remove();
+      expect(connectSpy).toBeCalledTimes(1);
+      expect(connectSpy.mock.calls).toEqual([[instance]]);
+      expect(disconnectSpy).toBeCalledTimes(1);
+      expect(disconnectSpy.mock.calls).toEqual([[instance]]);
+    });
+  });
+
   describe("@reactive", () => {
     test("initial call with reactive property", async () => {
       const spy = jest.fn();
@@ -471,6 +496,23 @@ describe("Decorators", () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         @subscribe(target, "foo")
+        test(event: Event) {
+          spy(this, event, event.target);
+        }
+      }
+      const instance = new Test();
+      const event = new Event("foo");
+      target.dispatchEvent(event);
+      expect(spy).toBeCalledTimes(1);
+      expect(spy.mock.calls).toEqual([[instance, event, target]]);
+    });
+
+    test("subscribe to an event target factory", async () => {
+      const spy = jest.fn();
+      const target = new EventTarget();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @subscribe(() => target, "foo")
         test(event: Event) {
           spy(this, event, event.target);
         }

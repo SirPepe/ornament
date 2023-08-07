@@ -24,7 +24,11 @@ type AttributeChangedCallback = (
   newValue: string | null
 ) => void;
 type CallbackMap = Map<string, AttributeChangedCallback>; // attr name -> cb
-const OBSERVER_CALLBACKS_BY_INSTANCE = new WeakMap<HTMLElement, CallbackMap>();
+const OBSERVER_CALLBACKS = new WeakMap<HTMLElement, CallbackMap>();
+
+// Callbacks to fire when connected or disconnected
+const CONNECTED_CALLBACKS = new WeakMap<HTMLElement, (() => void)[]>();
+const DISCONNECTED_CALLBACKS = new WeakMap<HTMLElement, (() => void)[]>();
 
 // Maps custom elements to a list of callbacks that trigger their @reactive()
 // method's initial calls (for methods that need such a call)
@@ -75,7 +79,10 @@ export function define<T extends CustomElementConstructor>(
     // User-defined custom element behaviors that need to be integrated into the
     // mixin class.
     const originalObservedAttributes = (target as any).observedAttributes ?? [];
-    const originalCallback = target.prototype.attributeChangedCallback;
+    const originalAttributeChangedCallback =
+      target.prototype.attributeChangedCallback;
+    const originalConnectedCallback = target.prototype.connectedCallback;
+    const originalDisconnectedCallback = target.prototype.disconnectedCallback;
     const originalToStringTag = Object.getOwnPropertyDescriptor(
       target.prototype,
       Symbol.toStringTag
@@ -92,9 +99,10 @@ export function define<T extends CustomElementConstructor>(
       // constructor's set-up is completed.
       constructor(...args: any[]) {
         super(...args);
-        // Perform the initial calls to reactive methods for this instance
+        // Perform the initial calls to reactive methods for this instance. The
+        // callbacks are bound methods, so there is no need to handle "this"
         for (const callback of REACTIVE_INIT_CALLBACKS.get(this) ?? []) {
-          callback.call(this);
+          callback();
         }
         REACTIVE_INIT_CALLBACKS.delete(this);
         // Mark the end of the constructor and the initial reactive calls,
@@ -127,10 +135,13 @@ export function define<T extends CustomElementConstructor>(
         oldVal: string | null,
         newVal: string | null
       ): void {
-        if (originalCallback && originalObservedAttributes.includes(name)) {
-          originalCallback.call?.(this, name, oldVal, newVal);
+        if (
+          originalAttributeChangedCallback &&
+          originalObservedAttributes.includes(name)
+        ) {
+          originalAttributeChangedCallback.call(this, name, oldVal, newVal);
         }
-        const callbacks = OBSERVER_CALLBACKS_BY_INSTANCE.get(this);
+        const callbacks = OBSERVER_CALLBACKS.get(this);
         if (!callbacks) {
           return;
         }
@@ -139,6 +150,26 @@ export function define<T extends CustomElementConstructor>(
           return;
         }
         callback.call(this, name, oldVal, newVal);
+      }
+
+      connectedCallback(): void {
+        if (originalConnectedCallback) {
+          originalConnectedCallback.call(this);
+        }
+        // The callbacks are bound methods, so there is no need to handle "this"
+        for (const callback of CONNECTED_CALLBACKS.get(this) ?? []) {
+          callback();
+        }
+      }
+
+      disconnectedCallback(): void {
+        if (originalDisconnectedCallback) {
+          originalDisconnectedCallback.call(this);
+        }
+        // The callbacks are bound methods, so there is no need to handle "this"
+        for (const callback of DISCONNECTED_CALLBACKS.get(this) ?? []) {
+          callback();
+        }
       }
     };
   };
@@ -159,9 +190,10 @@ export function reactive<T extends HTMLElement>(
   options: ReactiveOptions = {}
 ): ReactiveDecorator<T> {
   const initial = options.initial ?? true;
-  return function (value, context): void {
+  return function (_, context): void {
     assertContext(context, "@reactive", "method", { private: true });
     context.addInitializer(function () {
+      const value = context.access.get(this);
       // Register the callback that performs the initial method call
       if (initial) {
         const method = DEBOUNCED_METHOD_MAP.get(value) ?? value;
@@ -195,17 +227,68 @@ type SubscribeDecorator<T, E extends Event> = (
   context: ClassMethodDecoratorContext<T>
 ) => void;
 
+type LazyEventTarget<T extends EventTarget> = () => T;
+
 export function subscribe<
   T extends HTMLElement,
   U extends EventTarget,
   E extends Event
->(this: unknown, target: U, event: string): SubscribeDecorator<T, E> {
-  return function (value, context): void {
+>(
+  this: unknown,
+  target: U | LazyEventTarget<U>,
+  event: string,
+  predicate: (evt: E) => boolean = () => true
+): SubscribeDecorator<T, E> {
+  return function (_, context): void {
     assertContext(context, "@subscribe", "method", { private: true });
     context.addInitializer(function () {
-      const callback = (evt: any) => value.call(this, evt);
+      const value = context.access.get(this);
+      const callback = (evt: any) => {
+        if (predicate(evt)) {
+          value.call(this, evt);
+        }
+      };
+      if (typeof target === "function") {
+        target = target();
+      }
       unsubscribeRegistry.register(this, [target, event, callback]);
       target.addEventListener(event, callback);
+    });
+  };
+}
+
+export function connected<T extends HTMLElement>() {
+  return function (
+    _: Method<T, []>,
+    context: ClassMethodDecoratorContext<T>
+  ): void {
+    assertContext(context, "@connected", "method", { private: true });
+    context.addInitializer(function () {
+      const value = context.access.get(this);
+      const callbacks = CONNECTED_CALLBACKS.get(this);
+      if (callbacks) {
+        callbacks.push(value.bind(this));
+      } else {
+        CONNECTED_CALLBACKS.set(this, [value.bind(this)]);
+      }
+    });
+  };
+}
+
+export function disconnected<T extends HTMLElement>() {
+  return function (
+    _: Method<T, []>,
+    context: ClassMethodDecoratorContext<T>
+  ): void {
+    assertContext(context, "@disconnected", "method", { private: true });
+    context.addInitializer(function () {
+      const value = context.access.get(this);
+      const callbacks = DISCONNECTED_CALLBACKS.get(this);
+      if (callbacks) {
+        callbacks.push(value.bind(this));
+      } else {
+        DISCONNECTED_CALLBACKS.set(this, [value.bind(this)]);
+      }
     });
   };
 }
@@ -274,11 +357,11 @@ export function attr<T extends HTMLElement, V>(
           set.call(this, newValue);
           this.dispatchEvent(new ReactivityEvent(context.name));
         };
-        const instanceCallbacks = OBSERVER_CALLBACKS_BY_INSTANCE.get(this);
+        const instanceCallbacks = OBSERVER_CALLBACKS.get(this);
         if (instanceCallbacks) {
           instanceCallbacks.set(attrName, attributeChangedCallback);
         } else {
-          OBSERVER_CALLBACKS_BY_INSTANCE.set(
+          OBSERVER_CALLBACKS.set(
             this,
             new Map([[attrName, attributeChangedCallback]])
           );

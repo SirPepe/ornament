@@ -173,14 +173,16 @@ for something else, or combine any of the above with hand-written logic.
 
 ### API overview
 
-| Decorator      | Class element       | `static` | `#private` |
-| ---------------| --------------------|----------|------------|
-| `@define()`    | Class               | -        | -          |
-| `@attr()`      | Accessor            | ✕        | ✕          |
-| `@prop()`      | Accessor            | ✕        | ✓          |
-| `@reactive()`  | Method              | ✕        | ✓          |
-| `@subscribe()` | Method              | ✕        | ✓          |
-| `@debounce()`  | Method, Class Field | ✕        | ✓          |
+| Decorator         | Class element       | `static` | `#private` |
+| ------------------| --------------------|----------|------------|
+| `@define()`       | Class               | -        | -          |
+| `@attr()`         | Accessor            | ✕        | ✕          |
+| `@prop()`         | Accessor            | ✕        | ✓          |
+| `@reactive()`     | Method              | ✕        | ✓          |
+| `@connected()`    | Method              | ✕        | ✓          |
+| `@disconnected()` | Method              | ✕        | ✓          |
+| `@subscribe()`    | Method              | ✕        | ✓          |
+| `@debounce()`     | Method, Class Field | ✕        | ✓          |
 
 ### `@define(tagName: string)`
 
@@ -355,10 +357,51 @@ prevent excessive calls.
 - **`initial` (boolean, optional)**: Whether or not to run the function when the element's constructor finishes, before any actual changes to any decorated accessor. Defaults to `true`
 - **`keys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) to monitor. Can include private names and symbols. Defaults to monitoring all content and IDL attributes defined by `@prop()` or `@attr()`.
 
+### `@connected()`
+
+**Method decorator** that causes decorated class methods to run when the
+component connects to the DOM:
+
+```javascript
+import { define, connected } from "@sirpepe/ornament"
+
+@define("my-test")
+class Test extends HTMLElement {
+  @connected log() {
+    console.log("Connected!");
+  }
+}
+
+let testEl = document.createElement("my-test");
+document.body.append(testEl);
+// testEl.log logs "Connected!"
+```
+
+### `@disconnected()`
+
+**Method decorator** that causes decorated class methods to run when the
+component disconnects from the DOM:
+
+```javascript
+import { define, disconnected } from "@sirpepe/ornament"
+
+@define("my-test")
+class Test extends HTMLElement {
+  @disconnected log() {
+    console.log("Disconnected!");
+  }
+}
+
+let testEl = document.createElement("my-test");
+document.body.append(testEl);
+testEl.remove();
+// testEl.log logs "Disconnected!"
+```
+
 ### `@subscribe(target, eventName)`
 
-**Method decorator** that causes class methods to run when an event target
-fires.
+**Method decorator** that causes decorated class methods to run when an event
+target fires.
 
 ```javascript
 import { define, subscribe } from "@sirpepe/ornament"
@@ -417,6 +460,17 @@ source.value = 42;
 
 Both instances of `my-test` are now subscribed to `change` events on the data
 source and their shadow DOM content stays in sync.
+
+You can also provide a target-producing factory in place of the target itself:
+
+```javascript
+@define("my-test")
+class Test extends HTMLElement {
+
+  @subscribe(source, "change") #a() {} // same effect as below
+  @subscribe(() => source, "change") #b() {} // same effect as above
+}
+```
 
 ### `@debounce(options?)`
 
