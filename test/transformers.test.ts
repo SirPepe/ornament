@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { attr, define } from "../src/decorators";
+import { attr, define } from "../src/decorators.js";
 import {
   boolean,
   event,
@@ -12,8 +12,9 @@ import {
   number,
   record,
   string,
-} from "../src/transformers";
-import { generateTagName, wait } from "./helpers";
+} from "../src/transformers.js";
+import { generateTagName, wait } from "./helpers.js";
+import { jest } from "@jest/globals";
 
 describe("Transformers", () => {
   describe("string()", () => {

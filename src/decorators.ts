@@ -217,43 +217,129 @@ export function reactive<T extends HTMLElement>(
   };
 }
 
-type SubscriptionData = [EventTarget, string, (...args: any[]) => any];
-const unsubscribeRegistry = new FinalizationRegistry<SubscriptionData>(
-  ([target, event, callback]) => target.removeEventListener(event, callback)
+const unsubscribeRegistry = new FinalizationRegistry<() => void>(
+  (unsubscribe) => unsubscribe()
 );
 
-type SubscribeDecorator<T, E extends Event> = (
+type EventSubscribeDecorator<T, E extends Event> = (
   value: Method<T, [E]>,
   context: ClassMethodDecoratorContext<T>
 ) => void;
 
-type LazyEventTarget<T extends EventTarget> = () => T;
+type LazyEventTarget<T extends EventTarget = EventTarget> = () => T;
 
+function createEventSubscriberInitializer<T extends object, E extends Event>(
+  context: ClassMethodDecoratorContext<T>,
+  target: EventTarget | LazyEventTarget,
+  eventName: string,
+  predicate: (this: T, evt: E) => boolean = () => true
+): (this: T) => void {
+  return function (this: T) {
+    const value = context.access.get(this);
+    const callback = (evt: any) => {
+      if (predicate.call(this, evt)) {
+        value.call(this, evt);
+      }
+    };
+    if (typeof target === "function") {
+      target = target();
+    }
+    const unsubscribe = () =>
+      (target as EventTarget).removeEventListener(eventName, callback);
+    unsubscribeRegistry.register(this, unsubscribe);
+    target.addEventListener(eventName, callback);
+  };
+}
+
+type SignalSubscribeDecorator<T> = (
+  value: Method<T, []>,
+  context: ClassMethodDecoratorContext<T>
+) => void;
+
+type SignalLike = {
+  subscribe(callback: () => void): () => void;
+};
+
+function isSignalLike(value: unknown): value is SignalLike {
+  if (
+    value &&
+    typeof value === "object" &&
+    "effect" in value &&
+    typeof value.effect === "string"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function createSignalSubscriberInitializer<
+  T extends object,
+  S extends SignalLike
+>(
+  context: ClassMethodDecoratorContext<T>,
+  target: S,
+  predicate: (this: T, signal: S) => boolean = () => true
+): (this: T) => void {
+  return function (this: T) {
+    const value = context.access.get(this);
+    const callback = () => {
+      if (predicate.call(this, target)) {
+        value.call(this, target);
+      }
+    };
+    const unsubscribe = target.subscribe(callback);
+    unsubscribeRegistry.register(this, unsubscribe);
+  };
+}
+
+export function subscribe<T extends object, S extends SignalLike>(
+  this: unknown,
+  target: S,
+  predicate?: (this: T, signal: S) => boolean
+): SignalSubscribeDecorator<T>;
 export function subscribe<
-  T extends HTMLElement,
+  T extends object,
   U extends EventTarget,
   E extends Event
 >(
   this: unknown,
   target: U | LazyEventTarget<U>,
   event: string,
-  predicate: (evt: E) => boolean = () => true
-): SubscribeDecorator<T, E> {
-  return function (_, context): void {
+  predicate?: (this: T, evt: E) => boolean
+): EventSubscribeDecorator<T, E>;
+export function subscribe<T extends object>(
+  this: unknown,
+  target: EventTarget | LazyEventTarget<any> | SignalLike,
+  eventOrPredicate?: ((this: T, arg: any) => boolean) | string,
+  predicate?: (this: T, arg: any) => boolean
+): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
+  return function (_: unknown, context: ClassMethodDecoratorContext<T>): void {
     assertContext(context, "@subscribe", "method", { private: true });
-    context.addInitializer(function () {
-      const value = context.access.get(this);
-      const callback = (evt: any) => {
-        if (predicate(evt)) {
-          value.call(this, evt);
-        }
-      };
-      if (typeof target === "function") {
-        target = target();
-      }
-      unsubscribeRegistry.register(this, [target, event, callback]);
-      target.addEventListener(event, callback);
-    });
+    if (
+      (typeof target === "function" || target instanceof EventTarget) &&
+      typeof eventOrPredicate === "string"
+    ) {
+      context.addInitializer(
+        createEventSubscriberInitializer(
+          context,
+          target,
+          eventOrPredicate,
+          predicate
+        )
+      );
+      return;
+    }
+    if (
+      isSignalLike(target) &&
+      (typeof eventOrPredicate === "function" ||
+        typeof eventOrPredicate === "undefined")
+    ) {
+      context.addInitializer(
+        createSignalSubscriberInitializer(context, target, eventOrPredicate)
+      );
+      return;
+    }
+    throw new Error("Invalid arguments to @subscribe");
   };
 }
 

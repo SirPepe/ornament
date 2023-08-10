@@ -11,9 +11,11 @@ import {
   prop,
   reactive,
   subscribe,
-} from "../src/decorators";
-import { href, string } from "../src/transformers";
-import { generateTagName, wait } from "./helpers";
+} from "../src/decorators.js";
+import { href, string } from "../src/transformers.js";
+import { generateTagName, wait } from "./helpers.js";
+import { signal } from "@preact/signals-core";
+import { jest } from "@jest/globals";
 
 describe("Decorators", () => {
   describe("@define", () => {
@@ -490,61 +492,115 @@ describe("Decorators", () => {
   });
 
   describe("@subscribe", () => {
-    test("subscribe to an event target", async () => {
-      const spy = jest.fn();
-      const target = new EventTarget();
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        @subscribe(target, "foo")
-        test(event: Event) {
-          spy(this, event, event.target);
+    describe("@subscribe on signals", () => {
+      test("subscribe to a signal", async () => {
+        const spy = jest.fn();
+        const counter = signal(0);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(counter)
+          test() {
+            spy(this, counter.value);
+          }
         }
-      }
-      const instance = new Test();
-      const event = new Event("foo");
-      target.dispatchEvent(event);
-      expect(spy).toBeCalledTimes(1);
-      expect(spy.mock.calls).toEqual([[instance, event, target]]);
+        const instance = new Test();
+        counter.value = 1;
+        counter.value = 2;
+        counter.value = 3;
+        expect(spy).toBeCalledTimes(3);
+        expect(spy.mock.calls).toEqual([
+          [instance, 1],
+          [instance, 2],
+          [instance, 3],
+        ]);
+      });
     });
 
-    test("subscribe to an event target factory", async () => {
-      const spy = jest.fn();
-      const target = new EventTarget();
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        @subscribe(() => target, "foo")
-        test(event: Event) {
-          spy(this, event, event.target);
+    describe("@subscribe on event targets", () => {
+      test("subscribe to an event target", async () => {
+        const spy = jest.fn();
+        const target = new EventTarget();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "foo")
+          test(event: Event) {
+            spy(this, event, event.target);
+          }
         }
-      }
-      const instance = new Test();
-      const event = new Event("foo");
-      target.dispatchEvent(event);
-      expect(spy).toBeCalledTimes(1);
-      expect(spy.mock.calls).toEqual([[instance, event, target]]);
-    });
+        const instance = new Test();
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(spy).toBeCalledTimes(1);
+        expect(spy.mock.calls).toEqual([[instance, event, target]]);
+      });
 
-    test("subscribe to an element", async () => {
-      const spy = jest.fn();
-      const target = document.createElement("div");
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        @subscribe(target, "click")
-        test(event: MouseEvent) {
-          spy(this, event, event.target);
+      test("subscribe to an event target factory", async () => {
+        const spy = jest.fn();
+        const target = new EventTarget();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(() => target, "foo")
+          test(event: Event) {
+            spy(this, event, event.target);
+          }
         }
-      }
-      const instance = new Test();
-      const event = new MouseEvent("click");
-      target.dispatchEvent(event);
-      expect(spy).toBeCalledTimes(1);
-      expect(spy.mock.calls).toEqual([[instance, event, target]]);
+        const instance = new Test();
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(spy).toBeCalledTimes(1);
+        expect(spy.mock.calls).toEqual([[instance, event, target]]);
+      });
+
+      test("subscribe to an element", async () => {
+        const spy = jest.fn();
+        const target = document.createElement("div");
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "click")
+          test(event: MouseEvent) {
+            spy(this, event, event.target);
+          }
+        }
+        const instance = new Test();
+        const event = new MouseEvent("click");
+        target.dispatchEvent(event);
+        expect(spy).toBeCalledTimes(1);
+        expect(spy.mock.calls).toEqual([[instance, event, target]]);
+      });
+
+      test("subscribe with a predicate", async () => {
+        const spy = jest.fn();
+        const target = new EventTarget();
+        class TestEvent extends Event {
+          value: boolean;
+          constructor(value: boolean) {
+            super("test");
+            this.value = value;
+          }
+        }
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "test", (evt) => evt.value === true)
+          test(event: TestEvent) {
+            spy(this, event.value);
+          }
+        }
+        const instance = new Test();
+        target.dispatchEvent(new TestEvent(true));
+        target.dispatchEvent(new TestEvent(false));
+        target.dispatchEvent(new TestEvent(true));
+        target.dispatchEvent(new TestEvent(false));
+        expect(spy).toBeCalledTimes(2);
+        expect(spy.mock.calls).toEqual([
+          [instance, true],
+          [instance, true],
+        ]);
+      });
     });
 
     test("reject on static fields", async () => {
       expect(() => {
         class Test extends HTMLElement {
-          // @ts-expect-error for testing runtime checks
           @subscribe(new EventTarget(), "foo") static test() {
             return;
           }
