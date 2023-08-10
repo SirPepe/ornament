@@ -1,7 +1,5 @@
-/**
- * @jest-environment jsdom
- */
-
+import { expect } from "@esm-bundle/chai";
+import { spy } from "sinon";
 import { attr, define } from "../src/decorators.js";
 import {
   boolean,
@@ -14,7 +12,7 @@ import {
   string,
 } from "../src/transformers.js";
 import { generateTagName, wait } from "./helpers.js";
-import { jest } from "@jest/globals";
+const test = it;
 
 describe("Transformers", () => {
   describe("string()", () => {
@@ -24,27 +22,27 @@ describe("Transformers", () => {
         @attr(string()) accessor foo = "";
       }
       const el = new Test();
-      expect(el.foo).toBe("");
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.equal("");
+      expect(el.getAttribute("foo")).to.equal(null);
       el.foo = "A";
-      expect(el.foo).toBe("A");
-      expect(el.getAttribute("foo")).toBe("A");
+      expect(el.foo).to.equal("A");
+      expect(el.getAttribute("foo")).to.equal("A");
       el.setAttribute("foo", "B");
-      expect(el.foo).toBe("B");
-      expect(el.getAttribute("foo")).toBe("B");
+      expect(el.foo).to.equal("B");
+      expect(el.getAttribute("foo")).to.equal("B");
       el.removeAttribute("foo");
-      expect(el.foo).toBe("");
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.equal("");
+      expect(el.getAttribute("foo")).to.equal(null);
       el.foo = "A";
       el.foo = "";
-      expect(el.foo).toBe("");
-      expect(el.getAttribute("foo")).toBe("");
+      expect(el.foo).to.equal("");
+      expect(el.getAttribute("foo")).to.equal("");
       el.foo = null as any;
-      expect(el.foo).toBe("null");
-      expect(el.getAttribute("foo")).toBe("null");
+      expect(el.foo).to.equal("null");
+      expect(el.getAttribute("foo")).to.equal("null");
       el.foo = false as any;
-      expect(el.foo).toBe("false");
-      expect(el.getAttribute("foo")).toBe("false");
+      expect(el.foo).to.equal("false");
+      expect(el.getAttribute("foo")).to.equal("false");
     });
 
     test("custom fallback value", async () => {
@@ -54,9 +52,9 @@ describe("Transformers", () => {
       }
       const el = new Test();
       el.foo = "Hello";
-      expect(el.getAttribute("foo")).toBe("Hello");
+      expect(el.getAttribute("foo")).to.equal("Hello");
       el.removeAttribute("foo");
-      expect(el.foo).toBe("default");
+      expect(el.foo).to.equal("default");
     });
 
     test("non-initialized accessor", async () => {
@@ -65,15 +63,15 @@ describe("Transformers", () => {
         @attr(string()) accessor foo: any;
       }
       const el = new Test();
-      expect(el.foo).toBe("");
+      expect(el.foo).to.equal("");
       el.foo = "Hello";
-      expect(el.getAttribute("foo")).toBe("Hello");
+      expect(el.getAttribute("foo")).to.equal("Hello");
       el.removeAttribute("foo");
-      expect(el.foo).toBe("");
+      expect(el.foo).to.equal("");
       el.foo = "Hello";
-      expect(el.foo).toBe("Hello");
+      expect(el.foo).to.equal("Hello");
       el.foo = undefined as any;
-      expect(el.foo).toBe("");
+      expect(el.foo).to.equal("");
     });
   });
 
@@ -84,18 +82,18 @@ describe("Transformers", () => {
         @attr(href()) accessor foo = "";
       }
       const el = new Test();
-      expect(el.foo).toBe("");
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.equal("");
+      expect(el.getAttribute("foo")).to.equal(null);
       el.foo = "";
-      expect(el.foo).toBe("http://localhost/");
-      expect(el.getAttribute("foo")).toBe("");
+      expect(el.foo).to.equal(window.location.href);
+      expect(el.getAttribute("foo")).to.equal("");
       el.setAttribute("foo", "asdf");
-      expect(el.foo).toBe("http://localhost/asdf");
-      expect(el.getAttribute("foo")).toBe("asdf");
+      expect(el.foo).to.equal(`${window.location.origin}/asdf`);
+      expect(el.getAttribute("foo")).to.equal("asdf");
       el.removeAttribute("foo");
-      expect(el.foo).toBe("");
+      expect(el.foo).to.equal("");
       el.foo = "https://example.com/asdf/";
-      expect(el.foo).toBe("https://example.com/asdf/");
+      expect(el.foo).to.equal("https://example.com/asdf/");
     });
 
     test("from HTML", async () => {
@@ -106,7 +104,9 @@ describe("Transformers", () => {
       }
       const fixture = document.createElement("div");
       fixture.innerHTML = `<${tagName} foo="https://example.com/asdf"></${tagName}>`;
-      expect((fixture.children[0] as any).foo).toBe("https://example.com/asdf");
+      expect((fixture.children[0] as any).foo).to.equal(
+        "https://example.com/asdf"
+      );
     });
   });
 
@@ -118,13 +118,13 @@ describe("Transformers", () => {
           class extends HTMLElement {
             @attr(number({ min: 1, max: 0 })) accessor foo = 1;
           }
-      ).toThrow();
+      ).to.throw();
       expect(
         () =>
           class extends HTMLElement {
             @attr(number({ min: 1, max: 1 })) accessor foo = 1;
           }
-      ).toThrow();
+      ).to.throw();
       // Invalid initial value
       expect(() => {
         @define(generateTagName())
@@ -132,7 +132,7 @@ describe("Transformers", () => {
           @attr(number({ min: 0, max: 10 })) accessor foo = -7;
         }
         new Test();
-      }).toThrow();
+      }).to.throw();
     });
 
     test("as attribute", async () => {
@@ -141,21 +141,21 @@ describe("Transformers", () => {
         @attr(number()) accessor foo = 0;
       }
       const el = new Test();
-      expect(el.foo).toBe(0);
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.equal(0);
+      expect(el.getAttribute("foo")).to.equal(null);
       el.foo = 1;
-      expect(el.foo).toBe(1);
-      expect(el.getAttribute("foo")).toBe("1");
+      expect(el.foo).to.equal(1);
+      expect(el.getAttribute("foo")).to.equal("1");
       el.setAttribute("foo", "2");
-      expect(el.foo).toBe(2);
+      expect(el.foo).to.equal(2);
       el.setAttribute("foo", "2.22");
-      expect(el.foo).toBe(2.22);
+      expect(el.foo).to.equal(2.22);
       el.removeAttribute("foo");
-      expect(el.foo).toBe(0);
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.equal(0);
+      expect(el.getAttribute("foo")).to.equal(null);
       el.foo = 3;
       el.setAttribute("foo", "asdf");
-      expect(el.foo).toBe(0);
+      expect(el.foo).to.equal(0);
     });
 
     test("min/max", async () => {
@@ -166,9 +166,9 @@ describe("Transformers", () => {
       const el = new Test();
       expect(() => {
         el.foo = -1;
-      }).toThrow();
+      }).to.throw();
       el.setAttribute("foo", "22");
-      expect(el.foo).toBe(10);
+      expect(el.foo).to.equal(10);
     });
 
     test("custom fallback value", async () => {
@@ -178,9 +178,9 @@ describe("Transformers", () => {
       }
       const el = new Test();
       el.foo = 8;
-      expect(el.getAttribute("foo")).toBe("8");
+      expect(el.getAttribute("foo")).to.equal("8");
       el.removeAttribute("foo");
-      expect(el.foo).toBe(7);
+      expect(el.foo).to.equal(7);
     });
 
     test("non-initialized accessor", async () => {
@@ -189,15 +189,15 @@ describe("Transformers", () => {
         @attr(number()) accessor foo: any;
       }
       const el = new Test();
-      expect(el.foo).toBe(0);
+      expect(el.foo).to.equal(0);
       el.foo = 7;
-      expect(el.getAttribute("foo")).toBe("7");
+      expect(el.getAttribute("foo")).to.equal("7");
       el.removeAttribute("foo");
-      expect(el.foo).toBe(0);
+      expect(el.foo).to.equal(0);
       el.foo = 7;
-      expect(el.foo).toBe(7);
+      expect(el.foo).to.equal(7);
       el.foo = undefined as any;
-      expect(el.foo).toBe(0);
+      expect(el.foo).to.equal(0);
     });
   });
 
@@ -208,19 +208,19 @@ describe("Transformers", () => {
         @attr(int()) accessor foo = 0n;
       }
       const el = new Test();
-      expect(el.foo).toBe(0n);
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.equal(0n);
+      expect(el.getAttribute("foo")).to.equal(null);
       el.foo = 1n;
-      expect(el.foo).toBe(1n);
-      expect(el.getAttribute("foo")).toBe("1");
+      expect(el.foo).to.equal(1n);
+      expect(el.getAttribute("foo")).to.equal("1");
       el.setAttribute("foo", "2");
-      expect(el.foo).toBe(2n);
+      expect(el.foo).to.equal(2n);
       el.setAttribute("foo", "2.75");
-      expect(el.foo).toBe(0n);
+      expect(el.foo).to.equal(0n);
       el.setAttribute("foo", "3");
-      expect(el.foo).toBe(3n);
+      expect(el.foo).to.equal(3n);
       el.removeAttribute("foo");
-      expect(el.foo).toBe(0n);
+      expect(el.foo).to.equal(0n);
     });
 
     test("min/max", async () => {
@@ -231,9 +231,9 @@ describe("Transformers", () => {
       const el = new Test();
       expect(() => {
         el.foo = -1n;
-      }).toThrow();
+      }).to.throw();
       el.setAttribute("foo", "22");
-      expect(el.foo).toBe(10n);
+      expect(el.foo).to.equal(10n);
     });
 
     test("custom fallback value", async () => {
@@ -243,9 +243,9 @@ describe("Transformers", () => {
       }
       const el = new Test();
       el.foo = 8n;
-      expect(el.getAttribute("foo")).toBe("8");
+      expect(el.getAttribute("foo")).to.equal("8");
       el.removeAttribute("foo");
-      expect(el.foo).toBe(7n);
+      expect(el.foo).to.equal(7n);
     });
 
     test("non-initialized accessor", async () => {
@@ -254,15 +254,15 @@ describe("Transformers", () => {
         @attr(int()) accessor foo: any;
       }
       const el = new Test();
-      expect(el.foo).toBe(0n);
+      expect(el.foo).to.equal(0n);
       el.foo = 7n;
-      expect(el.getAttribute("foo")).toBe("7");
+      expect(el.getAttribute("foo")).to.equal("7");
       el.removeAttribute("foo");
-      expect(el.foo).toBe(0n);
+      expect(el.foo).to.equal(0n);
       el.foo = 7n;
-      expect(el.foo).toBe(7n);
+      expect(el.foo).to.equal(7n);
       el.foo = undefined as any;
-      expect(el.foo).toBe(0n);
+      expect(el.foo).to.equal(0n);
     });
   });
 
@@ -273,20 +273,20 @@ describe("Transformers", () => {
         @attr(boolean()) accessor foo = false;
       }
       const el = new Test();
-      expect(el.foo).toBe(false);
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.equal(false);
+      expect(el.getAttribute("foo")).to.equal(null);
       el.foo = true;
-      expect(el.foo).toBe(true);
-      expect(el.getAttribute("foo")).toBe("");
+      expect(el.foo).to.equal(true);
+      expect(el.getAttribute("foo")).to.equal("");
       el.removeAttribute("foo");
-      expect(el.foo).toBe(false);
+      expect(el.foo).to.equal(false);
       el.setAttribute("foo", "whatever");
-      expect(el.foo).toBe(true);
+      expect(el.foo).to.equal(true);
       el.setAttribute("foo", "");
-      expect(el.foo).toBe(true);
+      expect(el.foo).to.equal(true);
       el.foo = 0 as any;
-      expect(el.foo).toBe(false);
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.equal(false);
+      expect(el.getAttribute("foo")).to.equal(null);
     });
   });
 
@@ -299,7 +299,7 @@ describe("Transformers", () => {
             @attr(literal({ values: [], transformer: string() }))
             accessor foo = "A";
           }
-      ).toThrow();
+      ).to.throw();
       // Invalid transformer
       expect(
         () =>
@@ -307,7 +307,7 @@ describe("Transformers", () => {
             @attr(literal({ values: ["B", "B", "C"], transformer: {} } as any))
             accessor foo = "A";
           }
-      ).toThrow();
+      ).to.throw();
     });
 
     test("as attribute", async () => {
@@ -317,23 +317,23 @@ describe("Transformers", () => {
         accessor foo = "A";
       }
       const el = new Test();
-      expect(el.foo).toBe("A");
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.equal("A");
+      expect(el.getAttribute("foo")).to.equal(null);
       el.foo = "B";
-      expect(el.foo).toBe("B");
-      expect(el.getAttribute("foo")).toBe("B");
+      expect(el.foo).to.equal("B");
+      expect(el.getAttribute("foo")).to.equal("B");
       expect(() => {
         el.foo = "C";
-      }).toThrow();
+      }).to.throw();
       el.setAttribute("foo", "A");
-      expect(el.foo).toBe("A");
-      expect(el.getAttribute("foo")).toBe("A");
+      expect(el.foo).to.equal("A");
+      expect(el.getAttribute("foo")).to.equal("A");
       el.removeAttribute("foo");
-      expect(el.foo).toBe("A");
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.equal("A");
+      expect(el.getAttribute("foo")).to.equal(null);
       el.setAttribute("foo", "C");
-      expect(el.foo).toBe("A");
-      expect(el.getAttribute("foo")).toBe("C");
+      expect(el.foo).to.equal("A");
+      expect(el.getAttribute("foo")).to.equal("C");
     });
 
     test("custom fallback value", async () => {
@@ -344,9 +344,9 @@ describe("Transformers", () => {
       }
       const el = new Test();
       el.foo = "B";
-      expect(el.getAttribute("foo")).toBe("B");
+      expect(el.getAttribute("foo")).to.equal("B");
       el.removeAttribute("foo");
-      expect(el.foo).toBe("C");
+      expect(el.foo).to.equal("C");
     });
 
     test("non-initialized accessor", async () => {
@@ -356,15 +356,15 @@ describe("Transformers", () => {
         accessor foo: any;
       }
       const el = new Test();
-      expect(el.foo).toBe("A");
+      expect(el.foo).to.equal("A");
       el.foo = "C";
-      expect(el.getAttribute("foo")).toBe("C");
+      expect(el.getAttribute("foo")).to.equal("C");
       el.removeAttribute("foo");
-      expect(el.foo).toBe("A");
+      expect(el.foo).to.equal("A");
       el.foo = "B";
-      expect(el.foo).toBe("B");
+      expect(el.foo).to.equal("B");
       el.foo = undefined as any;
-      expect(el.foo).toBe("A");
+      expect(el.foo).to.equal("A");
     });
   });
 
@@ -376,23 +376,23 @@ describe("Transformers", () => {
         accessor foo = { user: "", email: "" };
       }
       const el = new Test();
-      expect(el.foo).toEqual({ user: "", email: "" });
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.eql({ user: "", email: "" });
+      expect(el.getAttribute("foo")).to.equal(null);
       el.foo = { user: "Foo", email: "a@b.c" };
-      expect(el.foo).toEqual({ user: "Foo", email: "a@b.c" });
-      expect(el.getAttribute("foo")).toBe(`{"user":"Foo","email":"a@b.c"}`);
+      expect(el.foo).to.eql({ user: "Foo", email: "a@b.c" });
+      expect(el.getAttribute("foo")).to.equal(`{"user":"Foo","email":"a@b.c"}`);
       expect(() => {
         el.foo = "Hello" as any;
-      }).toThrow(TypeError);
+      }).to.throw(TypeError);
       el.setAttribute("foo", "whatever");
-      expect(el.foo).toEqual({ user: "", email: "" });
-      expect(el.getAttribute("foo")).toBe("whatever");
+      expect(el.foo).to.eql({ user: "", email: "" });
+      expect(el.getAttribute("foo")).to.equal("whatever");
       el.removeAttribute("foo");
-      expect(el.foo).toEqual({ user: "", email: "" });
-      expect(el.getAttribute("foo")).toBe(null);
+      expect(el.foo).to.eql({ user: "", email: "" });
+      expect(el.getAttribute("foo")).to.equal(null);
       el.setAttribute("foo", `{ "foo": 42 }`);
-      expect(el.foo).toEqual({ foo: 42 });
-      expect(el.getAttribute("foo")).toBe(`{ "foo": 42 }`);
+      expect(el.foo).to.eql({ foo: 42 });
+      expect(el.getAttribute("foo")).to.equal(`{ "foo": 42 }`);
     });
   });
 
@@ -405,34 +405,34 @@ describe("Transformers", () => {
           accessor foo: ((evt: Event) => void) | null = null;
         }
         new Test();
-      }).toThrow();
+      }).to.throw();
     });
 
     test("use via property", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @attr(event())
         accessor onfoo: ((evt: Event) => void) | null = null;
       }
       const el = new Test();
-      expect(el.onfoo).toBe(null);
-      const eventHandler = (evt: Event) => spy(evt);
+      expect(el.onfoo).to.equal(null);
+      const eventHandler = (evt: Event) => fn(evt);
       el.onfoo = eventHandler;
-      expect(el.onfoo).toBe(eventHandler);
-      expect(el.getAttribute("onfoo")).toBe(null);
+      expect(el.onfoo).to.equal(eventHandler);
+      expect(el.getAttribute("onfoo")).to.equal(null);
       el.dispatchEvent(new Event("foo"));
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(fn.callCount).to.equal(1);
       el.onfoo = null;
-      expect(el.onfoo).toBe(null);
-      expect(el.getAttribute("onfoo")).toBe(null);
+      expect(el.onfoo).to.equal(null);
+      expect(el.getAttribute("onfoo")).to.equal(null);
       el.dispatchEvent(new Event("foo"));
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(fn.callCount).to.equal(1);
     });
 
     test("use via attribute", async () => {
-      const spy = jest.fn();
-      (globalThis as any).fnForEventHandlerAttrTest = spy;
+      const fn = spy();
+      (globalThis as any).fnForEventHandlerAttrTest = fn;
       @define(generateTagName())
       class Test extends HTMLElement {
         @attr(event())
@@ -440,21 +440,23 @@ describe("Transformers", () => {
       }
       const el = new Test();
       el.setAttribute("onfoo", "globalThis.fnForEventHandlerAttrTest(event)");
-      expect(el.onfoo?.toString()).toContain(
+      expect(el.onfoo?.toString()).to.have.string(
         "globalThis.fnForEventHandlerAttrTest(event)"
       );
       const evt1 = new Event("foo");
       el.dispatchEvent(evt1);
-      expect(spy.mock.calls).toEqual([[evt1]]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([evt1]);
       el.removeAttribute("onfoo");
-      expect(el.onfoo).toBe(null);
+      expect(el.onfoo).to.equal(null);
       el.dispatchEvent(new Event("foo"));
-      expect(spy.mock.calls).toEqual([[evt1]]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([evt1]);
     });
 
     test("use via attribute and property", async () => {
-      const spy = jest.fn();
-      (globalThis as any).fnForEventHandlerAttrAndPropTest = spy;
+      const fn = spy();
+      (globalThis as any).fnForEventHandlerAttrAndPropTest = fn;
       @define(generateTagName())
       class Test extends HTMLElement {
         @attr(event())
@@ -465,27 +467,30 @@ describe("Transformers", () => {
         "onfoo",
         "globalThis.fnForEventHandlerAttrAndPropTest(event)"
       );
-      expect(el.onfoo?.toString()).toContain(
+      expect(el.onfoo?.toString()).to.have.string(
         "globalThis.fnForEventHandlerAttrAndPropTest(event)"
       );
       const evt1 = new Event("foo");
       el.dispatchEvent(evt1);
-      expect(spy.mock.calls).toEqual([[evt1]]);
-      el.onfoo = (event) => spy(event);
-      expect(el.getAttribute("onfoo")).toBe(
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([evt1]);
+      el.onfoo = (event) => fn(event);
+      expect(el.getAttribute("onfoo")).to.equal(
         "globalThis.fnForEventHandlerAttrAndPropTest(event)"
       );
       const evt2 = new Event("foo");
       el.dispatchEvent(evt2);
-      expect(spy.mock.calls).toEqual([[evt1], [evt2]]);
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[0].args).to.eql([evt1]);
+      expect(fn.getCalls()[1].args).to.eql([evt2]);
       el.removeAttribute("onfoo");
-      expect(el.onfoo).toBe(null);
+      expect(el.onfoo).to.equal(null);
     });
 
     test("event order", async () => {
-      const e1 = jest.fn(); // added before first inline event handler
-      const e2 = jest.fn(); // inline event handler
-      const e3 = jest.fn(); // added after first inline event handler
+      const e1 = spy(); // added before first inline event handler
+      const e2 = spy(); // inline event handler
+      const e3 = spy(); // added after first inline event handler
       (globalThis as any).fnForEventHandlerOrderTest = e2;
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -497,38 +502,32 @@ describe("Transformers", () => {
       el.onfoo = (event) => e2(event);
       el.addEventListener("foo", e3);
       el.dispatchEvent(new Event("foo"));
-      expect(e1.mock.invocationCallOrder[0]).toBeLessThan(
-        e2.mock.invocationCallOrder[0]
-      );
-      expect(e2.mock.invocationCallOrder[0]).toBeLessThan(
-        e3.mock.invocationCallOrder[0]
-      );
+      expect(e1.calledBefore(e2)).to.equal(true);
+      expect(e2.calledBefore(e3)).to.equal(true);
       // Swap in place should keep the order
       el.onfoo = (event) => e2(event);
       el.dispatchEvent(new Event("foo"));
-      expect(e1.mock.invocationCallOrder[1]).toBeLessThan(
-        e2.mock.invocationCallOrder[1]
-      );
-      expect(e2.mock.invocationCallOrder[1]).toBeLessThan(
-        e3.mock.invocationCallOrder[1]
-      );
+      expect(e1.callCount).to.equal(2);
+      expect(e2.callCount).to.equal(2);
+      expect(e3.callCount).to.equal(2);
+      expect(e1.calledBefore(e2)).to.equal(true);
+      expect(e2.calledBefore(e3)).to.equal(true);
       // Deletion and re-setting should place the new event handler at the end
       el.onfoo = null;
       el.onfoo = (event) => e2(event);
       el.dispatchEvent(new Event("foo"));
-      expect(e1.mock.invocationCallOrder[2]).toBeLessThan(
-        e2.mock.invocationCallOrder[2]
-      );
-      expect(e3.mock.invocationCallOrder[2]).toBeLessThan(
-        e2.mock.invocationCallOrder[2]
-      );
+      expect(e1.callCount).to.equal(3);
+      expect(e2.callCount).to.equal(3);
+      expect(e3.callCount).to.equal(3);
+      expect(e1.calledBefore(e2)).to.equal(true);
+      expect(e3.calledBefore(e2)).to.equal(true);
     });
 
     test("preventDefault() via return false", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       class MyEvent extends Event {
         preventDefault() {
-          spy();
+          fn();
         }
       }
       @define(generateTagName())
@@ -543,7 +542,7 @@ describe("Transformers", () => {
       el.dispatchEvent(new MyEvent("specialevent"));
       el.dispatchEvent(new MyEvent("normalevent"));
       await wait();
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(fn.callCount).to.equal(1);
     });
   });
 });

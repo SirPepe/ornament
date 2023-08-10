@@ -5,7 +5,7 @@ import {
   type Method,
   type Transformer,
   assertContext,
-} from "./types";
+} from "./types.js";
 
 // Accessor decorators initialize *after* custom elements access their
 // observedAttributes getter, so there is no way to associate observed
@@ -256,16 +256,19 @@ type SignalSubscribeDecorator<T> = (
   context: ClassMethodDecoratorContext<T>
 ) => void;
 
-type SignalLike = {
+type SignalLike<T> = {
   subscribe(callback: () => void): () => void;
+  value: T;
 };
 
-function isSignalLike(value: unknown): value is SignalLike {
+type SignalType<T> = T extends SignalLike<infer V> ? V : any;
+
+function isSignalLike(value: unknown): value is SignalLike<any> {
   if (
     value &&
     typeof value === "object" &&
-    "effect" in value &&
-    typeof value.effect === "string"
+    "subscribe" in value &&
+    typeof value.subscribe === "function"
   ) {
     return true;
   }
@@ -274,16 +277,17 @@ function isSignalLike(value: unknown): value is SignalLike {
 
 function createSignalSubscriberInitializer<
   T extends object,
-  S extends SignalLike
+  V,
+  S extends SignalLike<V>
 >(
   context: ClassMethodDecoratorContext<T>,
   target: S,
-  predicate: (this: T, signal: S) => boolean = () => true
+  predicate: (this: T, value: V) => boolean = () => true
 ): (this: T) => void {
   return function (this: T) {
     const value = context.access.get(this);
     const callback = () => {
-      if (predicate.call(this, target)) {
+      if (predicate.call(this, target.value)) {
         value.call(this, target);
       }
     };
@@ -292,10 +296,10 @@ function createSignalSubscriberInitializer<
   };
 }
 
-export function subscribe<T extends object, S extends SignalLike>(
+export function subscribe<T extends object, S extends SignalLike<any>>(
   this: unknown,
   target: S,
-  predicate?: (this: T, signal: S) => boolean
+  predicate?: (this: T, value: SignalType<S>) => boolean
 ): SignalSubscribeDecorator<T>;
 export function subscribe<
   T extends object,
@@ -309,7 +313,7 @@ export function subscribe<
 ): EventSubscribeDecorator<T, E>;
 export function subscribe<T extends object>(
   this: unknown,
-  target: EventTarget | LazyEventTarget<any> | SignalLike,
+  target: EventTarget | LazyEventTarget<any> | SignalLike<any>,
   eventOrPredicate?: ((this: T, arg: any) => boolean) | string,
   predicate?: (this: T, arg: any) => boolean
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
@@ -531,21 +535,25 @@ type DebounceOptions = {
   fn?: (cb: () => void) => () => void;
 };
 
-function createDebouncedMethod<T, A extends unknown[]>(
-  method: Method<T, A>,
+function createDebouncedMethod<T extends object, A extends unknown[]>(
+  originalMethod: Method<T, A>,
   wait: (cb: () => void) => () => void
 ): Method<T, A> {
-  let cancelWait: null | (() => void) = null;
+  const cancelFns = new WeakMap<T, undefined | (() => void)>();
   function debouncedMethod(this: T, ...args: A): any {
-    if (cancelWait) {
-      cancelWait();
+    const cancelFn = cancelFns.get(this);
+    if (cancelFn) {
+      cancelFn();
     }
-    cancelWait = wait(() => {
-      method.call(this, ...args);
-      cancelWait = null;
-    });
+    cancelFns.set(
+      this,
+      wait(() => {
+        originalMethod.call(this, ...args);
+        cancelFns.delete(this);
+      })
+    );
   }
-  DEBOUNCED_METHOD_MAP.set(debouncedMethod, method);
+  DEBOUNCED_METHOD_MAP.set(debouncedMethod, originalMethod);
   return debouncedMethod;
 }
 
@@ -572,13 +580,16 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
     });
     if (context.kind === "field") {
       // Field decorator (bound methods)
-      return function init(func: Method<unknown, A>): Method<unknown, A> {
+      return function init(
+        this: T,
+        func: Method<unknown, A>
+      ): Method<unknown, A> {
         if (typeof func !== "function") {
           throw new TypeError(
             "@debounce() can only be applied to function class fields"
           );
         }
-        return createDebouncedMethod(func, fn);
+        return createDebouncedMethod(func, fn).bind(this);
       };
     } else if (context.kind === "method") {
       // Method decorator

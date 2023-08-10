@@ -3,7 +3,7 @@ import {
   assertRecord,
   assertTransformer,
   assertType,
-} from "./types";
+} from "./types.js";
 
 function eql(a: unknown, b: unknown): boolean {
   return a === b;

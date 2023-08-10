@@ -398,13 +398,20 @@ testEl.remove();
 // testEl.log logs "Disconnected!"
 ```
 
-### `@subscribe(target, eventName)`
+### `@subscribe(...args)`
 
-**Method decorator** that causes decorated class methods to run when an event
-target fires.
+**Method decorator** that causes decorated class methods to subscribe to either
+[Event Targets](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget) or
+[signals](https://github.com/preactjs/signals), depending on the arguments.
+
+#### `@subscribe(target, eventName, predicate?)`
+
+Subscribe to an EventTarget. EventTarget is an interface that objects such as
+HTMLElement, Window, Document and *many* more objects implement. You can also
+create a vanilla event target by calling `new EventTarget()`...
 
 ```javascript
-import { define, subscribe } from "@sirpepe/ornament"
+import { define, subscribe } from "@sirpepe/ornament";
 
 const myTarget = new EventTarget();
 
@@ -424,12 +431,12 @@ myTarget.dispatchEvent(new Event("foo"));
 // testEl.log logs "'foo' event fired!"
 ```
 
-[Event Target](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget) is
-an interface that objects such as HTMLElement, Window, Document and *many* more
-implement. You can use an an event bus that implements EventTarget together with
+... or you can build an event bus that implements EventTarget together with
 `@subscribe()` to keep your various components in sync:
 
 ```javascript
+import { define, subscribe } from "@sirpepe/ornament";
+
 class DataSource extends EventTarget {
   #value = 0;
   get value() {
@@ -464,13 +471,55 @@ source and their shadow DOM content stays in sync.
 You can also provide a target-producing factory in place of the target itself:
 
 ```javascript
+import { define, subscribe } from "@sirpepe/ornament";
+
 @define("my-test")
 class Test extends HTMLElement {
-
-  @subscribe(source, "change") #a() {} // same effect as below
-  @subscribe(() => source, "change") #b() {} // same effect as above
+  // "window" is a perfectly valid event target
+  @subscribe(window, "change") #a() {} // same effect as below
+  @subscribe(() => window, "change") #b() {} // same effect as above
 }
 ```
+
+##### Options for `@subscribe()` for EventTarget
+
+- **`target` (EventTarget)**: The event target to subscribe to
+- **`eventName` (string)**: The event name to listen to
+- **`predicate` (function, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the event object and must return a boolean
+
+#### `@subscribe(signal, predicate?)`
+
+Subscribe to a signal. Any signal implementation that roughly follows
+[Preact's implementation](https://github.com/preactjs/signals) should work:
+
+```javascript
+import { define, subscribe } from "@sirpepe/ornament";
+import { signal } from "@preact/signals-core";
+
+const counter = signal(0);
+@define("my-test")
+class Test extends HTMLElement {
+  @subscribe(counter)
+  test() {
+    console.log(counter.value);
+  }
+}
+const instance = new Test();
+counter.value = 1;
+counter.value = 2;
+counter.value = 3;
+// logs 0, 1, 2, 3
+```
+
+Because signals permanently represent reactive values, subscribing itself causes
+the method to be called with the then-current signal value. This is in contrast
+to subscribing to Event Targets, which do not represent values, but just happen
+to throw events around.
+
+##### Options for `@subscribe()` for signals
+
+- **`signal` (Signal)**: The signal to subscribe to
+- **`predicate` (function, optional)**: If provided, controls whether or not the decorated method is called for a given signal update. Gets passed the signal's value and must return a boolean
 
 ### `@debounce(options?)`
 
@@ -808,9 +857,9 @@ explicitly implement them.
 ### Debounced reactive
 
 `@reactive()` causes its decorated method to get called for once for *every*
-attribute change. This is sometimes useful, but sometimes you will want to batch
-method calls for increased efficiency. This is easy if you combine `@reactive()`
-with `@debounce()`:
+attribute and property change. This is sometimes useful, but sometimes you will
+want to batch method calls for increased efficiency. This is easy if you combine
+`@reactive()` with `@debounce()`:
 
 ```javascript
 import { define, prop, reactive, debounce int } from "@sirpepe/ornament";
@@ -897,6 +946,23 @@ class Test extends HTMLElement {
 }
 ```
 
+### Event delegation
+
+The following example captures all `input` events fired by
+`<input type="number">` in the document:
+
+```javascript
+import { define, subscribe } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @subscribe(document.documentElement, "input", (evt) => evt.target.matches("input[type-number]"))
+  log(evt) {
+    console.log(evt); // "input" events
+  }
+}
+```
+
 ### Custom defaults
 
 If you don't like ornament's defaults, remember that decorators and transformers
@@ -920,4 +986,28 @@ class Test extends HTMLElement {
 
 let test = new Test();
 test.foo = "B"; //  only logs "B"
+```
+
+The same approach works when you want to create specialized decorators from
+existing ones:
+
+```javascript
+import { define, subscribe } from "@sirpepe/ornament";
+
+// A more convenient decorator for event delegation
+function listen(event, selector = "*") {
+  return subscribe(
+    document.documentElement,
+    "input",
+    (evt) => evt.target.matches(selector)
+  )
+}
+
+@define("my-test")
+class Test extends HTMLElement {
+  @listen("input", "input[type-number]")
+  log(evt) {
+    console.log(evt);
+  }
+}
 ```

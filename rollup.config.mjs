@@ -3,9 +3,9 @@ import { nodeResolve } from "@rollup/plugin-node-resolve";
 import { babel } from "@rollup/plugin-babel";
 import terser from "@rollup/plugin-terser";
 
-const extensions = [".ts", ".js"];
+export const extensions = [".ts", ".js"];
 
-const babelConfig = JSON.parse(
+export const babelConfig = JSON.parse(
   readFileSync("./babel.config.json", { encoding: "utf8" })
 );
 

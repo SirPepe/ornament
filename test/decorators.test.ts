@@ -1,7 +1,5 @@
-/**
- * @jest-environment jsdom
- */
-
+import { expect } from "@esm-bundle/chai";
+import { spy } from "sinon";
 import {
   attr,
   connected,
@@ -15,15 +13,15 @@ import {
 import { href, string } from "../src/transformers.js";
 import { generateTagName, wait } from "./helpers.js";
 import { signal } from "@preact/signals-core";
-import { jest } from "@jest/globals";
+const test = it;
 
 describe("Decorators", () => {
   describe("@define", () => {
     test("register element and create string tag", () => {
       @define("register-test")
       class Test extends HTMLElement {}
-      expect(window.customElements.get("register-test")).toBe(Test);
-      expect(document.createElement("register-test").toString()).toEqual(
+      expect(window.customElements.get("register-test")).to.equal(Test);
+      expect(document.createElement("register-test").toString()).to.equal(
         "[object HTMLRegisterTestElement]"
       );
     });
@@ -36,22 +34,22 @@ describe("Decorators", () => {
           return "A";
         }
       }
-      expect(document.createElement(tagName).toString()).toEqual("[object A]");
+      expect(document.createElement(tagName).toString()).to.equal("[object A]");
     });
 
     test("reject invalid tag names", () => {
       expect(() => {
         @define("")
         class Test extends HTMLElement {}
-      }).toThrow();
+      }).to.throw();
       expect(() => {
         @define("invalid")
         class Test extends HTMLElement {}
-      }).toThrow();
+      }).to.throw();
       expect(() => {
         @define(undefined as any)
         class Test extends HTMLElement {}
-      }).toThrow();
+      }).to.throw();
     });
   });
 
@@ -62,11 +60,11 @@ describe("Decorators", () => {
         @prop(string()) accessor x = "A";
       }
       const el = new Test();
-      expect(el.x).toBe("A");
-      expect(el.getAttribute("x")).toBe(null);
+      expect(el.x).to.equal("A");
+      expect(el.getAttribute("x")).to.equal(null);
       el.x = "B";
-      expect(el.x).toBe("B");
-      expect(el.getAttribute("x")).toBe(null);
+      expect(el.x).to.equal("B");
+      expect(el.getAttribute("x")).to.equal(null);
     });
 
     test("register private property", () => {
@@ -82,7 +80,7 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.testSet("B");
-      expect(el.testGet()).toBe("B");
+      expect(el.testGet()).to.equal("B");
     });
 
     test("register symbol property", () => {
@@ -93,7 +91,7 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el[key] = "B";
-      expect(el[key]).toBe("B");
+      expect(el[key]).to.equal("B");
     });
 
     test("reject on static", () => {
@@ -103,7 +101,7 @@ describe("Decorators", () => {
           // @ts-expect-error for testing runtime checks
           @prop(string()) static accessor foo = "A";
         }
-      }).toThrow(TypeError);
+      }).to.throw(TypeError);
     });
   });
 
@@ -114,19 +112,19 @@ describe("Decorators", () => {
         @attr(string()) accessor x = "A";
       }
       const el = new Test();
-      expect(el.x).toBe("A");
-      expect(el.getAttribute("x")).toBe(null);
+      expect(el.x).to.equal("A");
+      expect(el.getAttribute("x")).to.equal(null);
       el.x = "B";
-      expect(el.x).toBe("B");
-      expect(el.getAttribute("x")).toBe("B");
+      expect(el.x).to.equal("B");
+      expect(el.getAttribute("x")).to.equal("B");
       el.setAttribute("x", "C");
-      expect(el.x).toBe("C");
-      expect(el.getAttribute("x")).toBe("C");
+      expect(el.x).to.equal("C");
+      expect(el.getAttribute("x")).to.equal("C");
     });
 
     test("user-defined attribute handling keeps working", async () => {
-      const userDefinedCallback = jest.fn();
-      const reactiveCallback = jest.fn();
+      const userDefinedCallback = spy();
+      const reactiveCallback = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @attr(string()) accessor x = "A";
@@ -143,10 +141,10 @@ describe("Decorators", () => {
       const el = new Test();
       el.setAttribute("x", "B");
       el.setAttribute("y", "B");
-      expect(userDefinedCallback).toBeCalledTimes(1);
-      expect(userDefinedCallback.mock.calls).toEqual([[el, "y"]]);
-      expect(reactiveCallback).toBeCalledTimes(1);
-      expect(reactiveCallback.mock.calls).toEqual([[el]]);
+      expect(userDefinedCallback.callCount).to.equal(1);
+      expect(userDefinedCallback.getCalls()[0].args).to.eql([el, "y"]);
+      expect(reactiveCallback.callCount).to.equal(1);
+      expect(reactiveCallback.getCalls()[0].args).to.eql([el]);
     });
 
     test("no cross-instance effects", async () => {
@@ -156,11 +154,11 @@ describe("Decorators", () => {
       }
       const el1 = new Test();
       const el2 = new Test();
-      expect(el1.x).toBe("");
-      expect(el2.x).toBe("");
+      expect(el1.x).to.equal("");
+      expect(el2.x).to.equal("");
       el1.x = window.location.href;
-      expect(el1.x).toBe(window.location.href);
-      expect(el2.x).toBe("");
+      expect(el1.x).to.equal(window.location.href);
+      expect(el2.x).to.equal("");
     });
 
     test("initialize attribute value", async () => {
@@ -171,7 +169,7 @@ describe("Decorators", () => {
       }
       const container = document.createElement("div");
       container.innerHTML = `<${tagName} x="B"></${tagName}>`;
-      expect((container.children[0] as any).x).toBe("B");
+      expect((container.children[0] as any).x).to.equal("B");
     });
 
     test("Non-reflective attribute", async () => {
@@ -180,14 +178,14 @@ describe("Decorators", () => {
         @attr(string(), { reflective: false }) accessor x = "A";
       }
       const el = new Test();
-      expect(el.x).toBe("A");
-      expect(el.getAttribute("x")).toBe(null);
+      expect(el.x).to.equal("A");
+      expect(el.getAttribute("x")).to.equal(null);
       el.x = "B";
-      expect(el.x).toBe("B");
-      expect(el.getAttribute("x")).toBe(null);
+      expect(el.x).to.equal("B");
+      expect(el.getAttribute("x")).to.equal(null);
       el.setAttribute("x", "C");
-      expect(el.x).toBe("B");
-      expect(el.getAttribute("x")).toBe("C");
+      expect(el.x).to.equal("B");
+      expect(el.getAttribute("x")).to.equal("C");
     });
 
     test("custom attribute name via 'as'", async () => {
@@ -196,14 +194,14 @@ describe("Decorators", () => {
         @attr(string(), { as: "y" }) accessor x = "A";
       }
       const el = new Test();
-      expect(el.x).toBe("A");
-      expect(el.getAttribute("y")).toBe(null);
+      expect(el.x).to.equal("A");
+      expect(el.getAttribute("y")).to.equal(null);
       el.x = "B";
-      expect(el.x).toBe("B");
-      expect(el.getAttribute("y")).toBe("B");
+      expect(el.x).to.equal("B");
+      expect(el.getAttribute("y")).to.equal("B");
       el.setAttribute("y", "C");
-      expect(el.x).toBe("C");
-      expect(el.getAttribute("y")).toBe("C");
+      expect(el.x).to.equal("C");
+      expect(el.getAttribute("y")).to.equal("C");
     });
 
     test("reject on non-public fields", async () => {
@@ -211,13 +209,13 @@ describe("Decorators", () => {
         class Test extends HTMLElement {
           @attr(string()) accessor #x = "A";
         }
-      }).toThrow(TypeError);
+      }).to.throw(TypeError);
       expect(() => {
         const key = Symbol();
         class Test extends HTMLElement {
           @attr(string()) accessor [key] = "A";
         }
-      }).toThrow(TypeError);
+      }).to.throw(TypeError);
     });
 
     test("reject on static fields", async () => {
@@ -226,17 +224,18 @@ describe("Decorators", () => {
           // @ts-expect-error for testing runtime checks
           @attr(string()) static accessor x = "A";
         }
-      }).toThrow(TypeError);
+      }).to.throw(TypeError);
     });
   });
 
   describe("@debounce", () => {
     test("debouncing class field functions", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
-        @debounce() test = (x: number) => {
-          spy(x, this);
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) }) test = (x: number) => {
+          fn(x, this);
           return x;
         };
       }
@@ -246,16 +245,17 @@ describe("Decorators", () => {
       el.test(2);
       func(3);
       await wait(100);
-      expect(spy).toBeCalledTimes(1);
-      expect(spy.mock.calls).toEqual([[3, el]]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([3, el]);
     });
 
     test("debouncing class methods", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
-        @debounce() test(x: number): number {
-          spy(x, this);
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) }) test(x: number): number {
+          fn(x, this);
           return x;
         }
       }
@@ -264,66 +264,67 @@ describe("Decorators", () => {
       el.test(2);
       el.test(3);
       await wait(100);
-      expect(spy).toBeCalledTimes(1);
-      expect(spy.mock.calls).toEqual([[3, el]]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([3, el]);
     });
   });
 
   describe("@connected/@disconnected", () => {
     test("fire on (dis)connect", async () => {
-      const connectSpy = jest.fn();
-      const disconnectSpy = jest.fn();
+      const connectFn = spy();
+      const disconnectFn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @connected() connected() {
-          connectSpy(this);
+          connectFn(this);
         }
         @disconnected() disconnected() {
-          disconnectSpy(this);
+          disconnectFn(this);
         }
       }
       const instance = new Test();
       document.body.append(instance);
       instance.remove();
-      expect(connectSpy).toBeCalledTimes(1);
-      expect(connectSpy.mock.calls).toEqual([[instance]]);
-      expect(disconnectSpy).toBeCalledTimes(1);
-      expect(disconnectSpy.mock.calls).toEqual([[instance]]);
+      expect(connectFn.callCount).to.equal(1);
+      expect(connectFn.getCalls()[0].args).to.eql([instance]);
+      expect(disconnectFn.callCount).to.equal(1);
+      expect(disconnectFn.getCalls()[0].args).to.eql([instance]);
     });
   });
 
   describe("@reactive", () => {
     test("initial call with reactive property", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
         @reactive() test() {
-          spy(this.x);
+          fn(this.x);
         }
       }
       new Test();
-      expect(spy).toBeCalledTimes(1);
-      expect(spy.mock.calls).toEqual([["A"]]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["A"]);
     });
 
     test("prop change", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
         @reactive() test() {
-          spy(this.x);
+          fn(this.x);
         }
       }
       const el = new Test();
       el.x = "B";
-      expect(spy).toBeCalledTimes(2); // initial + one update
-      expect(spy.mock.calls).toEqual([["A"], ["B"]]);
+      expect(fn.callCount).to.equal(2); // initial + one update
+      expect(fn.getCalls()[0].args).to.eql(["A"]);
+      expect(fn.getCalls()[1].args).to.eql(["B"]);
     });
 
     test("prop changes in the constructor cause no reaction", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
@@ -332,82 +333,82 @@ describe("Decorators", () => {
           this.x = "B";
         }
         @reactive() test() {
-          spy(this.x);
+          fn(this.x);
         }
       }
       const el = new Test();
       el.x = "C";
-      expect(spy).toBeCalledTimes(2); // initial + one update
-      expect(spy.mock.calls).toEqual([["B"], ["C"]]);
+      expect(fn.callCount).to.equal(2); // initial + one update
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
+      expect(fn.getCalls()[1].args).to.eql(["C"]);
     });
 
     test("two prop changes", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
         @prop(string()) accessor y = "Z";
         @reactive() test() {
-          spy(this.x, this.y);
+          fn(this.x, this.y);
         }
       }
       const el = new Test();
       el.x = "B";
       el.y = "Y";
-      expect(spy).toBeCalledTimes(3); // initial + two updates
-      expect(spy.mock.calls).toEqual([
-        ["A", "Z"],
-        ["B", "Z"],
-        ["B", "Y"],
-      ]);
+      expect(fn.callCount).to.equal(3); // initial + two updates
+      expect(fn.getCalls()[0].args).to.eql(["A", "Z"]);
+      expect(fn.getCalls()[1].args).to.eql(["B", "Z"]);
+      expect(fn.getCalls()[2].args).to.eql(["B", "Y"]);
     });
 
     test("multiple prop changes with the same value only cause one effect to run", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
         @reactive() test() {
-          spy(this.x);
+          fn(this.x);
         }
       }
       const el = new Test();
       el.x = "B";
       el.x = "B";
       el.x = "B";
-      expect(spy).toBeCalledTimes(2); // initial + one update
-      expect(spy.mock.calls).toEqual([["A"], ["B"]]);
+      expect(fn.callCount).to.equal(2); // initial + one update
+      expect(fn.getCalls()[0].args).to.eql(["A"]);
+      expect(fn.getCalls()[1].args).to.eql(["B"]);
     });
 
     test("keys option", async () => {
-      const spyX = jest.fn();
-      const spyY = jest.fn();
+      const fnX = spy();
+      const fnY = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
         @prop(string()) accessor y = "Z";
         @reactive({ keys: ["x"], initial: false }) testX() {
-          spyX(this.x, this.y);
+          fnX(this.x, this.y);
         }
         @reactive({ keys: ["y"], initial: false }) testY() {
-          spyY(this.x, this.y);
+          fnY(this.x, this.y);
         }
       }
       const el = new Test();
       el.x = "B";
-      expect(spyX).toBeCalledTimes(1);
-      expect(spyX.mock.calls).toEqual([["B", "Z"]]);
-      expect(spyY).toBeCalledTimes(0);
+      expect(fnX.callCount).to.equal(1);
+      expect(fnX.getCalls()[0].args).to.eql(["B", "Z"]);
+      expect(fnY.callCount).to.equal(0);
       el.y = "Y";
-      expect(spyX).toBeCalledTimes(1);
-      expect(spyX.mock.calls).toEqual([["B", "Z"]]);
-      expect(spyY).toBeCalledTimes(1);
-      expect(spyY.mock.calls).toEqual([["B", "Y"]]);
+      expect(fnX.callCount).to.equal(1);
+      expect(fnX.getCalls()[0].args).to.eql(["B", "Z"]);
+      expect(fnY.callCount).to.equal(1);
+      expect(fnY.getCalls()[0].args).to.eql(["B", "Y"]);
     });
 
     test("keys option with private names", async () => {
-      const spyX = jest.fn();
-      const spyY = jest.fn();
+      const fnX = spy();
+      const fnY = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(string()) accessor #x = "A";
@@ -416,67 +417,69 @@ describe("Decorators", () => {
           this.#x = value;
         }
         @reactive({ keys: ["#x"], initial: false }) testX() {
-          spyX(this.#x, this.y);
+          fnX(this.#x, this.y);
         }
         @reactive({ keys: ["y"], initial: false }) testY() {
-          spyY(this.#x, this.y);
+          fnY(this.#x, this.y);
         }
       }
       const el = new Test();
       el.setX("B");
-      expect(spyX).toBeCalledTimes(1);
-      expect(spyX.mock.calls).toEqual([["B", "Z"]]);
-      expect(spyY).toBeCalledTimes(0);
+      expect(fnX.callCount).to.equal(1);
+      expect(fnX.getCalls()[0].args).to.eql(["B", "Z"]);
+      expect(fnY.callCount).to.equal(0);
       el.y = "Y";
-      expect(spyX).toBeCalledTimes(1);
-      expect(spyX.mock.calls).toEqual([["B", "Z"]]);
-      expect(spyY).toBeCalledTimes(1);
-      expect(spyY.mock.calls).toEqual([["B", "Y"]]);
+      expect(fnX.callCount).to.equal(1);
+      expect(fnX.getCalls()[0].args).to.eql(["B", "Z"]);
+      expect(fnY.callCount).to.equal(1);
+      expect(fnY.getCalls()[0].args).to.eql(["B", "Y"]);
     });
 
     test("attribute changes via setter trigger @reactive", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @attr(string()) accessor x = "A";
         @reactive() test() {
-          spy(this.x);
+          fn(this.x);
         }
       }
       const el = new Test();
       el.x = "B";
-      expect(spy).toBeCalledTimes(2); // initial + one update
-      expect(spy.mock.calls).toEqual([["A"], ["B"]]);
+      expect(fn.callCount).to.equal(2); // initial + one update
+      expect(fn.getCalls()[0].args).to.eql(["A"]);
+      expect(fn.getCalls()[1].args).to.eql(["B"]);
     });
 
     test("attributes changes via setAttribute trigger @reactive", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @attr(string()) accessor x = "A";
         @reactive() test() {
-          spy(this.x);
+          fn(this.x);
         }
       }
       const el = new Test();
       el.setAttribute("x", "B");
-      expect(spy).toBeCalledTimes(2); // initial + one update
-      expect(spy.mock.calls).toEqual([["A"], ["B"]]);
+      expect(fn.callCount).to.equal(2); // initial + one update
+      expect(fn.getCalls()[0].args).to.eql(["A"]);
+      expect(fn.getCalls()[1].args).to.eql(["B"]);
     });
 
     test("skip initial call with options.initial = false", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
         @reactive({ initial: false }) test() {
-          spy(this.x);
+          fn(this.x);
         }
       }
       const el = new Test();
       el.x = "B";
-      expect(spy).toBeCalledTimes(1); // one update
-      expect(spy.mock.calls).toEqual([["B"]]);
+      expect(fn.callCount).to.equal(1); // one update
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
     test("reject on static fields", async () => {
@@ -487,89 +490,107 @@ describe("Decorators", () => {
             return;
           }
         }
-      }).toThrow(TypeError);
+      }).to.throw(TypeError);
     });
   });
 
   describe("@subscribe", () => {
     describe("@subscribe on signals", () => {
       test("subscribe to a signal", async () => {
-        const spy = jest.fn();
+        const fn = spy();
         const counter = signal(0);
         @define(generateTagName())
         class Test extends HTMLElement {
           @subscribe(counter)
           test() {
-            spy(this, counter.value);
+            fn(this, counter.value);
           }
         }
         const instance = new Test();
         counter.value = 1;
         counter.value = 2;
         counter.value = 3;
-        expect(spy).toBeCalledTimes(3);
-        expect(spy.mock.calls).toEqual([
-          [instance, 1],
-          [instance, 2],
-          [instance, 3],
-        ]);
+        expect(fn.callCount).to.equal(4);
+        expect(fn.getCalls()[0].args).to.eql([instance, 0]);
+        expect(fn.getCalls()[1].args).to.eql([instance, 1]);
+        expect(fn.getCalls()[2].args).to.eql([instance, 2]);
+        expect(fn.getCalls()[3].args).to.eql([instance, 3]);
+      });
+
+      test("subscribe to a signal with a predicate", async () => {
+        const fn = spy();
+        const counter = signal(0);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(counter, (v) => v % 2 === 0)
+          test() {
+            fn(this, counter.value);
+          }
+        }
+        const instance = new Test();
+        counter.value = 1;
+        counter.value = 2;
+        counter.value = 3;
+        expect(fn.callCount).to.equal(2);
+        expect(fn.getCalls()[0].args).to.eql([instance, 0]);
+        expect(fn.getCalls()[1].args).to.eql([instance, 2]);
       });
     });
 
     describe("@subscribe on event targets", () => {
       test("subscribe to an event target", async () => {
-        const spy = jest.fn();
+        const fn = spy();
         const target = new EventTarget();
         @define(generateTagName())
         class Test extends HTMLElement {
           @subscribe(target, "foo")
           test(event: Event) {
-            spy(this, event, event.target);
+            fn(this, event, event.target);
           }
         }
         const instance = new Test();
         const event = new Event("foo");
         target.dispatchEvent(event);
-        expect(spy).toBeCalledTimes(1);
-        expect(spy.mock.calls).toEqual([[instance, event, target]]);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
       test("subscribe to an event target factory", async () => {
-        const spy = jest.fn();
+        const fn = spy();
         const target = new EventTarget();
         @define(generateTagName())
         class Test extends HTMLElement {
           @subscribe(() => target, "foo")
           test(event: Event) {
-            spy(this, event, event.target);
+            fn(this, event, event.target);
           }
         }
         const instance = new Test();
         const event = new Event("foo");
         target.dispatchEvent(event);
-        expect(spy).toBeCalledTimes(1);
-        expect(spy.mock.calls).toEqual([[instance, event, target]]);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
       test("subscribe to an element", async () => {
-        const spy = jest.fn();
+        const fn = spy();
         const target = document.createElement("div");
         @define(generateTagName())
         class Test extends HTMLElement {
           @subscribe(target, "click")
           test(event: MouseEvent) {
-            spy(this, event, event.target);
+            fn(this, event, event.target);
           }
         }
         const instance = new Test();
         const event = new MouseEvent("click");
         target.dispatchEvent(event);
-        expect(spy).toBeCalledTimes(1);
-        expect(spy.mock.calls).toEqual([[instance, event, target]]);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
       test("subscribe with a predicate", async () => {
-        const spy = jest.fn();
+        const fn = spy();
         const target = new EventTarget();
         class TestEvent extends Event {
           value: boolean;
@@ -582,7 +603,7 @@ describe("Decorators", () => {
         class Test extends HTMLElement {
           @subscribe(target, "test", (evt) => evt.value === true)
           test(event: TestEvent) {
-            spy(this, event.value);
+            fn(this, event.value);
           }
         }
         const instance = new Test();
@@ -590,11 +611,9 @@ describe("Decorators", () => {
         target.dispatchEvent(new TestEvent(false));
         target.dispatchEvent(new TestEvent(true));
         target.dispatchEvent(new TestEvent(false));
-        expect(spy).toBeCalledTimes(2);
-        expect(spy.mock.calls).toEqual([
-          [instance, true],
-          [instance, true],
-        ]);
+        expect(fn.callCount).to.equal(2);
+        expect(fn.getCalls()[0].args).to.eql([instance, true]);
+        expect(fn.getCalls()[1].args).to.eql([instance, true]);
       });
     });
 
@@ -605,29 +624,32 @@ describe("Decorators", () => {
             return;
           }
         }
-      }).toThrow(TypeError);
+      }).to.throw(TypeError);
     });
   });
 
   describe("@reactive + @debounce", () => {
     test("debounced @reactive method", async () => {
-      const spy = jest.fn();
+      const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
-        @reactive() @debounce() test() {
-          spy(this.x);
+        @reactive()
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) })
+        test() {
+          fn(this.x);
         }
       }
       const el = new Test();
       el.x = "B";
       el.x = "C";
       el.x = "D";
-      expect(spy).toBeCalledTimes(1); // initial
-      expect(spy.mock.calls).toEqual([["A"]]);
+      expect(fn.callCount).to.equal(1); // initial
+      expect(fn.getCalls()[0].args).to.eql(["A"]);
       await wait(25);
-      expect(spy).toBeCalledTimes(2); // initial + one update
-      expect(spy.mock.calls).toEqual([["A"], ["D"]]);
+      expect(fn.callCount).to.equal(2); // initial + one update
+      expect(fn.getCalls()[1].args).to.eql(["D"]);
     });
   });
 });
