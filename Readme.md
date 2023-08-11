@@ -639,7 +639,6 @@ side effects.
 
 | Transformer       | Type                | Nullable | Options               |
 | ------------------| --------------------|----------|-----------------------|
-| `any()`           | Any                 | ✕        |                       |
 | `string()`        | `string`            | ✕        |                       |
 | `href()`          | `string` (URL)      | ✕        |                       |
 | `bool()`          | `boolean`           | ✕        |                       |
@@ -657,17 +656,17 @@ export type Transformer<T extends HTMLElement, V> = {
   // values. Must *never* throw exceptions, and instead always deal with its
   // input in a graceful way, just like the attribute handling in built-in
   // elements works.
-  parse: (this: T, value: unknown) => V;
+  parse: (this: T, rawValue: unknown, oldValue: V | typeof Nil) => V;
   // Validates setter inputs, which may be of absolutely any type. May throw for
   // invalid values, just like setters on built-in elements may.
-  validate: (this: T, value: unknown) => V;
+  validate: (this: T, newValue: unknown, oldValue: V | typeof Nil) => V;
   // Turns property values into attributes values (strings), thereby controlling
   // the attribute representation of an accessor together with
   // updateAttrPredicate(). Must never throw.
-  stringify: (this: T, value?: V | null) => string;
+  stringify: (this: T, value?: V) => string;
   // Determines whether two values are equal. If this method returns true,
   // reactive callbacks will not be triggered.
-  eql: (this: T, oldValue: V | null, newValue: V | null) => boolean;
+  eql: (this: T, newValue: V, oldValue: V) => boolean;
   // Optionally transforms a value before returned from the getter. Defaults to
   // the identity function.
   get?: (this: T, value: V) => V;
@@ -678,7 +677,7 @@ export type Transformer<T extends HTMLElement, V> = {
   updateAttrPredicate?: (
     this: T,
     oldValue: V | null,
-    newValue: V | null
+    newValue: V | null,
   ) => boolean | null;
   // Runs before accessor initialization and can be used to perform side effects
   // or to grab the accessors initial value as defined in the class.
@@ -686,7 +685,7 @@ export type Transformer<T extends HTMLElement, V> = {
     this: T,
     value: V,
     defaultValue: V,
-    context: ClassAccessorDecoratorContext<T, V>
+    context: ClassAccessorDecoratorContext<T, V>,
   ) => void;
   // Runs before an accessor's setter sets a new value and can be used to
   // perform side effects
@@ -694,7 +693,7 @@ export type Transformer<T extends HTMLElement, V> = {
     this: T,
     value: V,
     rawValue: unknown,
-    context: ClassAccessorDecoratorContext<T, V>
+    context: ClassAccessorDecoratorContext<T, V>,
   ) => void;
 };
 ```
@@ -704,23 +703,6 @@ bookkeeping, they are somewhat tricky to get right, but they are also always
 only a few self-contained lines of code. If you want to extend Ornament, you
 should simply clone one of the built-in transformers and modify it to your
 liking.
-
-### Transformer `any()`
-
-Implements an attribute without any type checking or coercion.
-
-```javascript
-import { define, attr, any } from "@sirpepe/ornament"
-
-@define("my-test")
-class Test extends HTMLElement {
-  @attr(any()) accessor foo = "default value";
-}
-```
-
-The property `foo` can be set to anything. Values get stringified for content
-attributes via the `String` functions, changes to content attributes are passed
-on as unmodified strings.
 
 ### Transformer `string()`
 
@@ -736,17 +718,26 @@ class Test extends HTMLElement {
 }
 ```
 
-In this case, the property `foo` always represents a string. Any non-string
-value gets converted to strings by the accessor's setter. When used with
-`@attr()`, if the content attribute gets removed, the value that was used to
-initialize the accessor (in this case `"default value"`) is returned. The same
-happens when the IDL attribute is set to `undefined`. If the accessor was not
-initialized with a value, the empty string is used.
+In this case, the attribute `foo` always represents a string. Any non-string
+value gets converted to strings by the accessor's setter. The attribute's value
+can be unset (to the accessor's initial value or `""`) by setting `undefined` or
+removing the content attribute.
+
+#### Behavior overview for transformer `string()`
+
+| Operation        | Value                          |
+| -----------------| -------------------------------|
+| Initialization   | Accessor initial value or `""` |
+| Set value `x`    | `String(x)`                    |
+| Set `null`       | `"null"`                       |
+| Set `undefined`  | Accessor initial value or `""` |
+| Set attribute    | Current attribute value        |
+| Remove attribute | Accessor initial value or `""` |
 
 ### Transformer `href()`
 
-Implements a string attribute or property that works like `href` on `a` in that
-it automatically turns relative URLs into absolute URLs.
+Implements a string attribute or property that works like the `href` attribute
+on `<a>` in that it automatically turns relative URLs into absolute URLs.
 
 ```javascript
 import { define, attr, href } from "@sirpepe/ornament"
@@ -765,6 +756,15 @@ console.log(testEl.foo); // > "http://localhost/asdf"
 testEl.foo = "https://example.com/foo/bar/"
 console.log(testEl.foo); // > "https://example.com/foo/bar/"
 ```
+
+#### Behavior overview for transformer `href()`
+
+| Operation               | Value                          |
+| ------------------------| -------------------------------|
+| Initialization          | Accessor initial value or `""` |
+| Set absolute URL        | Absolute URL                   |
+| Set any other value `x` | Relative URL to `String(x)`    |
+| Set attribute           | Absolute or relative URL       |
 
 ### Transformer `number(options?)`
 
@@ -891,11 +891,10 @@ class Test extends HTMLElement {
 ```
 
 Content attribute values are parsed with `JSON.parse()`. Invalid JSON is
-represented with the object used to initialize the accessor, or the empty object
-if the accessor has no initial value. Using the IDL attribute's setter with
-inputs than can't be serialized with JSON.`stringify()` throws Errors. This
-transformer is really just a wrapper around `JSON.parse()` and
-`JSON.stringify()` without any object validation.
+represented with the data used to initialize the accessor. Using the IDL
+attribute's setter with inputs than can't be serialized with JSON.`stringify()`
+throws errors. This transformer is really just a wrapper around `JSON.parse()`
+and `JSON.stringify()` without any object validation.
 
 **Note for TypeScript:** Even though the transformer will accept literally any
 value at runtime, TS may infer a more restrictive type from the accessor's
@@ -1087,7 +1086,7 @@ test.foo = "B"; //  only logs "B"
 ```
 
 The same approach works when you want to create specialized decorators from
-existing ones:
+existing ones...
 
 ```javascript
 import { define, subscribe } from "@sirpepe/ornament";
@@ -1107,5 +1106,46 @@ class Test extends HTMLElement {
   log(evt) {
     console.log(evt);
   }
+}
+```
+
+... or when you want to create your own transformers:
+
+```javascript
+import { define, attr, number } from "@sirpepe/ornament";
+
+function nonnegativeNumber(otherOptions) {
+  return number({ ...otherOptions, min: 0 })
+}
+
+@define("my-test")
+class Test extends HTMLElement {
+  @attr(nonnegativeNumber({ max: 1337 }))
+  accessor foo = 42;
+}
+```
+
+Also, remember that transformer functions return plain objects that you can
+modify for on-off custom transformers:
+
+```javascript
+import { define, attr, string } from "@sirpepe/ornament";
+
+// The built-in string transformer always represents strings, but we want to
+// allow `null` in this case
+let nullableString = {
+  ...string(),
+  validate(value) {
+    if (value === null || typeof value === undefined) {
+      return value;
+    }
+    return String(value);
+  }
+}
+
+@define("my-test")
+class Test extends HTMLElement {
+  @attr(nonnegativeNumber())
+  accessor foo = 42;
 }
 ```

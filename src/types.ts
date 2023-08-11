@@ -1,19 +1,21 @@
+import { Nil } from "./index.js";
+
 export type Transformer<T extends HTMLElement, V> = {
   // parse() turns attribute values (usually string | null) into property
   // values. Must *never* throw exceptions, and instead always deal with its
   // input in a graceful way, just like the attribute handling in built-in
   // elements works.
-  parse: (this: T, value: unknown) => V;
+  parse: (this: T, rawValue: unknown, oldValue: V | typeof Nil) => V;
   // Validates setter inputs, which may be of absolutely any type. May throw for
   // invalid values, just like setters on built-in elements may.
-  validate: (this: T, value: unknown) => V;
+  validate: (this: T, newValue: unknown, oldValue: V | typeof Nil) => V;
   // Turns property values into attributes values (strings), thereby controlling
   // the attribute representation of an accessor together with
   // updateAttrPredicate(). Must never throw.
-  stringify: (this: T, value?: V | null) => string;
+  stringify: (this: T, value?: V) => string;
   // Determines whether two values are equal. If this method returns true,
   // reactive callbacks will not be triggered.
-  eql: (this: T, oldValue: V | null, newValue: V | null) => boolean;
+  eql: (this: T, newValue: V, oldValue: V) => boolean;
   // Optionally transforms a value before returned from the getter. Defaults to
   // the identity function.
   get?: (this: T, value: V) => V;

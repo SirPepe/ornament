@@ -1,3 +1,4 @@
+import { Nil } from "./index.js";
 import {
   type ClassAccessorDecorator,
   type FunctionFieldOrMethodDecorator,
@@ -434,8 +435,8 @@ export function attr<T extends HTMLElement, V>(
             return; // skip irrelevant invocations
           }
           const oldValue = get.call(this);
-          const newValue = transformer.parse.call(this, newAttrValue);
-          if (transformer.eql.call(this, oldValue, newValue)) {
+          const newValue = transformer.parse.call(this, newAttrValue, oldValue);
+          if (transformer.eql.call(this, newValue, oldValue)) {
             return;
           }
           transformer.beforeSetCallback?.call(
@@ -463,18 +464,18 @@ export function attr<T extends HTMLElement, V>(
       init(input) {
         const attrValue = this.getAttribute(attrName);
         if (attrValue !== null) {
-          const value = transformer.parse.call(this, attrValue);
+          const value = transformer.parse.call(this, attrValue, Nil);
           transformer.beforeInitCallback?.call(this, value, input, context);
           return value;
         }
-        const value = transformer.validate.call(this, input);
+        const value = transformer.validate.call(this, input, Nil);
         transformer.beforeInitCallback?.call(this, value, input, context);
         return value;
       },
       set(input) {
         const oldValue = get.call(this);
-        const newValue = transformer.validate.call(this, input);
-        if (transformer.eql.call(this, oldValue, newValue)) {
+        const newValue = transformer.validate.call(this, input, oldValue);
+        if (transformer.eql.call(this, newValue, oldValue)) {
           return;
         }
         transformer.beforeSetCallback?.call(this, newValue, input, context);
@@ -511,12 +512,12 @@ export function prop<T extends HTMLElement, V>(
     return {
       init(input) {
         transformer.beforeInitCallback?.call(this, input, input, context);
-        return transformer.validate.call(this, input);
+        return transformer.validate.call(this, input, Nil);
       },
       set(input) {
         const oldValue = get.call(this);
-        const newValue = transformer.validate.call(this, input);
-        if (transformer.eql.call(this, oldValue, newValue)) {
+        const newValue = transformer.validate.call(this, input, Nil);
+        if (transformer.eql.call(this, newValue, oldValue)) {
           return;
         }
         set.call(this, newValue);

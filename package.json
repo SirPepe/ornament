@@ -47,6 +47,7 @@
     "release-it": "^16.0.0",
     "rollup": "^3.25.1",
     "sinon": "^15.2.0",
-    "typescript": "^5.0.4"
+    "typescript": "^5.0.4",
+    "zod": "^3.21.4"
   }
 }

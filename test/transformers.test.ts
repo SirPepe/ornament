@@ -1,5 +1,6 @@
 import { expect } from "@esm-bundle/chai";
 import { spy } from "sinon";
+import { z } from "zod";
 import { attr, define } from "../src/decorators.js";
 import {
   bool,
@@ -10,6 +11,7 @@ import {
   number,
   json,
   string,
+  schema,
 } from "../src/transformers.js";
 import { generateTagName, wait } from "./helpers.js";
 const test = it;
@@ -45,7 +47,7 @@ describe("Transformers", () => {
       expect(el.getAttribute("foo")).to.equal("false");
     });
 
-    test("custom fallback value", async () => {
+    test("with initial value", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         @attr(string()) accessor foo = "default";
@@ -94,6 +96,20 @@ describe("Transformers", () => {
       expect(el.foo).to.equal("");
       el.foo = "https://example.com/asdf/";
       expect(el.foo).to.equal("https://example.com/asdf/");
+    });
+
+    test("with initial value", async () => {
+      const tagName = generateTagName();
+      @define(tagName)
+      class Test extends HTMLElement {
+        @attr(href()) accessor foo = "https://example.com/asdf";
+      }
+      const el = new Test();
+      expect(el.foo).to.equal("https://example.com/asdf");
+      el.setAttribute("foo", "https://www.peterkroener.de/");
+      expect(el.foo).to.equal("https://www.peterkroener.de/");
+      el.removeAttribute("foo");
+      expect(el.foo).to.equal("https://example.com/asdf");
     });
 
     test("from HTML", async () => {
@@ -368,7 +384,7 @@ describe("Transformers", () => {
     });
   });
 
-  describe("record()", () => {
+  describe("json()", () => {
     test("as attribute", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -389,7 +405,7 @@ describe("Transformers", () => {
         } as any;
       }).to.throw(Error);
       el.setAttribute("foo", "whatever");
-      expect(el.foo).to.eql({ user: "", email: "" });
+      expect(el.foo).to.eql({ user: "Foo", email: "a@b.c" });
       expect(el.getAttribute("foo")).to.equal("whatever");
       el.removeAttribute("foo");
       expect(el.foo).to.eql({ user: "", email: "" });
@@ -397,6 +413,50 @@ describe("Transformers", () => {
       el.setAttribute("foo", `{ "foo": 42 }`);
       expect(el.foo).to.eql({ foo: 42 });
       expect(el.getAttribute("foo")).to.equal(`{ "foo": 42 }`);
+    });
+  });
+
+  describe("schema()", () => {
+    test("object schema as attribute", async () => {
+      const userSchema = z.object({
+        user: z.string().nonempty(),
+        email: z.string().nonempty().email(),
+      });
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(schema(userSchema))
+        accessor foo = { user: "a", email: "a@b.com" };
+      }
+      const el = new Test();
+      expect(el.foo).to.eql({ user: "a", email: "a@b.com" });
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.foo = { user: "b", email: "b@c.org" };
+      expect(el.foo).to.eql({ user: "b", email: "b@c.org" });
+      expect(el.getAttribute("foo")).to.equal(`{"user":"b","email":"b@c.org"}`);
+      // Object does not match the schema
+      expect(() => {
+        el.foo = { asdf: 42 } as any;
+      }).to.throw(Error);
+      el.setAttribute("foo", "whatever"); // noop
+      expect(el.foo).to.eql({ user: "b", email: "b@c.org" });
+      expect(el.getAttribute("foo")).to.equal("whatever");
+      el.removeAttribute("foo");
+      expect(el.foo).to.eql({ user: "a", email: "a@b.com" });
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.setAttribute("foo", `{ "foo": 42 }`);
+      expect(el.foo).to.eql({ user: "a", email: "a@b.com" });
+      expect(el.getAttribute("foo")).to.equal(`{ "foo": 42 }`);
+    });
+
+    test("invalid initial value", async () => {
+      const userSchema = z.number();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        // @ts-expect-error value does not match schema
+        @attr(schema(userSchema))
+        accessor foo = "asdf";
+      }
+      expect(() => new Test()).to.throw(Error);
     });
   });
 

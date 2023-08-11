@@ -1,3 +1,4 @@
+import { Nil } from "./index.js";
 import {
   type Transformer,
   assertRecord,
@@ -5,37 +6,33 @@ import {
   assertType,
 } from "./types.js";
 
-function eql(a: unknown, b: unknown): boolean {
-  return a === b;
-}
-
+const eql = (a: unknown, b: unknown) => a === b;
 const stringify = String;
 
-export function any(): Transformer<HTMLElement, any> {
-  return {
-    parse(value) {
-      return value;
-    },
-    validate(value) {
-      return value;
-    },
-    stringify,
-    eql,
-  };
+function stringifyJSONAttribute(value: any, replacer: any): string {
+  try {
+    return JSON.stringify(value, replacer);
+  } catch (cause) {
+    throw new Error(
+      "Value is not JSON-serializable, but this is required for attribute handling",
+      { cause },
+    );
+  }
 }
 
 export function string(): Transformer<HTMLElement, string> {
-  const fallbackValues = new WeakMap<HTMLElement, string>();
+  const initialValues = new WeakMap<HTMLElement, string>();
   return {
-    parse(value) {
-      if (value) {
-        return String(value);
+    parse(newValue, oldValue) {
+      // Attribute removed
+      if (!newValue && oldValue !== Nil) {
+        return initialValues.get(this) ?? "";
       }
-      return fallbackValues.get(this) ?? "";
+      return String(newValue);
     },
     validate(value) {
       if (typeof value === "undefined") {
-        return fallbackValues.get(this) ?? "";
+        return initialValues.get(this) ?? "";
       }
       return String(value);
     },
@@ -43,42 +40,51 @@ export function string(): Transformer<HTMLElement, string> {
     eql,
     beforeInitCallback(_, defaultValue) {
       if (typeof defaultValue === "string") {
-        fallbackValues.set(this, defaultValue);
+        initialValues.set(this, defaultValue);
       }
     },
   };
 }
 
 export function href(): Transformer<HTMLElement, string> {
-  const valueInitialized = new WeakMap<HTMLElement, boolean>();
+  const initialValues = new WeakMap<HTMLElement, string>();
   return {
-    parse(value) {
-      if (value === null) {
-        return "";
+    parse(newValue, oldValue) {
+      // Attribute removed
+      if (!newValue && oldValue !== Nil) {
+        const result = initialValues.get(this) ?? "";
+        initialValues.delete(this); // reset like <a href>
+        return result;
       }
-      return String(value);
+      return String(newValue);
     },
     validate(value) {
       return String(value);
     },
     stringify: String,
-    eql(oldValue, newValue) {
-      if (!valueInitialized.get(this)) {
+    eql(newValue, oldValue) {
+      if (!initialValues.get(this)) {
         return false;
       }
-      return eql(oldValue, newValue);
+      return eql(newValue, oldValue);
     },
     get(value) {
-      if (!valueInitialized.get(this)) {
+      if (!initialValues.has(this)) {
         return value;
       }
       const tmp = document.createElement("a");
       tmp.href = value;
       return tmp.href;
     },
-    beforeSetCallback(_, rawValue) {
-      const setAsInit = rawValue !== null && typeof rawValue !== "undefined";
-      valueInitialized.set(this, setAsInit);
+    beforeSetCallback(value, rawValue) {
+      if (!initialValues.has(this) && rawValue !== null) {
+        initialValues.set(this, value);
+      }
+    },
+    beforeInitCallback(_, defaultValue) {
+      if (defaultValue && typeof defaultValue === "string") {
+        initialValues.set(this, defaultValue);
+      }
     },
   };
 }
@@ -239,30 +245,97 @@ type JSONOptions = {
 export function json(options: JSONOptions = {}): Transformer<HTMLElement, any> {
   const fallbackValues = new WeakMap<HTMLElement, any>();
   return {
-    parse(value) {
+    parse(newValue, oldValue) {
+      // Attribute removed
+      if (!newValue && oldValue !== Nil) {
+        return fallbackValues.get(this);
+      }
+      // Attribute set or init from attribute
       try {
-        const obj = JSON.parse(String(value), options.reviver);
-        if (obj === null || typeof obj !== "object") {
-          return fallbackValues.get(this);
-        }
-        return obj;
+        return JSON.parse(String(newValue), options.reviver);
       } catch {
+        if (oldValue !== Nil) {
+          return oldValue;
+        }
         return fallbackValues.get(this);
       }
     },
     validate(value) {
-      // trigger exception if the value is not serializable
-      JSON.stringify(value, options.replacer);
+      // Verify that the new value stringifies
+      stringifyJSONAttribute(value, options.replacer);
       return value;
     },
     stringify(value) {
-      return JSON.stringify(value, options.replacer);
+      return stringifyJSONAttribute(value, options.replacer);
     },
     eql,
     beforeInitCallback(_, defaultValue) {
-      if (typeof defaultValue === "object" && defaultValue !== null) {
-        fallbackValues.set(this, defaultValue);
+      // Verify that the default stringifies
+      stringifyJSONAttribute(defaultValue, options.replacer);
+      fallbackValues.set(this, defaultValue);
+    },
+  };
+}
+
+type SchemaLike<V> = {
+  parse(data: unknown): V;
+  safeParse(
+    data: unknown,
+  ): { success: true; data: V } | { success: false; error: any };
+};
+
+type ZodOptions = {
+  reviver?: Parameters<typeof JSON.parse>[1];
+  replacer?: Parameters<typeof JSON.stringify>[1];
+};
+
+export function schema<V>(
+  schema: SchemaLike<V>,
+  options: ZodOptions = {},
+): Transformer<HTMLElement, V> {
+  if (typeof schema !== "object") {
+    throw new TypeError("First argument of the schema transformer is required");
+  }
+  const fallbackValues = new WeakMap<HTMLElement, V>();
+  return {
+    parse(newValue, oldValue) {
+      // Attribute removed
+      if (!newValue && oldValue !== Nil) {
+        return fallbackValues.get(this) as V;
       }
+      // Attribute set or init from attribute
+      try {
+        const raw = JSON.parse(String(newValue), options.reviver);
+        const parsed = schema.safeParse(raw);
+        if (parsed.success) {
+          return parsed.data;
+        }
+        if (oldValue !== Nil) {
+          return oldValue;
+        }
+        return fallbackValues.get(this) as V;
+      } catch {
+        if (oldValue !== Nil) {
+          return oldValue;
+        }
+        return fallbackValues.get(this) as V;
+      }
+    },
+    validate(value) {
+      const parsed = schema.parse(value);
+      // Verify that the parsed value stringifies
+      stringifyJSONAttribute(parsed, options.replacer);
+      return parsed;
+    },
+    stringify(value) {
+      return stringifyJSONAttribute(value, options.replacer);
+    },
+    eql,
+    beforeInitCallback(_, defaultValue) {
+      const value = schema.parse(defaultValue);
+      // Verify that the default stringifies
+      stringifyJSONAttribute(value, options.replacer);
+      fallbackValues.set(this, value);
     },
   };
 }
@@ -296,18 +369,22 @@ export function literal<T extends HTMLElement, V>(
   const fallbackValues = new WeakMap<HTMLElement, V>();
   const options = literalOptions<T, V>(inputOptions);
   return {
-    parse(value) {
-      const parsed = options.transform.parse.call(this, value);
+    parse(rawValue, oldValue) {
+      const parsed = options.transform.parse.call(this, rawValue, oldValue);
       if (options.values.includes(parsed)) {
         return parsed;
       }
       return fallbackValues.get(this) ?? options.values[0];
     },
-    validate(value) {
-      if (typeof value === "undefined") {
+    validate(newValue, oldValue) {
+      if (typeof newValue === "undefined") {
         return fallbackValues.get(this) ?? options.values[0];
       }
-      const validated = options.transform.validate.call(this, value);
+      const validated = options.transform.validate.call(
+        this,
+        newValue,
+        oldValue,
+      );
       if (options.values.includes(validated)) {
         return validated;
       }
