@@ -3,35 +3,63 @@
 Micro-library for building vanilla web components:
 
 ```javascript
-import { define, attr, string, reactive } from "@sirpepe/ornament"
+import { define, attr, string, number, reactive } from "@sirpepe/ornament"
 
 // Register the element with the specified tag name
 @define("my-greeter")
 class MyGreeter extends HTMLElement {
+  #shadow = this.attachShadow({ mode: "open" });
 
-  // Define a content attribute alongside a corresponding getter/setter pair
-  // for a JS api and attribute change handling
+  // Define content attributes alongside corresponding getter/setter pairs
+  // for a JS api and attribute change handling and type checking
   @attr(string()) accessor name = "Anonymous";
+  @attr(number({ min: 0 })) accessor age = 0;
 
   // Mark the method as reactive to have it run every time the attribute "name"
   // changes
   @reactive() greet() {
-    console.log(`Hello ${this.name}`);
+    this.#shadow.innerHTML = `Hello! My name is ${this.#name}, my age is ${this.#age || "unknown"}`;
   }
 }
 ```
 
-The code above translates to the following boilerplate monstrosity:
+The code above
+
+- registers the class `MyGreeter` with the tag name `my-greeter`
+- implements two content attributes named `name` and `age`, which includes
+  - initial values initialized from HTML
+  - content attribute change handling (via `setAttribute()` and the like)
+  - DOM attribute change handling via a JavaScript getter/setter pair, with type checking/coercion included (`name` is always a string, `age` is always a number >= 0)
+- a `greet()` method that...
+  - automatically gets called when any of the attributes decorated with `@attr` change
+  - automatically gets called when the element instance initializes
+
+This translates to the following boilerplate monstrosity when written by hand:
 
 ```javascript
 class MyGreeter extends HTMLElement {
-  // Internal "name" state, initialized from the element's content attributes,
-  // with a default value in case the content attribute is not set
-  #name = this.getAttribute("name") || "Anonymous";
+  #shadow = this.attachShadow({ mode: "open" });
 
-  // Method to run each time `#name` changes
+  // Internal "name" and "age" states, initialized from the element's content
+  // attributes, with default values in case the content attributes are not set.
+  // The value for "age" has to be figured out with some imperative code in the
+  // constructor to keep NaN off our backs.
+  #name = this.getAttribute("name") || "Anonymous";
+  #age;
+
+  constructor() {
+    super(); // mandatory boilerplate
+    let age = Number(this.getAttribute("age"));
+    if (Number.isNaN(age)) {
+      age = 0;
+    }
+    this.#age = 0;
+    this.greet(); // Remember to run the method on initialization
+  }
+
+  // Method to run each time `#name` or `#age` changes
   greet() {
-    console.log(`Hello ${this.name}`);
+    this.#shadow.innerHTML = `Hello! My name is ${this.#name}, my age is ${this.#age || "unknown"}`;
   }
 
   // DOM getter for the IDL property, required to make JS operations like
@@ -50,34 +78,59 @@ class MyGreeter extends HTMLElement {
     this.greet(); // Remember to run the method!
   }
 
+  // DOM getter for the IDL property, required to make JS operations like
+  // `console.log(el.age)` work
+  get age() {
+    return this.#age;
+  }
+
+  // DOM setter for the IDL property with type checking and/or conversion *and*
+  // attribute updates, required to make JS operations like `el.age = 42` work.
+  set age(value) {
+    value = Number(value); // Remember to convert/check the type!
+    if (Number.isNaN(value) || value < 0) { // Remember to keep NaN in check
+      value = 0;
+    }
+    this.#age = value;
+    this.setAttribute("age", value); // Remember to sync the content attribute!
+    this.greet(); // Remember to run the method!
+  }
+
   // Attribute change handling, required to make JS operations like
   // `el.setAttribute("name", "Bob")` update the internal element state
   attributeChangedCallback(name, oldValue, newValue) {
+    // Because `#name` is a string, and attribute values are always strings as
+    // well we don't need to convert the types at this stage, but we still need
+    // to manually make sure that we fall back to "Anonymous" if the new value
+    // is null (if the attribute got removed) or if the value is (essentially)
+    // an empty string
     if (name === "name") {
-      // Because `#name` is a string, and attribute values are always strings as
-      // well we don't need to convert the types at this stage, but we still
-      // need to manually make sure that we fall back to "Anonymous" if the new
-      // value is null (if the attribute got removed) or if the value is
-      // (essentially) an empty string
       if (newValue === null || newValue.trim() === "") {
         newValue = "Anonymous";
       }
       this.#name = newValue;
       this.greet(); // Remember to run the method!
     }
+    // But for "#age" we do again need to convert types, check for NaN, enforce
+    // the min value of 0...
+    if (name === "age") {
+      const value = Number(value); // Remember to convert/check the type!
+      if (Number.isNaN(value) || value < 0) { // Remember to keep NaN in check
+        value = 0;
+      }
+      this.#age = value;
+      this.greet(); // Remember to run the method!
+    }
   }
 
   // Required for attribute change monitoring to work
   static get observedAttributes() {
-    return ["name"]; // remember to always keep this up to date
+    return ["name", "age"]; // remember to always keep this up to date
   }
 }
 
-// Finally register the element, with an extra check to make sure that the
-// tag name has not already been registered
-if (!window.customElements.has("my-greeter")) {
-  window.customElements.define("my-greeter", MyGreeter);
-}
+// Finally remember to register the element
+window.customElements.define("my-greeter", MyGreeter);
 ```
 
 Ornament aims to make the most tedious bits of building vanilla web components
@@ -89,19 +142,21 @@ as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babe
 [TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
 (with the option `experimentalDecorators` turned *off*).
 
-## Why use Ornament?
-
-The native APIs for web components are verbose and imperative. This is not
-really a problem, but lends itself to quite a bit of streamlining.
+## Guide
 
 ### General philosophy
 
-Ornament is not a framework. Its decorators are meant to be easy to add (either
-to existing components or greenfield projects), easy to extend, but also *very*
-easy to remove or replace with more complicated hand-written logic. They
-co-exist with eg. custom attribute change handling logic just fine. Ornament
-still wants you to have full control over your components' behavior, just with
-less *mandatory* boilerplate.
+The native APIs for web components are verbose and imperative, but lend
+themselves to quite a bit of streamlining, without going all-in with a whole
+framework.
+
+Ornament is decidedly *not* a framework. Its decorators are meant to be easy to
+add (either to existing components or greenfield projects), easy to extend, but
+also *very* easy to remove or replace with hand-written logic, your own
+decorators, or a future replacement for Ornament. Ornaments decorators co-exist
+with eg. regular attribute change handling logic just fine. Ornament still wants
+you to have full control over your components' behavior, just with less
+*mandatory* boilerplate.
 
 ### Component registration
 
@@ -118,8 +173,6 @@ class MyTest extends HTMLElement {}
 
 ### Attribute handling
 
-Getting attribute handling on Web Components right is hard, because many
-different APIs and states need to interact in just the right way.
 [To paraphrase MDN:](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes?retiredLocale=de#content_versus_idl_attributes)
 Attributes have two faces: the *content attribute* and the *IDL attribute* (also
 known as "JavaScript properties"). Content attributes are always strings and are
@@ -128,8 +181,12 @@ attributes can be accessed via properties such as `someElement.foo` and may be
 of any type. Both faces of attributes need to be implemented and properly synced
 up for an element to be truly compatible with any software out there - a JS
 frontend framework may work primarily with IDL attributes, while HTML authors or
-server-side rendering software will work with content attributes. Keeping
-content and IDL attributes in sync can entail any of the following tasks:
+server-side rendering software will work with content attributes.
+
+Getting attribute handling on Web Components right is hard, because many
+different APIs and states need to interact in just the right way and the related
+code tends to end up scattered across various class members. Keeping content and
+IDL attributes in sync can entail any of the following tasks:
 
 - Updating the content attribute when the IDL attribute gets changed (eg. update the HTML attribute `id` when running `element.id = "foo"` in JS)
 - Updating the IDL attribute when the content attribute gets changed (eg. `element.id` should return `"bar"` after `element.setAttribute("id", "bar")`)

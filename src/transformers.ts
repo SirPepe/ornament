@@ -106,7 +106,7 @@ function numberOptions(input: unknown): NumberOptions<number> {
 }
 
 export function number(
-  options: Partial<NumberOptions<number>> = {}
+  options: Partial<NumberOptions<number>> = {},
 ): Transformer<HTMLElement, number> {
   const fallbackValues = new WeakMap<HTMLElement, number>();
   const { min, max } = numberOptions(options);
@@ -151,7 +151,7 @@ export function number(
 }
 
 function isBigIntConvertible(
-  value: unknown
+  value: unknown,
 ): value is string | number | bigint | boolean {
   return (
     typeof value === "string" ||
@@ -173,7 +173,7 @@ function bigintOptions(input: unknown): NumberOptions<bigint | undefined> {
 }
 
 export function int(
-  options: Partial<NumberOptions<bigint>> = {}
+  options: Partial<NumberOptions<bigint>> = {},
 ): Transformer<HTMLElement, bigint> {
   const fallbackValues = new WeakMap<HTMLElement, bigint>();
   const { min, max } = bigintOptions(options);
@@ -258,7 +258,7 @@ type LiteralOptions<T extends HTMLElement, V> = {
 };
 
 function literalOptions<T extends HTMLElement, V>(
-  input: unknown
+  input: unknown,
 ): LiteralOptions<T, V> {
   input = input ?? {};
   assertRecord(input, "options");
@@ -266,7 +266,7 @@ function literalOptions<T extends HTMLElement, V>(
   assertTransformer<T, V>(transformer);
   if (!Array.isArray(values)) {
     throw new TypeError(
-      `Expected "values" to be array, got "${typeof values}".`
+      `Expected "values" to be array, got "${typeof values}".`,
     );
   }
   if (values.length === 0) {
@@ -276,7 +276,7 @@ function literalOptions<T extends HTMLElement, V>(
 }
 
 export function literal<T extends HTMLElement, V>(
-  inputOptions: LiteralOptions<T, V>
+  inputOptions: LiteralOptions<T, V>,
 ): Transformer<T, V> {
   const fallbackValues = new WeakMap<HTMLElement, V>();
   const options = literalOptions<T, V>(inputOptions);
@@ -297,7 +297,7 @@ export function literal<T extends HTMLElement, V>(
         return validated;
       }
       throw new Error(
-        `Invalid value: ${options.transformer.stringify.call(this, validated)}`
+        `Invalid value: ${options.transformer.stringify.call(this, validated)}`,
       );
     },
     stringify: options.transformer.stringify,
@@ -320,7 +320,7 @@ type HandlerTransform<T extends HTMLElement, E extends Event> = Transformer<
 
 export function event<
   T extends HTMLElement,
-  E extends Event
+  E extends Event,
 >(): HandlerTransform<T, E> {
   const functions = new WeakMap<HTMLElement, Handler<T, E>>();
   function handler(this: T, evt: E) {
@@ -350,7 +350,7 @@ export function event<
     },
     stringify() {
       throw new Error(
-        "This function should never be called, updating event handler properties does not change the attribute value!"
+        "This function should never be called, updating event handler properties does not change the attribute value!",
       );
     },
     eql,

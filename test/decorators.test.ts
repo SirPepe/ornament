@@ -22,7 +22,7 @@ describe("Decorators", () => {
       class Test extends HTMLElement {}
       expect(window.customElements.get("register-test")).to.equal(Test);
       expect(document.createElement("register-test").toString()).to.equal(
-        "[object HTMLRegisterTestElement]"
+        "[object HTMLRegisterTestElement]",
       );
     });
 

@@ -1,13 +1,9 @@
-import { readFileSync } from "fs";
+import babelConfig from "./babel.config.mjs";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 import { babel } from "@rollup/plugin-babel";
 import terser from "@rollup/plugin-terser";
 
 export const extensions = [".ts", ".js"];
-
-export const babelConfig = JSON.parse(
-  readFileSync("./babel.config.json", { encoding: "utf8" })
-);
 
 const commonConfig = {
   plugins: [

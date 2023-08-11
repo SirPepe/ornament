@@ -105,7 +105,7 @@ describe("Transformers", () => {
       const fixture = document.createElement("div");
       fixture.innerHTML = `<${tagName} foo="https://example.com/asdf"></${tagName}>`;
       expect((fixture.children[0] as any).foo).to.equal(
-        "https://example.com/asdf"
+        "https://example.com/asdf",
       );
     });
   });
@@ -117,13 +117,13 @@ describe("Transformers", () => {
         () =>
           class extends HTMLElement {
             @attr(number({ min: 1, max: 0 })) accessor foo = 1;
-          }
+          },
       ).to.throw();
       expect(
         () =>
           class extends HTMLElement {
             @attr(number({ min: 1, max: 1 })) accessor foo = 1;
-          }
+          },
       ).to.throw();
       // Invalid initial value
       expect(() => {
@@ -298,7 +298,7 @@ describe("Transformers", () => {
           class extends HTMLElement {
             @attr(literal({ values: [], transformer: string() }))
             accessor foo = "A";
-          }
+          },
       ).to.throw();
       // Invalid transformer
       expect(
@@ -306,7 +306,7 @@ describe("Transformers", () => {
           class extends HTMLElement {
             @attr(literal({ values: ["B", "B", "C"], transformer: {} } as any))
             accessor foo = "A";
-          }
+          },
       ).to.throw();
     });
 
@@ -441,7 +441,7 @@ describe("Transformers", () => {
       const el = new Test();
       el.setAttribute("onfoo", "globalThis.fnForEventHandlerAttrTest(event)");
       expect(el.onfoo?.toString()).to.have.string(
-        "globalThis.fnForEventHandlerAttrTest(event)"
+        "globalThis.fnForEventHandlerAttrTest(event)",
       );
       const evt1 = new Event("foo");
       el.dispatchEvent(evt1);
@@ -465,10 +465,10 @@ describe("Transformers", () => {
       const el = new Test();
       el.setAttribute(
         "onfoo",
-        "globalThis.fnForEventHandlerAttrAndPropTest(event)"
+        "globalThis.fnForEventHandlerAttrAndPropTest(event)",
       );
       expect(el.onfoo?.toString()).to.have.string(
-        "globalThis.fnForEventHandlerAttrAndPropTest(event)"
+        "globalThis.fnForEventHandlerAttrAndPropTest(event)",
       );
       const evt1 = new Event("foo");
       el.dispatchEvent(evt1);
@@ -476,7 +476,7 @@ describe("Transformers", () => {
       expect(fn.getCalls()[0].args).to.eql([evt1]);
       el.onfoo = (event) => fn(event);
       expect(el.getAttribute("onfoo")).to.equal(
-        "globalThis.fnForEventHandlerAttrAndPropTest(event)"
+        "globalThis.fnForEventHandlerAttrAndPropTest(event)",
       );
       const evt2 = new Event("foo");
       el.dispatchEvent(evt2);

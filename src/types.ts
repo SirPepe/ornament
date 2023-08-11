@@ -24,7 +24,7 @@ export type Transformer<T extends HTMLElement, V> = {
   updateAttrPredicate?: (
     this: T,
     oldValue: V | null,
-    newValue: V | null
+    newValue: V | null,
   ) => boolean | null;
   // Runs before accessor initialization and can be used to perform side effects
   // or to grab the accessors initial value as defined in the class.
@@ -32,7 +32,7 @@ export type Transformer<T extends HTMLElement, V> = {
     this: T,
     value: V,
     defaultValue: V,
-    context: ClassAccessorDecoratorContext<T, V>
+    context: ClassAccessorDecoratorContext<T, V>,
   ) => void;
   // Runs before an accessor's setter sets a new value and can be used to
   // perform side effects
@@ -40,7 +40,7 @@ export type Transformer<T extends HTMLElement, V> = {
     this: T,
     value: V,
     rawValue: unknown,
-    context: ClassAccessorDecoratorContext<T, V>
+    context: ClassAccessorDecoratorContext<T, V>,
   ) => void;
 };
 
@@ -77,11 +77,11 @@ type Types = {
 
 export function assertRecord(
   input: unknown,
-  name: string
+  name: string,
 ): asserts input is Record<any, any> {
   if (typeof input !== "object") {
     throw new TypeError(
-      `Expected "${name}" to be an object, got ${typeof input}`
+      `Expected "${name}" to be an object, got ${typeof input}`,
     );
   }
   if (input === null) {
@@ -100,7 +100,7 @@ export function assertType<K extends keyof Types>(
     }
   }
   throw new TypeError(
-    `Expected "${name}" to "${types.join("/")}" but got ${typeof value}`
+    `Expected "${name}" to "${types.join("/")}" but got ${typeof value}`,
   );
 }
 
@@ -115,12 +115,12 @@ export function assertPropType<K extends keyof Types>(
     }
   }
   throw new TypeError(
-    `Expected "${prop}" to be "${types.join("/")}" but got ${typeof obj[prop]}`
+    `Expected "${prop}" to be "${types.join("/")}" but got ${typeof obj[prop]}`,
   );
 }
 
 export function assertTransformer<T extends HTMLElement, V>(
-  input: unknown
+  input: unknown,
 ): asserts input is Transformer<T, V> {
   assertRecord(input, "transformer");
   assertPropType(input, "parse", "function");
@@ -140,7 +140,7 @@ export function assertContext(
   ctx: any,
   name: string,
   kind: DecoratorContext["kind"] | DecoratorContext["kind"][],
-  accept: Partial<AcceptOptions> = {}
+  accept: Partial<AcceptOptions> = {},
 ): void {
   const kinds = Array.isArray(kind) ? kind : [kind];
   if (!kinds.includes(ctx.kind)) {

@@ -21,7 +21,7 @@ const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 type AttributeChangedCallback = (
   name: string,
   oldValue: string | null,
-  newValue: string | null
+  newValue: string | null,
 ) => void;
 type CallbackMap = Map<string, AttributeChangedCallback>; // attr name -> cb
 const OBSERVER_CALLBACKS = new WeakMap<HTMLElement, CallbackMap>();
@@ -66,7 +66,7 @@ declare global {
 // init callback handling.
 export function define<T extends CustomElementConstructor>(
   this: unknown,
-  tagName: string
+  tagName: string,
 ): (target: T, context: ClassDecoratorContext<T>) => T {
   return function (target: T, context: ClassDecoratorContext<T>): T {
     assertContext(context, "@define", "class");
@@ -85,7 +85,7 @@ export function define<T extends CustomElementConstructor>(
     const originalDisconnectedCallback = target.prototype.disconnectedCallback;
     const originalToStringTag = Object.getOwnPropertyDescriptor(
       target.prototype,
-      Symbol.toStringTag
+      Symbol.toStringTag,
     );
 
     // Installs the mixin class. This kindof changes the type of the input
@@ -119,7 +119,7 @@ export function define<T extends CustomElementConstructor>(
           .split("-")
           .map(
             (part) =>
-              part.slice(0, 1).toUpperCase() + part.slice(1).toLowerCase()
+              part.slice(0, 1).toUpperCase() + part.slice(1).toLowerCase(),
           )
           .join("");
         return "HTML" + stringTag + "Element";
@@ -133,7 +133,7 @@ export function define<T extends CustomElementConstructor>(
         this: HTMLElement,
         name: string,
         oldVal: string | null,
-        newVal: string | null
+        newVal: string | null,
       ): void {
         if (
           originalAttributeChangedCallback &&
@@ -182,12 +182,12 @@ type ReactiveOptions = {
 
 type ReactiveDecorator<T extends HTMLElement> = (
   value: () => any,
-  context: ClassMethodDecoratorContext<T, () => any>
+  context: ClassMethodDecoratorContext<T, () => any>,
 ) => void;
 
 export function reactive<T extends HTMLElement>(
   this: unknown,
-  options: ReactiveOptions = {}
+  options: ReactiveOptions = {},
 ): ReactiveDecorator<T> {
   const initial = options.initial ?? true;
   return function (_, context): void {
@@ -218,12 +218,12 @@ export function reactive<T extends HTMLElement>(
 }
 
 const unsubscribeRegistry = new FinalizationRegistry<() => void>(
-  (unsubscribe) => unsubscribe()
+  (unsubscribe) => unsubscribe(),
 );
 
 type EventSubscribeDecorator<T, E extends Event> = (
   value: Method<T, [E]>,
-  context: ClassMethodDecoratorContext<T>
+  context: ClassMethodDecoratorContext<T>,
 ) => void;
 
 type LazyEventTarget<T extends EventTarget = EventTarget> = () => T;
@@ -232,7 +232,7 @@ function createEventSubscriberInitializer<T extends object, E extends Event>(
   context: ClassMethodDecoratorContext<T>,
   target: EventTarget | LazyEventTarget,
   eventName: string,
-  predicate: (this: T, evt: E) => boolean = () => true
+  predicate: (this: T, evt: E) => boolean = () => true,
 ): (this: T) => void {
   return function (this: T) {
     const value = context.access.get(this);
@@ -253,7 +253,7 @@ function createEventSubscriberInitializer<T extends object, E extends Event>(
 
 type SignalSubscribeDecorator<T> = (
   value: Method<T, []>,
-  context: ClassMethodDecoratorContext<T>
+  context: ClassMethodDecoratorContext<T>,
 ) => void;
 
 type SignalLike<T> = {
@@ -278,11 +278,11 @@ function isSignalLike(value: unknown): value is SignalLike<any> {
 function createSignalSubscriberInitializer<
   T extends object,
   V,
-  S extends SignalLike<V>
+  S extends SignalLike<V>,
 >(
   context: ClassMethodDecoratorContext<T>,
   target: S,
-  predicate: (this: T, value: V) => boolean = () => true
+  predicate: (this: T, value: V) => boolean = () => true,
 ): (this: T) => void {
   return function (this: T) {
     const value = context.access.get(this);
@@ -299,23 +299,23 @@ function createSignalSubscriberInitializer<
 export function subscribe<T extends object, S extends SignalLike<any>>(
   this: unknown,
   target: S,
-  predicate?: (this: T, value: SignalType<S>) => boolean
+  predicate?: (this: T, value: SignalType<S>) => boolean,
 ): SignalSubscribeDecorator<T>;
 export function subscribe<
   T extends object,
   U extends EventTarget,
-  E extends Event
+  E extends Event,
 >(
   this: unknown,
   target: U | LazyEventTarget<U>,
   event: string,
-  predicate?: (this: T, evt: E) => boolean
+  predicate?: (this: T, evt: E) => boolean,
 ): EventSubscribeDecorator<T, E>;
 export function subscribe<T extends object>(
   this: unknown,
   target: EventTarget | LazyEventTarget<any> | SignalLike<any>,
   eventOrPredicate?: ((this: T, arg: any) => boolean) | string,
-  predicate?: (this: T, arg: any) => boolean
+  predicate?: (this: T, arg: any) => boolean,
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
   return function (_: unknown, context: ClassMethodDecoratorContext<T>): void {
     assertContext(context, "@subscribe", "method", { private: true });
@@ -328,8 +328,8 @@ export function subscribe<T extends object>(
           context,
           target,
           eventOrPredicate,
-          predicate
-        )
+          predicate,
+        ),
       );
       return;
     }
@@ -339,7 +339,7 @@ export function subscribe<T extends object>(
         typeof eventOrPredicate === "undefined")
     ) {
       context.addInitializer(
-        createSignalSubscriberInitializer(context, target, eventOrPredicate)
+        createSignalSubscriberInitializer(context, target, eventOrPredicate),
       );
       return;
     }
@@ -350,7 +350,7 @@ export function subscribe<T extends object>(
 export function connected<T extends HTMLElement>() {
   return function (
     _: Method<T, []>,
-    context: ClassMethodDecoratorContext<T>
+    context: ClassMethodDecoratorContext<T>,
   ): void {
     assertContext(context, "@connected", "method", { private: true });
     context.addInitializer(function () {
@@ -368,7 +368,7 @@ export function connected<T extends HTMLElement>() {
 export function disconnected<T extends HTMLElement>() {
   return function (
     _: Method<T, []>,
-    context: ClassMethodDecoratorContext<T>
+    context: ClassMethodDecoratorContext<T>,
   ): void {
     assertContext(context, "@disconnected", "method", { private: true });
     context.addInitializer(function () {
@@ -395,7 +395,7 @@ type AttrOptions = {
 export function attr<T extends HTMLElement, V>(
   this: unknown,
   transformer: Transformer<T, V>,
-  options: AttrOptions = {}
+  options: AttrOptions = {},
 ): ClassAccessorDecorator<T, V> {
   const getTransform = transformer.get ?? ((x: V) => x);
   const isReflectiveAttribute = options.reflective !== false;
@@ -428,7 +428,7 @@ export function attr<T extends HTMLElement, V>(
           this: T,
           name: string,
           oldAttrValue: string | null,
-          newAttrValue: string | null
+          newAttrValue: string | null,
         ): void {
           if (name !== attrName || newAttrValue === oldAttrValue) {
             return; // skip irrelevant invocations
@@ -442,7 +442,7 @@ export function attr<T extends HTMLElement, V>(
             this,
             newValue,
             newAttrValue,
-            context
+            context,
           );
           set.call(this, newValue);
           this.dispatchEvent(new ReactivityEvent(context.name));
@@ -453,7 +453,7 @@ export function attr<T extends HTMLElement, V>(
         } else {
           OBSERVER_CALLBACKS.set(
             this,
-            new Map([[attrName, attributeChangedCallback]])
+            new Map([[attrName, attributeChangedCallback]]),
           );
         }
       });
@@ -486,7 +486,7 @@ export function attr<T extends HTMLElement, V>(
           } else if (updateAttr === true) {
             this.setAttribute(
               attrName,
-              transformer.stringify.call(this, newValue)
+              transformer.stringify.call(this, newValue),
             );
           }
         }
@@ -503,7 +503,7 @@ export function attr<T extends HTMLElement, V>(
 // reactivity added.
 export function prop<T extends HTMLElement, V>(
   this: unknown,
-  transformer: Transformer<T, V>
+  transformer: Transformer<T, V>,
 ): ClassAccessorDecorator<T, V> {
   const getTransform = transformer.get ?? ((x: V) => x);
   return function ({ get, set }, context): ClassAccessorDecoratorResult<T, V> {
@@ -537,7 +537,7 @@ type DebounceOptions = {
 
 function createDebouncedMethod<T extends object, A extends unknown[]>(
   originalMethod: Method<T, A>,
-  wait: (cb: () => void) => () => void
+  wait: (cb: () => void) => () => void,
 ): Method<T, A> {
   const cancelFns = new WeakMap<T, undefined | (() => void)>();
   function debouncedMethod(this: T, ...args: A): any {
@@ -550,7 +550,7 @@ function createDebouncedMethod<T extends object, A extends unknown[]>(
       wait(() => {
         originalMethod.call(this, ...args);
         cancelFns.delete(this);
-      })
+      }),
     );
   }
   DEBOUNCED_METHOD_MAP.set(debouncedMethod, originalMethod);
@@ -559,20 +559,20 @@ function createDebouncedMethod<T extends object, A extends unknown[]>(
 
 export function debounce<T extends HTMLElement, A extends unknown[]>(
   this: unknown,
-  options: DebounceOptions = {}
+  options: DebounceOptions = {},
 ): FunctionFieldOrMethodDecorator<T, A> {
   const fn = options.fn ?? debounce.raf();
   function decorator(
     value: Method<T, A>,
-    context: ClassMethodDecoratorContext<T, Method<T, A>>
+    context: ClassMethodDecoratorContext<T, Method<T, A>>,
   ): Method<T, A>;
   function decorator(
     value: undefined,
-    context: ClassFieldDecoratorContext<T, Method<unknown, A>>
+    context: ClassFieldDecoratorContext<T, Method<unknown, A>>,
   ): (init: Method<unknown, A>) => Method<unknown, A>;
   function decorator(
     value: Method<T, A> | undefined,
-    context: FunctionFieldOrMethodContext<T, A>
+    context: FunctionFieldOrMethodContext<T, A>,
   ): Method<T, A> | ((init: Method<unknown, A>) => Method<unknown, A>) {
     assertContext(context, "@debounce", ["field", "method"], {
       private: true,
@@ -582,11 +582,11 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
       // Field decorator (bound methods)
       return function init(
         this: T,
-        func: Method<unknown, A>
+        func: Method<unknown, A>,
       ): Method<unknown, A> {
         if (typeof func !== "function") {
           throw new TypeError(
-            "@debounce() can only be applied to function class fields"
+            "@debounce() can only be applied to function class fields",
           );
         }
         return createDebouncedMethod(func, fn).bind(this);
