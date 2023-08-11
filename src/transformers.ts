@@ -11,6 +11,19 @@ function eql(a: unknown, b: unknown): boolean {
 
 const stringify = String;
 
+export function any(): Transformer<HTMLElement, any> {
+  return {
+    parse(value) {
+      return value;
+    },
+    validate(value) {
+      return value;
+    },
+    stringify,
+    eql,
+  };
+}
+
 export function string(): Transformer<HTMLElement, string> {
   const fallbackValues = new WeakMap<HTMLElement, string>();
   return {
@@ -70,7 +83,7 @@ export function href(): Transformer<HTMLElement, string> {
   };
 }
 
-export function boolean(): Transformer<HTMLElement, boolean> {
+export function bool(): Transformer<HTMLElement, boolean> {
   return {
     parse(value) {
       return value !== null;
@@ -218,13 +231,17 @@ export function int(
   };
 }
 
-// TODO: any ersetzen
-export function record(): Transformer<HTMLElement, any> {
+type JSONOptions = {
+  reviver?: Parameters<typeof JSON.parse>[1];
+  replacer?: Parameters<typeof JSON.stringify>[1];
+};
+
+export function json(options: JSONOptions = {}): Transformer<HTMLElement, any> {
   const fallbackValues = new WeakMap<HTMLElement, any>();
   return {
     parse(value) {
       try {
-        const obj = JSON.parse(String(value));
+        const obj = JSON.parse(String(value), options.reviver);
         if (obj === null || typeof obj !== "object") {
           return fallbackValues.get(this);
         }
@@ -234,15 +251,13 @@ export function record(): Transformer<HTMLElement, any> {
       }
     },
     validate(value) {
-      if (value === null) {
-        throw new TypeError(`Expected object, got "null"`);
-      }
-      if (typeof value !== "object") {
-        throw new TypeError(`Expected object, got "${typeof value}"`);
-      }
+      // trigger exception if the value is not serializable
+      JSON.stringify(value, options.replacer);
       return value;
     },
-    stringify: JSON.stringify,
+    stringify(value) {
+      return JSON.stringify(value, options.replacer);
+    },
     eql,
     beforeInitCallback(_, defaultValue) {
       if (typeof defaultValue === "object" && defaultValue !== null) {
@@ -254,7 +269,7 @@ export function record(): Transformer<HTMLElement, any> {
 
 type LiteralOptions<T extends HTMLElement, V> = {
   values: V[];
-  transformer: Transformer<T, V>;
+  transform: Transformer<T, V>;
 };
 
 function literalOptions<T extends HTMLElement, V>(
@@ -262,8 +277,8 @@ function literalOptions<T extends HTMLElement, V>(
 ): LiteralOptions<T, V> {
   input = input ?? {};
   assertRecord(input, "options");
-  const { values, transformer } = input as Record<any, any>;
-  assertTransformer<T, V>(transformer);
+  const { values, transform } = input as Record<any, any>;
+  assertTransformer<T, V>(transform);
   if (!Array.isArray(values)) {
     throw new TypeError(
       `Expected "values" to be array, got "${typeof values}".`,
@@ -272,7 +287,7 @@ function literalOptions<T extends HTMLElement, V>(
   if (values.length === 0) {
     throw new TypeError(`Expected "values" to not be empty`);
   }
-  return { transformer, values };
+  return { transform, values };
 }
 
 export function literal<T extends HTMLElement, V>(
@@ -282,7 +297,7 @@ export function literal<T extends HTMLElement, V>(
   const options = literalOptions<T, V>(inputOptions);
   return {
     parse(value) {
-      const parsed = options.transformer.parse.call(this, value);
+      const parsed = options.transform.parse.call(this, value);
       if (options.values.includes(parsed)) {
         return parsed;
       }
@@ -292,16 +307,16 @@ export function literal<T extends HTMLElement, V>(
       if (typeof value === "undefined") {
         return fallbackValues.get(this) ?? options.values[0];
       }
-      const validated = options.transformer.validate.call(this, value);
+      const validated = options.transform.validate.call(this, value);
       if (options.values.includes(validated)) {
         return validated;
       }
       throw new Error(
-        `Invalid value: ${options.transformer.stringify.call(this, validated)}`,
+        `Invalid value: ${options.transform.stringify.call(this, validated)}`,
       );
     },
-    stringify: options.transformer.stringify,
-    eql: options.transformer.eql,
+    stringify: options.transform.stringify,
+    eql: options.transform.eql,
     beforeInitCallback(_, defaultValue) {
       if (options.values.includes(defaultValue)) {
         return fallbackValues.set(this, defaultValue);

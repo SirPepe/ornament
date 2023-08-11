@@ -2,13 +2,13 @@ import { expect } from "@esm-bundle/chai";
 import { spy } from "sinon";
 import { attr, define } from "../src/decorators.js";
 import {
-  boolean,
+  bool,
   event,
   href,
   int,
   literal,
   number,
-  record,
+  json,
   string,
 } from "../src/transformers.js";
 import { generateTagName, wait } from "./helpers.js";
@@ -266,11 +266,11 @@ describe("Transformers", () => {
     });
   });
 
-  describe("boolean()", () => {
+  describe("bool()", () => {
     test("as attribute", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
-        @attr(boolean()) accessor foo = false;
+        @attr(bool()) accessor foo = false;
       }
       const el = new Test();
       expect(el.foo).to.equal(false);
@@ -296,7 +296,7 @@ describe("Transformers", () => {
       expect(
         () =>
           class extends HTMLElement {
-            @attr(literal({ values: [], transformer: string() }))
+            @attr(literal({ values: [], transform: string() }))
             accessor foo = "A";
           },
       ).to.throw();
@@ -313,7 +313,7 @@ describe("Transformers", () => {
     test("as attribute", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
-        @attr(literal({ values: ["A", "B"], transformer: string() }))
+        @attr(literal({ values: ["A", "B"], transform: string() }))
         accessor foo = "A";
       }
       const el = new Test();
@@ -339,7 +339,7 @@ describe("Transformers", () => {
     test("custom fallback value", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
-        @attr(literal({ values: ["A", "B", "C"], transformer: string() }))
+        @attr(literal({ values: ["A", "B", "C"], transform: string() }))
         accessor foo = "C";
       }
       const el = new Test();
@@ -352,7 +352,7 @@ describe("Transformers", () => {
     test("non-initialized accessor", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
-        @attr(literal({ values: ["A", "B", "C"], transformer: string() }))
+        @attr(literal({ values: ["A", "B", "C"], transform: string() }))
         accessor foo: any;
       }
       const el = new Test();
@@ -372,7 +372,7 @@ describe("Transformers", () => {
     test("as attribute", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
-        @attr(record())
+        @attr(json())
         accessor foo = { user: "", email: "" };
       }
       const el = new Test();
@@ -382,8 +382,12 @@ describe("Transformers", () => {
       expect(el.foo).to.eql({ user: "Foo", email: "a@b.c" });
       expect(el.getAttribute("foo")).to.equal(`{"user":"Foo","email":"a@b.c"}`);
       expect(() => {
-        el.foo = "Hello" as any;
-      }).to.throw(TypeError);
+        el.foo = {
+          toJSON() {
+            throw new Error();
+          },
+        } as any;
+      }).to.throw(Error);
       el.setAttribute("foo", "whatever");
       expect(el.foo).to.eql({ user: "", email: "" });
       expect(el.getAttribute("foo")).to.equal("whatever");

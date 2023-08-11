@@ -27,7 +27,7 @@ The code above
 
 - registers the class `MyGreeter` with the tag name `my-greeter`
 - implements two content attributes named `name` and `age`, which includes
-  - initial values initialized from HTML
+  - initial values initialized from HTML (when possible)
   - content attribute change handling (via `setAttribute()` and the like)
   - DOM attribute change handling via a JavaScript getter/setter pair, with type checking/coercion included (`name` is always a string, `age` is always a number >= 0)
 - a `greet()` method that...
@@ -635,6 +635,20 @@ implement attribute and property handling. This includes converting content
 attributes from and to IDL attributes, type checks on IDL setters, and running
 side effects.
 
+### Transformers overview
+
+| Transformer       | Type                | Nullable | Options               |
+| ------------------| --------------------|----------|-----------------------|
+| `any()`           | Any                 | ✕        |                       |
+| `string()`        | `string`            | ✕        |                       |
+| `href()`          | `string` (URL)      | ✕        |                       |
+| `bool()`          | `boolean`           | ✕        |                       |
+| `number()`        | `number`            | ✕        | `min`, `max`          |
+| `int()`           | `bigint`            | ✕        | `min`, `max`          |
+| `json()`          | JSON serializable   | ✕        | `reviver`, `replacer` |
+| `literal()`       | Any                 | ✓        | `values`, `transform` |
+| `event()`         | `function`          | ✓        |                       |
+
 A transformers's type signature is as follows:
 
 ```typescript
@@ -690,6 +704,23 @@ bookkeeping, they are somewhat tricky to get right, but they are also always
 only a few self-contained lines of code. If you want to extend Ornament, you
 should simply clone one of the built-in transformers and modify it to your
 liking.
+
+### Transformer `any()`
+
+Implements an attribute without any type checking or coercion.
+
+```javascript
+import { define, attr, any } from "@sirpepe/ornament"
+
+@define("my-test")
+class Test extends HTMLElement {
+  @attr(any()) accessor foo = "default value";
+}
+```
+
+The property `foo` can be set to anything. Values get stringified for content
+attributes via the `String` functions, changes to content attributes are passed
+on as unmodified strings.
 
 ### Transformer `string()`
 
@@ -792,17 +823,17 @@ attribute is set to `undefined`.
 - **`min` (bigint, optional)**: Smallest possible value. Defaults to the minimum possible bigint value. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception.
 - **`max` (bigint, optional)**: Largest possible value. Defaults to the maximum possible bigint value. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception.
 
-### Transformer `boolean()`
+### Transformer `bool()`
 
 Implements a boolean attribute. Modeled after built-in boolean attributes such
 as `disabled`. Changes to the IDL attribute values toggle the content attribute
 and do not just change the content attribute's value.
 
 ```javascript
-import { define, attr, boolean } from "@sirpepe/ornament"
+import { define, attr, bool } from "@sirpepe/ornament"
 
 class DemoElement extends HTMLElement {
-  @attr(boolean()) accessor foo = false;
+  @attr(bool()) accessor foo = false;
 }
 ```
 
@@ -814,7 +845,7 @@ missing content attribute counts as `false`.
 If you want your content attribute to represent `"false"` as a string value,
 you can use the `literal()` transformer with the strings `"true"` and `"false"`.
 
-### Transformer `literal(options)`
+### Transformer `literal(options?)`
 
 Implements an attribute with a finite number of valid values. Should really be
 called "enum", but that's a reserved word in JavaScript. It works by declaring
@@ -827,7 +858,7 @@ import { define, attr, literal, string } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
-  @attr(literal({ values: ["A", "B"], transformer: string() })) accessor foo = "A";
+  @attr(literal({ values: ["A", "B"], transform: string() })) accessor foo = "A";
 }
 ```
 
@@ -839,32 +870,42 @@ IDL attribute to values other than `A` or `B` will result in an exception.
 The default value is either the value the accessor was initialized with or, if
 the accessor has no initial value, the first element in `values`.
 
-#### Options for `literal()`
+#### Options for `literal(options?)`
 
 - **`values` (array)**: List of valid values. Must contain at least one element.
-- **`transformer` (Transformer)**: Transformer to use, eg. `string()` for a list of strings, `number()` for numbers etc.
+- **`transform` (Transformer)**: Transformer to use, eg. `string()` for a list of strings, `number()` for numbers etc.
 
-### Transformer `record()`
+### Transformer `json()`
 
-Implements a plain object attribute that gets reflected as a JSON content
-attribute when used with `@attr()`. Such attributes do not exist in standard
-HTML, but may be useful nevertheless:
+Implements an attribute that can take any valid JSON value and gets reflected as
+a JSON-encoded content attribute when used with `@attr()`. Such attributes do
+not exist in standard HTML, but may be useful nevertheless:
 
 ```javascript
-import { define, attr, record } from "@sirpepe/ornament";
+import { define, attr, json } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
-  @attr(record()) accessor foo = { user: "", email: "" };
+  @attr(json()) accessor foo = { user: "", email: "" };
 }
 ```
 
 Content attribute values are parsed with `JSON.parse()`. Invalid JSON is
 represented with the object used to initialize the accessor, or the empty object
 if the accessor has no initial value. Using the IDL attribute's setter with
-non-objects throws TypeErrors. Note that this transformer is really just a
-wrapper around `JSON.parse()` and `JSON.stringify()` without any object
-validation.
+inputs than can't be serialized with JSON.`stringify()` throws Errors. This
+transformer is really just a wrapper around `JSON.parse()` and
+`JSON.stringify()` without any object validation.
+
+**Note for TypeScript:** Even though the transformer will accept literally any
+value at runtime, TS may infer a more restrictive type from the accessor's
+initial values. Decorators can't currently change the type of class members they
+are applied to, so you man need to provide a type annotation.
+
+#### Options for `json(options?)`
+
+- **`reviver` (function, optional)**: The `reviver` argument to use with `JSON.parse()`, if any
+- **`replacer` (function, optional)**: The `replacer` argument to use with `JSON.stringify()`, if any
 
 ### Transformer `event()`
 
