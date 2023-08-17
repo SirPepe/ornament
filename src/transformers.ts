@@ -1,13 +1,10 @@
-import { Nil } from "./index.js";
+import { Nil } from "./lib.js";
 import {
   type Transformer,
   assertRecord,
   assertTransformer,
   assertType,
 } from "./types.js";
-
-const eql = (a: unknown, b: unknown) => a === b;
-const stringify = String;
 
 function stringifyJSONAttribute(value: any, replacer: any): string {
   try {
@@ -24,7 +21,7 @@ export function string(): Transformer<HTMLElement, string> {
   const initialValues = new WeakMap<HTMLElement, string>();
   return {
     parse(newValue, oldValue) {
-      // Attribute removed
+      // Content attribute got removed
       if (!newValue && oldValue !== Nil) {
         return initialValues.get(this) ?? "";
       }
@@ -36,12 +33,11 @@ export function string(): Transformer<HTMLElement, string> {
       }
       return String(value);
     },
-    stringify,
-    eql,
-    beforeInitCallback(_, defaultValue) {
+    init(value, defaultValue) {
       if (typeof defaultValue === "string") {
         initialValues.set(this, defaultValue);
       }
+      return value;
     },
   };
 }
@@ -50,7 +46,7 @@ export function href(): Transformer<HTMLElement, string> {
   const initialValues = new WeakMap<HTMLElement, string>();
   return {
     parse(newValue, oldValue) {
-      // Attribute removed
+      // Content attribute got removed
       if (!newValue && oldValue !== Nil) {
         const result = initialValues.get(this) ?? "";
         initialValues.delete(this); // reset like <a href>
@@ -58,15 +54,12 @@ export function href(): Transformer<HTMLElement, string> {
       }
       return String(newValue);
     },
-    validate(value) {
-      return String(value);
-    },
-    stringify: String,
+    validate: String,
     eql(newValue, oldValue) {
       if (!initialValues.get(this)) {
         return false;
       }
-      return eql(newValue, oldValue);
+      return newValue === oldValue;
     },
     get(value) {
       if (!initialValues.has(this)) {
@@ -76,15 +69,17 @@ export function href(): Transformer<HTMLElement, string> {
       tmp.href = value;
       return tmp.href;
     },
-    beforeSetCallback(value, rawValue) {
+    set(value, rawValue) {
       if (!initialValues.has(this) && rawValue !== null) {
         initialValues.set(this, value);
       }
+      return value;
     },
-    beforeInitCallback(_, defaultValue) {
+    init(value, defaultValue) {
       if (defaultValue && typeof defaultValue === "string") {
         initialValues.set(this, defaultValue);
       }
+      return value;
     },
   };
 }
@@ -98,8 +93,7 @@ export function bool(): Transformer<HTMLElement, boolean> {
     stringify() {
       return "";
     },
-    eql,
-    updateAttrPredicate(_, newValue) {
+    updateContentAttr(_, newValue) {
       if (newValue === false) {
         return null;
       }
@@ -138,13 +132,7 @@ export function number(
       if (Number.isNaN(asNumber)) {
         return fallbackValues.get(this) ?? 0;
       }
-      if (asNumber <= min) {
-        return min;
-      }
-      if (asNumber >= max) {
-        return max;
-      }
-      return asNumber;
+      return Math.min(Math.max(asNumber, min), max);
     },
     validate(value) {
       if (typeof value === "undefined") {
@@ -159,12 +147,11 @@ export function number(
       }
       return asNumber;
     },
-    stringify: String,
-    eql,
-    beforeInitCallback(_, defaultValue) {
+    init(value, defaultValue) {
       if (typeof defaultValue === "number") {
         fallbackValues.set(this, defaultValue);
       }
+      return value;
     },
   };
 }
@@ -191,6 +178,16 @@ function bigintOptions(input: unknown): NumberOptions<bigint | undefined> {
   return { min, max };
 }
 
+function toBigInt(value: string | number | bigint | boolean): bigint {
+  if (typeof value === "string") {
+    const match = /^(-?[0-9]+)(\.[0-9]+)/.exec(value);
+    if (match) {
+      return BigInt(match[1]);
+    }
+  }
+  return BigInt(value);
+}
+
 export function int(
   options: Partial<NumberOptions<bigint>> = {},
 ): Transformer<HTMLElement, bigint> {
@@ -200,7 +197,7 @@ export function int(
     parse(value) {
       if (isBigIntConvertible(value)) {
         try {
-          const asInt = BigInt(value);
+          const asInt = toBigInt(value);
           if (typeof min !== "undefined" && asInt <= min) {
             return min;
           }
@@ -215,7 +212,7 @@ export function int(
       return fallbackValues.get(this) ?? 0n;
     },
     validate(value) {
-      if (typeof value === "undefined") {
+      if (typeof value === "undefined" || value === null) {
         return fallbackValues.get(this) ?? 0n;
       }
       const asInt = BigInt(value as any);
@@ -227,12 +224,11 @@ export function int(
       }
       return asInt;
     },
-    stringify,
-    eql,
-    beforeInitCallback(_, defaultValue) {
+    init(value, defaultValue) {
       if (typeof defaultValue === "bigint") {
         fallbackValues.set(this, defaultValue);
       }
+      return value;
     },
   };
 }
@@ -268,11 +264,11 @@ export function json(options: JSONOptions = {}): Transformer<HTMLElement, any> {
     stringify(value) {
       return stringifyJSONAttribute(value, options.replacer);
     },
-    eql,
-    beforeInitCallback(_, defaultValue) {
+    init(value, defaultValue) {
       // Verify that the default stringifies
       stringifyJSONAttribute(defaultValue, options.replacer);
       fallbackValues.set(this, defaultValue);
+      return value;
     },
   };
 }
@@ -330,12 +326,12 @@ export function schema<V>(
     stringify(value) {
       return stringifyJSONAttribute(value, options.replacer);
     },
-    eql,
-    beforeInitCallback(_, defaultValue) {
-      const value = schema.parse(defaultValue);
+    init(value, defaultValue) {
+      defaultValue = schema.parse(defaultValue);
       // Verify that the default stringifies
-      stringifyJSONAttribute(value, options.replacer);
-      fallbackValues.set(this, value);
+      stringifyJSONAttribute(defaultValue, options.replacer);
+      fallbackValues.set(this, defaultValue);
+      return value;
     },
   };
 }
@@ -388,16 +384,21 @@ export function literal<T extends HTMLElement, V>(
       if (options.values.includes(validated)) {
         return validated;
       }
-      throw new Error(
-        `Invalid value: ${options.transform.stringify.call(this, validated)}`,
-      );
+      if (options.transform.stringify) {
+        throw new Error(
+          `Invalid value: ${options.transform.stringify.call(this, validated)}`,
+        );
+      } else {
+        throw new Error(`Invalid value: ${String(validated)}`);
+      }
     },
     stringify: options.transform.stringify,
     eql: options.transform.eql,
-    beforeInitCallback(_, defaultValue) {
+    init(value, defaultValue) {
       if (options.values.includes(defaultValue)) {
-        return fallbackValues.set(this, defaultValue);
+        fallbackValues.set(this, defaultValue);
       }
+      return value;
     },
   };
 }
@@ -445,8 +446,7 @@ export function event<
         "This function should never be called, updating event handler properties does not change the attribute value!",
       );
     },
-    eql,
-    beforeInitCallback(value, defaultValue, context) {
+    init(value, defaultValue, context) {
       if (context.private || typeof context.name === "symbol") {
         throw new Error("Event handler name must be a non-private non-symbol");
       }
@@ -457,8 +457,9 @@ export function event<
         functions.set(this, value);
         this.addEventListener(context.name.slice(2), handler as any);
       }
+      return value;
     },
-    beforeSetCallback(value, _, context) {
+    set(value, _, context) {
       // If either the new handler or the old handler are falsy, the event
       // handler must be detached and then re-attached to reflect the new firing
       // order of event handlers. If both the new and old handlers are
@@ -470,8 +471,9 @@ export function event<
         this.addEventListener(name, handler as any);
       }
       functions.set(this, value); // change the actual event handler
+      return value;
     },
-    updateAttrPredicate() {
+    updateContentAttr() {
       return false;
     },
   };

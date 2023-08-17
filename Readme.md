@@ -264,7 +264,7 @@ console.log(document.createElement("my-test").toString());
 
 ```typescript
 @define("my-test")
-class MyTest extends HTMLElement {
+export class MyTest extends HTMLElement {
   foo = 1;
 }
 
@@ -280,7 +280,7 @@ console.log(test.foo); // only type checks with the above interface declaration
 
 ### `@prop(transformer)`
 
-**Accessor decorator** to define a IDL property on the custom element class
+**Accessor decorator** to define an IDL property on the custom element class
 *without* an associated content attribute. Such a property is more or less a
 regular accessor with two additional features:
 
@@ -645,56 +645,62 @@ side effects.
 | `number()`        | `number`            | ✕        | `min`, `max`          |
 | `int()`           | `bigint`            | ✕        | `min`, `max`          |
 | `json()`          | JSON serializable   | ✕        | `reviver`, `replacer` |
+| `schema()`        | JSON serializable   | ✕        | `reviver`, `replacer` |
 | `literal()`       | Any                 | ✓        | `values`, `transform` |
 | `event()`         | `function`          | ✓        |                       |
 
-A transformers's type signature is as follows:
+A transformers is just a bag of functions with the following type signature:
 
 ```typescript
 export type Transformer<T extends HTMLElement, V> = {
   // parse() turns attribute values (usually string | null) into property
   // values. Must *never* throw exceptions, and instead always deal with its
-  // input in a graceful way, just like the attribute handling in built-in
-  // elements works.
+  // input in a graceful way.
   parse: (this: T, rawValue: unknown, oldValue: V | typeof Nil) => V;
   // Validates setter inputs, which may be of absolutely any type. May throw for
   // invalid values, just like setters on built-in elements may.
   validate: (this: T, newValue: unknown, oldValue: V | typeof Nil) => V;
-  // Turns property values into attributes values (strings), thereby controlling
-  // the attribute representation of an accessor together with
-  // updateAttrPredicate(). Must never throw.
-  stringify: (this: T, value?: V) => string;
-  // Determines whether two values are equal. If this method returns true,
-  // reactive callbacks will not be triggered.
-  eql: (this: T, newValue: V, oldValue: V) => boolean;
-  // Optionally transforms a value before returned from the getter. Defaults to
-  // the identity function.
-  get?: (this: T, value: V) => V;
-  // Decides if, based on a new value, an attribute gets updated to match the
-  // new value (true/false) or removed (null). Only gets called when the
-  // transformer's eql() method returns false. Defaults to a function that
-  // always returns true.
-  updateAttrPredicate?: (
-    this: T,
-    oldValue: V | null,
-    newValue: V | null,
-  ) => boolean | null;
-  // Runs before accessor initialization and can be used to perform side effects
-  // or to grab the accessors initial value as defined in the class.
-  beforeInitCallback?: (
+  // Turns IDL attribute values into content attribute values (strings), thereby
+  // controlling the attribute representation of an accessor together with
+  // updateContentAttr(). Must never throw, defaults to the String() function
+  stringify?: (this: T, value?: V) => string;
+  // Determines whether a new attribute value is equal to the old value. If this
+  // method returns true, reactive callbacks will not be triggered. Defaults to
+  // simple strict equality (===).
+  eql?: (this: T, newValue: V, oldValue: V) => boolean;
+  // Optionally transforms a value before it is used to initialize the accessor.
+  // Can also be used to run a side effect when the accessor initializes.
+  // Defaults to the identity function.
+  init?: (
     this: T,
     value: V,
     defaultValue: V,
     context: ClassAccessorDecoratorContext<T, V>,
-  ) => void;
-  // Runs before an accessor's setter sets a new value and can be used to
-  // perform side effects
-  beforeSetCallback?: (
+  ) => V;
+  // Optionally transforms a value before it is returned from the getter. Can
+  // also be used to run a side effect when the setter gets used. Defaults to
+  // the identity function.
+  get?: (this: T, value: V, context: ClassAccessorDecoratorContext<T, V>) => V;
+  // Optionally transforms a value before it is set by either the setter or a
+  // content attribute update. Can also be used to run a side effect when the
+  // setter gets used. Defaults to the identity function. If the raw value is
+  // not Nil, the set operation was caused by a content attribute update and the
+  // content attribute value is reflected in the raw value (string | null).
+  set?: (
     this: T,
     value: V,
     rawValue: unknown,
     context: ClassAccessorDecoratorContext<T, V>,
-  ) => void;
+  ) => V;
+  // Decides if, based on a new value, an attribute gets updated to match the
+  // new value (true/false) or removed (null). Only gets called when the
+  // transformer's eql() method returns false. Defaults to a function that
+  // always returns true.
+  updateContentAttr?: (
+    this: T,
+    oldValue: V | null,
+    newValue: V | null,
+  ) => boolean | null;
 };
 ```
 
@@ -789,10 +795,23 @@ if the content attribute gets removed or set to some non-numeric value, the
 value that was used to initialize the accessor (in this case `0`) is returned.
 The same happens when the IDL attribute is set to `undefined`.
 
-#### Options for `number()`
+#### Options for transformer `number()`
 
 - **`min` (number, optional)**: Smallest possible value. Defaults to `-Infinity`. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception.
 - **`max` (number, optional)**: Largest possible value. Defaults to `Infinity`. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception.
+
+#### Behavior overview for transformer `number()`
+
+| Operation                  | Value                                              |
+| ---------------------------| ---------------------------------------------------|
+| Initialization             | Accessor initial value or `0`                      |
+| Set value `x`              | `minmax(ops.min, opts.max, x)`                     |
+| Set out-of-range value     | Error                                              |
+| Set out-of-range attribute | `minmax(ops.min, opts.max, toNumberWithoutNaN(x))` |
+| Set `null`                 | `0`                                                |
+| Set `undefined`            | `0`                                                |
+| Set attribute              | `minmax(ops.min, opts.max, toNumberWithoutNaN(x))` |
+| Remove attribute           | Accessor initial value or `0`                      |
 
 ### Transformer `int(options?)`
 
@@ -818,10 +837,25 @@ set to some non-integer value, the value that was used to initialize the
 accessor (in the above examples `0n`) is returned. The same happens when the IDL
 attribute is set to `undefined`.
 
-#### Options for `int()`
+#### Options for transformer `int()`
 
 - **`min` (bigint, optional)**: Smallest possible value. Defaults to the minimum possible bigint value. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception.
 - **`max` (bigint, optional)**: Largest possible value. Defaults to the maximum possible bigint value. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception.
+
+#### Behavior overview for transformer `int()`
+
+| Operation                  | Value                                     |
+| ---------------------------| ------------------------------------------|
+| Initialization             | Accessor initial value or `0n`            |
+| Set value `x`              | `minmax(ops.min, opts.max, x)`            |
+| Set out-of-range value     | Error                                     |
+| Set out-of-range attribute | `minmax(ops.min, opts.max, toBigInt(x))`  |
+| Set non-int value          | `BigInt(x)`                               |
+| Set non-int attribute      | Clamp to Int if float, else initial value |
+| Set `null`                 | `0n`                                      |
+| Set `undefined`            | `0n`                                      |
+| Set attribute              | `minmax(ops.min, opts.max, toBigInt(x))`  |
+| Remove attribute           | Accessor initial value or `n0`            |
 
 ### Transformer `bool()`
 

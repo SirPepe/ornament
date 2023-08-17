@@ -215,6 +215,16 @@ describe("Transformers", () => {
       el.foo = undefined as any;
       expect(el.foo).to.equal(0);
     });
+
+    test("initial value out of range", async () => {
+      expect(() => {
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @attr(number({ max: 5 })) accessor foo = 10;
+        }
+        const el = new Test();
+      }).to.throw();
+    });
   });
 
   describe("int()", () => {
@@ -229,12 +239,20 @@ describe("Transformers", () => {
       el.foo = 1n;
       expect(el.foo).to.equal(1n);
       expect(el.getAttribute("foo")).to.equal("1");
+      el.foo = undefined as any;
+      expect(el.foo).to.equal(0n);
       el.setAttribute("foo", "2");
       expect(el.foo).to.equal(2n);
-      el.setAttribute("foo", "2.75");
+      el.foo = null as any;
+      expect(el.foo).to.equal(0n);
+      el.setAttribute("foo", "5.75");
+      expect(el.foo).to.equal(5n);
+      el.setAttribute("foo", "sfhuehueghugeh");
       expect(el.foo).to.equal(0n);
       el.setAttribute("foo", "3");
       expect(el.foo).to.equal(3n);
+      el.foo = "1" as any;
+      expect(el.foo).to.equal(1n);
       el.removeAttribute("foo");
       expect(el.foo).to.equal(0n);
     });
@@ -279,6 +297,16 @@ describe("Transformers", () => {
       expect(el.foo).to.equal(7n);
       el.foo = undefined as any;
       expect(el.foo).to.equal(0n);
+    });
+
+    test("initial value out of range", async () => {
+      expect(() => {
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @attr(int({ max: 5n })) accessor foo = 10n;
+        }
+        const el = new Test();
+      }).to.throw();
     });
   });
 

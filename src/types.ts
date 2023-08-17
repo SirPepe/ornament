@@ -1,49 +1,54 @@
-import { Nil } from "./index.js";
+import { Nil } from "./lib.js";
 
 export type Transformer<T extends HTMLElement, V> = {
   // parse() turns attribute values (usually string | null) into property
   // values. Must *never* throw exceptions, and instead always deal with its
-  // input in a graceful way, just like the attribute handling in built-in
-  // elements works.
+  // input in a graceful way.
   parse: (this: T, rawValue: unknown, oldValue: V | typeof Nil) => V;
   // Validates setter inputs, which may be of absolutely any type. May throw for
   // invalid values, just like setters on built-in elements may.
   validate: (this: T, newValue: unknown, oldValue: V | typeof Nil) => V;
-  // Turns property values into attributes values (strings), thereby controlling
-  // the attribute representation of an accessor together with
-  // updateAttrPredicate(). Must never throw.
-  stringify: (this: T, value?: V) => string;
-  // Determines whether two values are equal. If this method returns true,
-  // reactive callbacks will not be triggered.
-  eql: (this: T, newValue: V, oldValue: V) => boolean;
-  // Optionally transforms a value before returned from the getter. Defaults to
-  // the identity function.
-  get?: (this: T, value: V) => V;
-  // Decides if, based on a new value, an attribute gets updated to match the
-  // new value (true/false) or removed (null). Only gets called when the
-  // transformer's eql() method returns false. Defaults to a function that
-  // always returns true.
-  updateAttrPredicate?: (
-    this: T,
-    oldValue: V | null,
-    newValue: V | null,
-  ) => boolean | null;
-  // Runs before accessor initialization and can be used to perform side effects
-  // or to grab the accessors initial value as defined in the class.
-  beforeInitCallback?: (
+  // Turns IDL attribute values into content attribute values (strings), thereby
+  // controlling the attribute representation of an accessor together with
+  // updateContentAttr(). Must never throw, defaults to the String() function
+  stringify?: (this: T, value?: V) => string;
+  // Determines whether a new attribute value is equal to the old value. If this
+  // method returns true, reactive callbacks will not be triggered. Defaults to
+  // simple strict equality (===).
+  eql?: (this: T, newValue: V, oldValue: V) => boolean;
+  // Optionally transforms a value before it is used to initialize the accessor.
+  // Can also be used to run a side effect when the accessor initializes.
+  // Defaults to the identity function.
+  init?: (
     this: T,
     value: V,
     defaultValue: V,
     context: ClassAccessorDecoratorContext<T, V>,
-  ) => void;
-  // Runs before an accessor's setter sets a new value and can be used to
-  // perform side effects
-  beforeSetCallback?: (
+  ) => V;
+  // Optionally transforms a value before it is returned from the getter. Can
+  // also be used to run a side effect when the setter gets used. Defaults to
+  // the identity function.
+  get?: (this: T, value: V, context: ClassAccessorDecoratorContext<T, V>) => V;
+  // Optionally transforms a value before it is set by either the setter or a
+  // content attribute update. Can also be used to run a side effect when the
+  // setter gets used. Defaults to the identity function. If the raw value is
+  // not Nil, the set operation was caused by a content attribute update and the
+  // content attribute value is reflected in the raw value (string | null).
+  set?: (
     this: T,
     value: V,
     rawValue: unknown,
     context: ClassAccessorDecoratorContext<T, V>,
-  ) => void;
+  ) => V;
+  // Decides if, based on a new value, an attribute gets updated to match the
+  // new value (true/false) or removed (null). Only gets called when the
+  // transformer's eql() method returns false. Defaults to a function that
+  // always returns true.
+  updateContentAttr?: (
+    this: T,
+    oldValue: V | null,
+    newValue: V | null,
+  ) => boolean | null;
 };
 
 /* eslint-disable */

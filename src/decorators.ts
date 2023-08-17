@@ -1,4 +1,4 @@
-import { Nil } from "./index.js";
+import { Nil } from "./lib.js";
 import {
   type ClassAccessorDecorator,
   type FunctionFieldOrMethodDecorator,
@@ -7,6 +7,22 @@ import {
   type Transformer,
   assertContext,
 } from "./types.js";
+
+const identity = <T>(x: T) => x;
+
+function withDefaults<T extends HTMLElement, V>(
+  source: Transformer<T, V>,
+): Required<Transformer<T, V>> {
+  return {
+    ...source,
+    stringify: source.stringify ?? String,
+    eql: source.eql ?? ((a: any, b: any) => a === b),
+    init: source.init ?? identity,
+    get: source.get ?? identity,
+    set: source.set ?? identity,
+    updateContentAttr: source.updateContentAttr ?? (() => true),
+  };
+}
 
 // Accessor decorators initialize *after* custom elements access their
 // observedAttributes getter, so there is no way to associate observed
@@ -395,13 +411,12 @@ type AttrOptions = {
 
 export function attr<T extends HTMLElement, V>(
   this: unknown,
-  transformer: Transformer<T, V>,
+  inputTransformer: Transformer<T, V>,
   options: AttrOptions = {},
 ): ClassAccessorDecorator<T, V> {
-  const getTransform = transformer.get ?? ((x: V) => x);
+  const transformer = withDefaults(inputTransformer);
   const isReflectiveAttribute = options.reflective !== false;
-  const updateAttrPredicate = transformer.updateAttrPredicate ?? (() => true);
-  return function ({ get, set }, context): ClassAccessorDecoratorResult<T, V> {
+  return function (target, context): ClassAccessorDecoratorResult<T, V> {
     assertContext(context, "@attr", "accessor");
 
     // Accessor decorators can be applied to symbol accessors, but DOM attribute
@@ -428,24 +443,19 @@ export function attr<T extends HTMLElement, V>(
         const attributeChangedCallback = function (
           this: T,
           name: string,
-          oldAttrValue: string | null,
-          newAttrValue: string | null,
+          oldAttrVal: string | null,
+          newAttrVal: string | null,
         ): void {
-          if (name !== attrName || newAttrValue === oldAttrValue) {
+          if (name !== attrName || newAttrVal === oldAttrVal) {
             return; // skip irrelevant invocations
           }
-          const oldValue = get.call(this);
-          const newValue = transformer.parse.call(this, newAttrValue, oldValue);
+          const oldValue = target.get.call(this);
+          let newValue = transformer.parse.call(this, newAttrVal, oldValue);
           if (transformer.eql.call(this, newValue, oldValue)) {
             return;
           }
-          transformer.beforeSetCallback?.call(
-            this,
-            newValue,
-            newAttrValue,
-            context,
-          );
-          set.call(this, newValue);
+          newValue = transformer.set.call(this, newValue, newAttrVal, context);
+          target.set.call(this, newValue);
           this.dispatchEvent(new ReactivityEvent(context.name));
         };
         const instanceCallbacks = OBSERVER_CALLBACKS.get(this);
@@ -463,25 +473,26 @@ export function attr<T extends HTMLElement, V>(
     return {
       init(input) {
         const attrValue = this.getAttribute(attrName);
-        if (attrValue !== null) {
-          const value = transformer.parse.call(this, attrValue, Nil);
-          transformer.beforeInitCallback?.call(this, value, input, context);
-          return value;
-        }
-        const value = transformer.validate.call(this, input, Nil);
-        transformer.beforeInitCallback?.call(this, value, input, context);
-        return value;
+        const value =
+          attrValue !== null
+            ? transformer.parse.call(this, attrValue, Nil)
+            : transformer.validate.call(this, input, Nil);
+        return transformer.init.call(this, value, input, context);
       },
       set(input) {
-        const oldValue = get.call(this);
-        const newValue = transformer.validate.call(this, input, oldValue);
+        const oldValue = target.get.call(this);
+        let newValue = transformer.validate.call(this, input, oldValue);
         if (transformer.eql.call(this, newValue, oldValue)) {
           return;
         }
-        transformer.beforeSetCallback?.call(this, newValue, input, context);
-        set.call(this, newValue);
+        newValue = transformer.set.call(this, newValue, input, context);
+        target.set.call(this, newValue);
         if (isReflectiveAttribute) {
-          const updateAttr = updateAttrPredicate.call(this, oldValue, newValue);
+          const updateAttr = transformer.updateContentAttr.call(
+            this,
+            oldValue,
+            newValue,
+          );
           if (updateAttr === null) {
             this.removeAttribute(attrName);
           } else if (updateAttr === true) {
@@ -494,7 +505,7 @@ export function attr<T extends HTMLElement, V>(
         this.dispatchEvent(new ReactivityEvent(context.name));
       },
       get() {
-        return getTransform.call(this, get.call(this));
+        return transformer.get.call(this, target.get.call(this), context);
       },
     };
   };
@@ -506,25 +517,26 @@ export function prop<T extends HTMLElement, V>(
   this: unknown,
   transformer: Transformer<T, V>,
 ): ClassAccessorDecorator<T, V> {
-  const getTransform = transformer.get ?? ((x: V) => x);
-  return function ({ get, set }, context): ClassAccessorDecoratorResult<T, V> {
+  const { eql, get, set, init } = withDefaults(transformer);
+  return function (target, context): ClassAccessorDecoratorResult<T, V> {
     assertContext(context, "@prop", "accessor", { private: true });
     return {
       init(input) {
-        transformer.beforeInitCallback?.call(this, input, input, context);
+        input = init.call(this, input, input, context);
         return transformer.validate.call(this, input, Nil);
       },
       set(input) {
-        const oldValue = get.call(this);
-        const newValue = transformer.validate.call(this, input, Nil);
-        if (transformer.eql.call(this, newValue, oldValue)) {
+        const oldValue = target.get.call(this);
+        let newValue = transformer.validate.call(this, input, Nil);
+        if (eql.call(this, newValue, oldValue)) {
           return;
         }
-        set.call(this, newValue);
+        newValue = set.call(this, newValue, Nil, context);
+        target.set.call(this, newValue);
         this.dispatchEvent(new ReactivityEvent(context.name));
       },
       get() {
-        return getTransform.call(this, get.call(this));
+        return get.call(this, target.get.call(this), context);
       },
     };
   };
