@@ -290,6 +290,28 @@ describe("Decorators", () => {
       expect(disconnectFn.callCount).to.equal(1);
       expect(disconnectFn.getCalls()[0].args).to.eql([instance]);
     });
+
+    test("fire on (dis)connect with access to private fields", async () => {
+      const connectFn = spy();
+      const disconnectFn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        #test = 42;
+        @connected() connected() {
+          connectFn(this, this.#test);
+        }
+        @disconnected() disconnected() {
+          disconnectFn(this, this.#test);
+        }
+      }
+      const instance = new Test();
+      document.body.append(instance);
+      instance.remove();
+      expect(connectFn.callCount).to.equal(1);
+      expect(connectFn.getCalls()[0].args).to.eql([instance, 42]);
+      expect(disconnectFn.callCount).to.equal(1);
+      expect(disconnectFn.getCalls()[0].args).to.eql([instance, 42]);
+    });
   });
 
   describe("@reactive", () => {
@@ -482,6 +504,23 @@ describe("Decorators", () => {
       expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
+    test("access to private fields", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        #foo = 42;
+        @prop(string()) accessor x = "A";
+        @reactive() test() {
+          fn(this.x, this.#foo);
+        }
+      }
+      const el = new Test();
+      el.x = "B";
+      expect(fn.callCount).to.equal(2); // initial + one update
+      expect(fn.getCalls()[0].args).to.eql(["A", 42]);
+      expect(fn.getCalls()[1].args).to.eql(["B", 42]);
+    });
+
     test("reject on static fields", async () => {
       expect(() => {
         class Test extends HTMLElement {
@@ -553,6 +592,24 @@ describe("Decorators", () => {
         target.dispatchEvent(event);
         expect(fn.callCount).to.equal(1);
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
+      });
+
+      test("subscribe to an event target and access private fields", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          #foo = 42;
+          @subscribe(target, "foo")
+          test(event: Event) {
+            fn(this, event, event.target, this.#foo);
+          }
+        }
+        const instance = new Test();
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event, target, 42]);
       });
 
       test("subscribe to an event target factory", async () => {
