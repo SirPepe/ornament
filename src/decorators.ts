@@ -8,6 +8,8 @@ import {
   assertContext,
 } from "./types.js";
 
+const eventName = "__ornament-reactivity";
+
 const identity = <T>(x: T) => x;
 
 function withDefaults<T extends HTMLElement, V>(
@@ -25,31 +27,71 @@ function withDefaults<T extends HTMLElement, V>(
 }
 
 // Accessor decorators initialize *after* custom elements access their
-// observedAttributes getter, so there is no way to associate observed
-// attributes with specific elements or constructors from inside the @attr()
-// decorator. Instead we simply track *all* attributes defined by @attr() (on
-// any class) and decide *inside the attribute changed callback* whether they
-// are *actually* observed by a given element.
+// observedAttributes getter. This means that, in the absence of the decorators
+// metadata feature, there is no way to associate observed attributes with
+// specific elements or constructors from inside the @attr() decorator. Instead
+// we simply track *all* attributes defined by @attr() *on any class* and decide
+// *inside the attribute changed callback* whether they are *actually* observed
+// by a given element.
 const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 
-// Map of attribute to handling callbacks mapped by element. The mixin classes'
-// actual attributeChangedCallback() to decide whether an attribute reaction
-// must run an effect defined by @attr().
-type AttributeChangedCallback = (
+// The following callback wrangling code fills the hole left by the
+// non-existence of decorator metadata as of Q3 2023.
+const onConnect = new WeakMap<CustomElementConstructor, (() => void)[]>();
+const onDisconnect = new WeakMap<CustomElementConstructor, (() => void)[]>();
+const onInit = new WeakMap<CustomElementConstructor, (() => void)[]>();
+
+function setCallback(
+  instance: any,
+  on: "connect" | "disconnect" | "init",
+  callback: () => void,
+): void {
+  const source =
+    on === "connect" ? onConnect : on === "disconnect" ? onDisconnect : onInit;
+  const callbacks = source.get(instance.constructor);
+  if (!callbacks) {
+    source.set(instance.constructor, [callback]);
+  } else {
+    callbacks.push(callback);
+  }
+}
+
+function getCallbacks(
+  instance: any,
+  on: "connect" | "disconnect" | "init",
+): (() => void)[] {
+  const source =
+    on === "connect" ? onConnect : on === "disconnect" ? onDisconnect : onInit;
+  return source.get(instance.constructor) ?? [];
+}
+
+// Maps attributes to attribute observer callbacks mapped by custom element
+// constructor. The mixin classes' actual `attributeChangedCallback()` decides
+// whether an attribute reaction must run an effect defined by @attr().
+type ObserverCallback = (
   name: string,
   oldValue: string | null,
   newValue: string | null,
 ) => void;
-type CallbackMap = Map<string, AttributeChangedCallback>; // attr name -> cb
-const OBSERVER_CALLBACKS = new WeakMap<HTMLElement, CallbackMap>();
+type ObserverMap = Record<string, ObserverCallback>; // attr name -> cb
+const observerCallbacks = new WeakMap<CustomElementConstructor, ObserverMap>();
 
-// Callbacks to fire when connected or disconnected
-const CONNECTED_CALLBACKS = new WeakMap<HTMLElement, (() => void)[]>();
-const DISCONNECTED_CALLBACKS = new WeakMap<HTMLElement, (() => void)[]>();
+function setObserver(
+  instance: any,
+  attribute: string,
+  callback: ObserverCallback,
+): void {
+  let callbacks = observerCallbacks.get(instance.constructor);
+  if (!callbacks) {
+    callbacks = {};
+    observerCallbacks.set(instance.constructor, callbacks);
+  }
+  callbacks[attribute] = callback;
+}
 
-// Maps custom elements to a list of callbacks that trigger their @reactive()
-// method's initial calls (for methods that need such a call)
-const REACTIVE_INIT_CALLBACKS = new WeakMap<HTMLElement, (() => any)[]>();
+function getObservers(instance: any): Record<string, ObserverCallback> {
+  return observerCallbacks.get(instance.constructor) ?? {};
+}
 
 // A developer might want to initialize properties decorated with @prop() in
 // their custom element constructors. This should NOT trigger reactivity events,
@@ -67,7 +109,7 @@ const DEBOUNCED_METHOD_MAP = new WeakMap<Method<any, any>, Method<any, any>>();
 class ReactivityEvent extends Event {
   readonly key: string | symbol;
   constructor(key: string | symbol) {
-    super("__ornament-reactivity");
+    super(eventName);
     this.key = key;
   }
 }
@@ -118,10 +160,9 @@ export function define<T extends CustomElementConstructor>(
         super(...args);
         // Perform the initial calls to reactive methods for this instance. The
         // callbacks are bound methods, so there is no need to handle "this"
-        for (const callback of REACTIVE_INIT_CALLBACKS.get(this) ?? []) {
+        for (const callback of getCallbacks(this, "init")) {
           callback();
         }
-        REACTIVE_INIT_CALLBACKS.delete(this);
         // Mark the end of the constructor and the initial reactive calls,
         // allow the element to receive reactivity events.
         REACTIVE_READY.add(this);
@@ -135,8 +176,7 @@ export function define<T extends CustomElementConstructor>(
         const stringTag = this.tagName
           .split("-")
           .map(
-            (part) =>
-              part.slice(0, 1).toUpperCase() + part.slice(1).toLowerCase(),
+            (str) => str.slice(0, 1).toUpperCase() + str.slice(1).toLowerCase(),
           )
           .join("");
         return "HTML" + stringTag + "Element";
@@ -158,23 +198,17 @@ export function define<T extends CustomElementConstructor>(
         ) {
           originalAttributeChangedCallback.call(this, name, oldVal, newVal);
         }
-        const callbacks = OBSERVER_CALLBACKS.get(this);
-        if (!callbacks) {
-          return;
+        const callback = getObservers(this)[name];
+        if (callback) {
+          callback.call(this, name, oldVal, newVal);
         }
-        const callback = callbacks.get(name);
-        if (!callback) {
-          return;
-        }
-        callback.call(this, name, oldVal, newVal);
       }
 
       connectedCallback(): void {
         if (originalConnectedCallback) {
           originalConnectedCallback.call(this);
         }
-        // The callbacks are bound methods, so there is no need to handle "this"
-        for (const callback of CONNECTED_CALLBACKS.get(this) ?? []) {
+        for (const callback of getCallbacks(this, "connect")) {
           callback();
         }
       }
@@ -183,8 +217,7 @@ export function define<T extends CustomElementConstructor>(
         if (originalDisconnectedCallback) {
           originalDisconnectedCallback.call(this);
         }
-        // The callbacks are bound methods, so there is no need to handle "this"
-        for (const callback of DISCONNECTED_CALLBACKS.get(this) ?? []) {
+        for (const callback of getCallbacks(this, "disconnect")) {
           callback();
         }
       }
@@ -214,18 +247,13 @@ export function reactive<T extends HTMLElement>(
       // Register the callback that performs the initial method call
       if (initial) {
         const method = DEBOUNCED_METHOD_MAP.get(value) ?? value;
-        const callbacks = REACTIVE_INIT_CALLBACKS.get(this);
-        if (callbacks) {
-          callbacks.push(method.bind(this));
-        } else {
-          REACTIVE_INIT_CALLBACKS.set(this, [method.bind(this)]);
-        }
+        setCallback(this, "init", method.bind(this));
       }
       // Start listening for reactivity events that happen after reactive init
-      this.addEventListener("__ornament-reactivity", (evt) => {
+      this.addEventListener(eventName, (evt) => {
         if (
           REACTIVE_READY.has(this) &&
-          (!options.keys || options.keys.includes(evt.key))
+          (!options.keys || options.keys?.includes(evt.key))
         ) {
           value.call(this);
         }
@@ -371,13 +399,7 @@ export function connected<T extends HTMLElement>() {
   ): void {
     assertContext(context, "@connected", "method", { private: true });
     context.addInitializer(function () {
-      const value = context.access.get(this);
-      const callbacks = CONNECTED_CALLBACKS.get(this);
-      if (callbacks) {
-        callbacks.push(value.bind(this));
-      } else {
-        CONNECTED_CALLBACKS.set(this, [value.bind(this)]);
-      }
+      setCallback(this, "connect", context.access.get(this).bind(this));
     });
   };
 }
@@ -389,13 +411,7 @@ export function disconnected<T extends HTMLElement>() {
   ): void {
     assertContext(context, "@disconnected", "method", { private: true });
     context.addInitializer(function () {
-      const value = context.access.get(this);
-      const callbacks = DISCONNECTED_CALLBACKS.get(this);
-      if (callbacks) {
-        callbacks.push(value.bind(this));
-      } else {
-        DISCONNECTED_CALLBACKS.set(this, [value.bind(this)]);
-      }
+      setCallback(this, "connect", context.access.get(this).bind(this));
     });
   };
 }
@@ -424,7 +440,7 @@ export function attr<T extends HTMLElement, V>(
     // and setters, the following check throws even if an alternative attribute
     // name was provided via the "as" option.
     if (typeof context.name === "symbol") {
-      throw new TypeError("Attribute backends for @attr must not be symbols");
+      throw new TypeError("Attribute backends for @attr() must not be symbols");
     }
 
     const attrName = options.as ?? context.name;
@@ -458,15 +474,7 @@ export function attr<T extends HTMLElement, V>(
           target.set.call(this, newValue);
           this.dispatchEvent(new ReactivityEvent(context.name));
         };
-        const instanceCallbacks = OBSERVER_CALLBACKS.get(this);
-        if (instanceCallbacks) {
-          instanceCallbacks.set(attrName, attributeChangedCallback);
-        } else {
-          OBSERVER_CALLBACKS.set(
-            this,
-            new Map([[attrName, attributeChangedCallback]]),
-          );
-        }
+        setObserver(this, attrName, attributeChangedCallback);
       });
     }
 
