@@ -291,6 +291,28 @@ describe("Decorators", () => {
       expect(disconnectFn.getCalls()[0].args).to.eql([instance]);
     });
 
+    test("no duplicate registration from multiple instances", async () => {
+      const connectFn = spy();
+      const disconnectFn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @connected() connected() {
+          connectFn(this);
+        }
+        @disconnected() disconnected() {
+          disconnectFn(this);
+        }
+      }
+      const instance = new Test();
+      const instance2 = new Test();
+      document.body.append(instance);
+      instance.remove();
+      expect(connectFn.callCount).to.equal(1);
+      expect(connectFn.getCalls()[0].args).to.eql([instance]);
+      expect(disconnectFn.callCount).to.equal(1);
+      expect(disconnectFn.getCalls()[0].args).to.eql([instance]);
+    });
+
     test("fire on (dis)connect with access to private fields", async () => {
       const connectFn = spy();
       const disconnectFn = spy();

@@ -37,22 +37,26 @@ const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 
 // The following callback wrangling code fills the hole left by the
 // non-existence of decorator metadata as of Q3 2023.
-const onConnect = new WeakMap<CustomElementConstructor, (() => void)[]>();
-const onDisconnect = new WeakMap<CustomElementConstructor, (() => void)[]>();
-const onInit = new WeakMap<CustomElementConstructor, (() => void)[]>();
+type Callbacks = Record<string | symbol, () => void>;
+const onConnect = new WeakMap<CustomElementConstructor, Callbacks>();
+const onDisconnect = new WeakMap<CustomElementConstructor, Callbacks>();
+const onInit = new WeakMap<CustomElementConstructor, Callbacks>();
 
 function setCallback(
   instance: any,
   on: "connect" | "disconnect" | "init",
+  name: string | symbol,
   callback: () => void,
 ): void {
   const source =
     on === "connect" ? onConnect : on === "disconnect" ? onDisconnect : onInit;
   const callbacks = source.get(instance.constructor);
   if (!callbacks) {
-    source.set(instance.constructor, [callback]);
-  } else {
-    callbacks.push(callback);
+    source.set(instance.constructor, { [name]: callback });
+    return;
+  }
+  if (!callbacks[name]) {
+    callbacks[name] = callback;
   }
 }
 
@@ -62,7 +66,11 @@ function getCallbacks(
 ): (() => void)[] {
   const source =
     on === "connect" ? onConnect : on === "disconnect" ? onDisconnect : onInit;
-  return source.get(instance.constructor) ?? [];
+  const callbacks = source.get(instance.constructor);
+  if (!callbacks) {
+    return [];
+  }
+  return Object.values(callbacks);
 }
 
 // Maps attributes to attribute observer callbacks mapped by custom element
@@ -81,12 +89,14 @@ function setObserver(
   attribute: string,
   callback: ObserverCallback,
 ): void {
-  let callbacks = observerCallbacks.get(instance.constructor);
+  const callbacks = observerCallbacks.get(instance.constructor);
   if (!callbacks) {
-    callbacks = {};
-    observerCallbacks.set(instance.constructor, callbacks);
+    observerCallbacks.set(instance.constructor, { [attribute]: callback });
+    return;
   }
-  callbacks[attribute] = callback;
+  if (!callbacks[attribute]) {
+    callbacks[attribute] = callback;
+  }
 }
 
 function getObservers(instance: any): Record<string, ObserverCallback> {
@@ -247,7 +257,7 @@ export function reactive<T extends HTMLElement>(
       // Register the callback that performs the initial method call
       if (initial) {
         const method = DEBOUNCED_METHOD_MAP.get(value) ?? value;
-        setCallback(this, "init", method.bind(this));
+        setCallback(this, "init", context.name, method.bind(this));
       }
       // Start listening for reactivity events that happen after reactive init
       this.addEventListener(eventName, (evt) => {
@@ -399,7 +409,12 @@ export function connected<T extends HTMLElement>() {
   ): void {
     assertContext(context, "@connected", "method", { private: true });
     context.addInitializer(function () {
-      setCallback(this, "connect", context.access.get(this).bind(this));
+      setCallback(
+        this,
+        "connect",
+        context.name,
+        context.access.get(this).bind(this),
+      );
     });
   };
 }
@@ -411,7 +426,12 @@ export function disconnected<T extends HTMLElement>() {
   ): void {
     assertContext(context, "@disconnected", "method", { private: true });
     context.addInitializer(function () {
-      setCallback(this, "connect", context.access.get(this).bind(this));
+      setCallback(
+        this,
+        "connect",
+        context.name,
+        context.access.get(this).bind(this),
+      );
     });
   };
 }
