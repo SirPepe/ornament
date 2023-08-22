@@ -1,6 +1,6 @@
 # Ornament
 
-Micro-library for building vanilla web components:
+Unopinionated, pareto-optimal micro-library for building vanilla web components:
 
 ```javascript
 import { define, attr, string, number, reactive } from "@sirpepe/ornament"
@@ -15,8 +15,8 @@ class MyGreeter extends HTMLElement {
   @attr(string()) accessor name = "Anonymous";
   @attr(number({ min: 0 })) accessor age = 0;
 
-  // Mark the method as reactive to have it run every time the attribute "name"
-  // changes
+  // Mark the method as reactive to have it run every time one of the attributes
+  // change
   @reactive() greet() {
     this.#shadow.innerHTML = `Hello! My name is ${this.#name}, my age is ${this.#age || "unknown"}`;
   }
@@ -134,8 +134,9 @@ window.customElements.define("my-greeter", MyGreeter);
 ```
 
 Ornament aims to make the most tedious bits of building vanilla web components
-(attribute handling and reactions to attribute handling) so easy that a
-full-blown frameworks is not necessary for many use cases. Ornament uses
+(attribute handling and reactions to attribute handling) easy. This makes
+full-blown framework either superfluous or easy to build on top of Ornament when
+required. Ornament uses
 [the latest ECMAScript Decorators API](https://2ality.com/2022/10/javascript-decorators.html)
 as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
 (with option `version` set to `""2023-05""`) and
@@ -148,15 +149,22 @@ as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babe
 
 The native APIs for web components are verbose and imperative, but lend
 themselves to quite a bit of streamlining, without going all-in with a whole
-framework.
+framework. And streamlining the native APIs is the entire goal here. Ornament is
+**decidedly *not* a framework** but instead aims to be:
 
-Ornament is decidedly *not* a framework. Its decorators are meant to be easy to
-add (either to existing components or greenfield projects), easy to extend, but
-also *very* easy to remove or replace with hand-written logic, your own
-decorators, or a future replacement for Ornament. Ornaments decorators co-exist
-with eg. regular attribute change handling logic just fine. Ornament still wants
-you to have full control over your components' behavior, just with less
-*mandatory* boilerplate.
+- tiny
+- dependency-free
+- treeshake-friendly
+- adherent to (the spirit of) web standards
+- easy to extend
+- easy to get rid of
+
+Ornaments decorators are meant to be easy to add (either to existing components
+or greenfield projects), easy to extend, but also *very* easy to remove or
+replace with hand-written logic, your own decorators, or a future replacement
+for Ornament. Ornaments decorators co-exist with eg. regular attribute change
+handling logic just fine. Ornament still wants you to have full control over
+your components' behavior, just with less *mandatory* boilerplate.
 
 ### Component registration
 
