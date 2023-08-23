@@ -171,7 +171,7 @@ describe("Transformers", () => {
       expect(el.getAttribute("foo")).to.equal(null);
       el.foo = 3;
       el.setAttribute("foo", "asdf");
-      expect(el.foo).to.equal(0);
+      expect(el.foo).to.equal(3);
     });
 
     test("min/max", async () => {
@@ -248,7 +248,7 @@ describe("Transformers", () => {
       el.setAttribute("foo", "5.75");
       expect(el.foo).to.equal(5n);
       el.setAttribute("foo", "sfhuehueghugeh");
-      expect(el.foo).to.equal(0n);
+      expect(el.foo).to.equal(5n);
       el.setAttribute("foo", "3");
       expect(el.foo).to.equal(3n);
       el.foo = "1" as any;

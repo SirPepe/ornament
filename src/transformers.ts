@@ -124,12 +124,15 @@ export function number(
   const fallbackValues = new WeakMap<HTMLElement, number>();
   const { min, max } = numberOptions(options);
   return {
-    parse(value) {
+    parse(value, oldValue) {
       if (value === null) {
         return fallbackValues.get(this) ?? 0;
       }
       const asNumber = Number(value);
       if (Number.isNaN(asNumber)) {
+        if (oldValue !== Nil) {
+          return oldValue;
+        }
         return fallbackValues.get(this) ?? 0;
       }
       return Math.min(Math.max(asNumber, min), max);
@@ -194,7 +197,7 @@ export function int(
   const fallbackValues = new WeakMap<HTMLElement, bigint>();
   const { min, max } = bigintOptions(options);
   return {
-    parse(value) {
+    parse(value, oldValue) {
       if (isBigIntConvertible(value)) {
         try {
           const asInt = toBigInt(value);
@@ -206,6 +209,9 @@ export function int(
           }
           return asInt;
         } catch {
+          if (oldValue !== Nil) {
+            return oldValue;
+          }
           return fallbackValues.get(this) ?? 0n;
         }
       }

@@ -834,6 +834,7 @@ The same happens when the IDL attribute is set to `undefined`.
 | Set out-of-range attribute | `minmax(ops.min, opts.max, toNumberWithoutNaN(x))` |
 | Set `null`                 | `0`                                                |
 | Set `undefined`            | `0`                                                |
+| Set non-numeric attribute  | Previous value                                     |
 | Set attribute              | `minmax(ops.min, opts.max, toNumberWithoutNaN(x))` |
 | Remove attribute           | Accessor initial value or `0`                      |
 
@@ -868,18 +869,18 @@ attribute is set to `undefined`.
 
 #### Behavior overview for transformer `int()`
 
-| Operation                  | Value                                     |
-| ---------------------------| ------------------------------------------|
-| Initialization             | Accessor initial value or `0n`            |
-| Set value `x`              | `minmax(ops.min, opts.max, x)`            |
-| Set out-of-range value     | Error                                     |
-| Set out-of-range attribute | `minmax(ops.min, opts.max, toBigInt(x))`  |
-| Set non-int value          | `BigInt(x)`                               |
-| Set non-int attribute      | Clamp to Int if float, else initial value |
-| Set `null`                 | `0n`                                      |
-| Set `undefined`            | `0n`                                      |
-| Set attribute              | `minmax(ops.min, opts.max, toBigInt(x))`  |
-| Remove attribute           | Accessor initial value or `n0`            |
+| Operation                  | Value                                      |
+| ---------------------------| -------------------------------------------|
+| Initialization             | Accessor initial value or `0n`             |
+| Set value `x`              | `minmax(ops.min, opts.max, x)`             |
+| Set out-of-range value     | Error                                      |
+| Set out-of-range attribute | `minmax(ops.min, opts.max, toBigInt(x))`   |
+| Set non-int value          | `BigInt(x)`                                |
+| Set non-int attribute      | Clamp to Int if float, else previous value |
+| Set `null`                 | `0n`                                       |
+| Set `undefined`            | `0n`                                       |
+| Set attribute              | `minmax(ops.min, opts.max, toBigInt(x))`   |
+| Remove attribute           | Accessor initial value or `0n`             |
 
 ### Transformer `bool()`
 
