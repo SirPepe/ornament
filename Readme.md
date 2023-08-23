@@ -3,7 +3,7 @@
 Unopinionated, pareto-optimal micro-library for building vanilla web components:
 
 ```javascript
-import { define, attr, string, number, reactive } from "@sirpepe/ornament"
+import { define, attr, string, number, reactive } from "@sirpepe/ornament";
 
 // Register the element with the specified tag name
 @define("my-greeter")
@@ -18,7 +18,7 @@ class MyGreeter extends HTMLElement {
   // Mark the method as reactive to have it run every time one of the attributes
   // change
   @reactive() greet() {
-    this.#shadow.innerHTML = `Hello! My name is ${this.#name}, my age is ${this.#age || "unknown"}`;
+    this.#shadow.innerHTML = `Hello! My name is ${this.name}, my age is ${this.age || "unknown"}`;
   }
 }
 ```
@@ -148,13 +148,14 @@ as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babe
 ### General philosophy
 
 The native APIs for web components are verbose and imperative, but lend
-themselves to quite a bit of streamlining, without going all-in with a whole
-framework. And streamlining the native APIs is the entire goal here. Ornament is
-**decidedly *not* a framework** but instead aims to be:
+themselves to quite a bit of streamlining. And a bit of sstreamlining the native
+APIs is the entire goal here. Ornament is **decidedly *not* a framework** but
+instead aims to be:
 
 - tiny
 - dependency-free
 - treeshake-friendly
+- equipped with useful type definitions
 - adherent to (the spirit of) web standards
 - easy to extend
 - easy to get rid of
@@ -165,6 +166,21 @@ replace with hand-written logic, your own decorators, or a future replacement
 for Ornament. Ornaments decorators co-exist with eg. regular attribute change
 handling logic just fine. Ornament still wants you to have full control over
 your components' behavior, just with less *mandatory* boilerplate.
+
+### Some assembly required
+
+Ornament is not a framework and if you want to do anything more that just write
+three independent components you will probably want to combine it with some
+additional framework-like logic or other libraries. Ornament does not come with
+any of the following:
+
+- state management (even though it is simple to connect components to signals or event targets)
+- rendering (but it works well with [uhtml](https://github.com/WebReflection/uhtml) and similar libraries
+- built-in solutions for client-side routing
+- any preconceived notions about what should be going on server-side
+
+You can (and probably have to) therefore pick or write your own solutions for
+the above features.
 
 ### Component registration
 
