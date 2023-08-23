@@ -18,7 +18,7 @@ class MyGreeter extends HTMLElement {
   // Mark the method as reactive to have it run every time one of the attributes
   // change
   @reactive() greet() {
-    this.#shadow.innerHTML = `Hello! My name is ${this.name}, my age is ${this.age || "unknown"}`;
+    this.#shadow.innerHTML = `Hello! My name is ${this.name}, my age is ${this.age}`;
   }
 }
 ```
@@ -59,7 +59,7 @@ class MyGreeter extends HTMLElement {
 
   // Method to run each time `#name` or `#age` changes
   greet() {
-    this.#shadow.innerHTML = `Hello! My name is ${this.#name}, my age is ${this.#age || "unknown"}`;
+    this.#shadow.innerHTML = `Hello! My name is ${this.#name}, my age is ${this.#age}`;
   }
 
   // DOM getter for the IDL property, required to make JS operations like

@@ -10,6 +10,7 @@
     "lint": "eslint --ext .ts src",
     "test": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve",
     "build": "rollup -c rollup.config.mjs",
+    "build-examples": "cd examples/my-greeter && rollup -c rollup.config.mjs",
     "types": "tsc -p tsconfig.build.json",
     "prepareRelease": "rm -rf dist && npm run types && npm run lint && npm run test && npm run build",
     "release": "npm run prepareRelease && release-it"
@@ -30,6 +31,7 @@
     "@babel/preset-typescript": "^7.21.5",
     "@esm-bundle/chai": "^4.3.4-fix.0",
     "@preact/signals-core": "^1.4.0",
+    "@rollup/plugin-alias": "^5.0.0",
     "@rollup/plugin-babel": "^6.0.3",
     "@rollup/plugin-node-resolve": "^15.1.0",
     "@rollup/plugin-terser": "^0.4.3",
