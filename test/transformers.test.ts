@@ -442,6 +442,20 @@ describe("Transformers", () => {
       expect(el.foo).to.eql({ foo: 42 });
       expect(el.getAttribute("foo")).to.equal(`{ "foo": 42 }`);
     });
+
+    test("as attribute, initializing empty", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(json())
+        accessor foo: any;
+      }
+      const el = new Test();
+      expect(el.foo).to.equal(undefined);
+      el.foo = { a: 1 };
+      expect(el.getAttribute("foo")).to.equal('{"a":1}');
+      el.foo = undefined;
+      expect(el.getAttribute("foo")).to.equal("undefined");
+    });
   });
 
   describe("schema()", () => {

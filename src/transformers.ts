@@ -218,8 +218,11 @@ export function int(
       return fallbackValues.get(this) ?? 0n;
     },
     validate(value) {
-      if (typeof value === "undefined" || value === null) {
+      if (typeof value === "undefined") {
         return fallbackValues.get(this) ?? 0n;
+      }
+      if (value === null) {
+        return 0n;
       }
       const asInt = BigInt(value as any);
       if (typeof min !== "undefined" && asInt < min) {

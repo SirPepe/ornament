@@ -148,7 +148,7 @@ as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babe
 ### General philosophy
 
 The native APIs for web components are verbose and imperative, but lend
-themselves to quite a bit of streamlining. And a bit of sstreamlining the native
+themselves to quite a bit of streamlining. And a bit of streamlining the native
 APIs is the entire goal here. Ornament is **decidedly *not* a framework** but
 instead aims to be:
 
@@ -175,12 +175,21 @@ additional framework-like logic or other libraries. Ornament does not come with
 any of the following:
 
 - state management (even though it is simple to connect components to signals or event targets)
-- rendering (but it works well with [uhtml](https://github.com/WebReflection/uhtml) and similar libraries
-- built-in solutions for client-side routing
+- rendering (but it works well with [uhtml](https://github.com/WebReflection/uhtml) and similar libraries)
+- built-in solutions for client-side routing, data fetching, or anything beyond the components themselves
 - any preconceived notions about what should be going on server-side
+- specialized syntax for every (or any specific) use case
 
 You can (and probably have to) therefore pick or write your own solutions for
-the above features.
+the above features. I would recommend that you
+
+- Build one or more base classes with essential logic for your use cases (eg. rendering logic)
+- Partially apply at least some decorators and/or transformers for your use case (eg. a variant of `@subscribe` that automatically subscribes to your global state container)
+- Apply common sense when designing components (eg. have some reusable components wrapped by application-specific components)
+
+This gets you 90% of the features of a frontend-framework without tying you down
+on any specific architecture, feature set, or general approach to web
+components.
 
 ### Component registration
 
@@ -189,7 +198,7 @@ is no too bad, but setting a custom element's tag name should really be part of
 the class declaration. The `@define()` decorator provides just that:
 
 ```javascript
-import { define } from "@sirpepe/ornament"
+import { define } from "@sirpepe/ornament";
 
 @define("my-test")
 class MyTest extends HTMLElement {}
@@ -225,7 +234,7 @@ more or less the same for all attributes, it is possible to to simplify the
 syntax quite a bit:
 
 ```javascript
-import { attr, define number } from "@sirpepe/ornament"
+import { attr, define number } from "@sirpepe/ornament";
 
 @define("my-test")
 class MyTest extends HTMLElement {
@@ -274,7 +283,7 @@ decorator and installs an automatic
 (unless your component has its own string tag getter).
 
 ```javascript
-import { define } from "@sirpepe/ornament"
+import { define } from "@sirpepe/ornament";
 
 @define("my-test")
 class MyTest extends HTMLElement {}
@@ -314,7 +323,7 @@ regular accessor with two additional features:
 Example:
 
 ```javascript
-import { define, prop, number } from "@sirpepe/ornament"
+import { define, prop, number } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -354,7 +363,7 @@ accessors decorated with `@prop()`, but with the following additional features:
 - Changes to the content attribute's value update the value of the IDL attribute to match (depending on the options and the transformer)
 
 ```javascript
-import { define, attr, number } from "@sirpepe/ornament"
+import { define, attr, number } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -404,7 +413,7 @@ attributes will not cause `@reactive()` methods to run.
 with `@prop()` or `@attr()` change their values:
 
 ```javascript
-import { define, reactive, prop, number } from "@sirpepe/ornament"
+import { define, reactive, prop, number } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -444,7 +453,7 @@ prevent excessive calls.
 component connects to the DOM:
 
 ```javascript
-import { define, connected } from "@sirpepe/ornament"
+import { define, connected } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -464,7 +473,7 @@ document.body.append(testEl);
 component disconnects from the DOM:
 
 ```javascript
-import { define, disconnected } from "@sirpepe/ornament"
+import { define, disconnected } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -483,7 +492,8 @@ testEl.remove();
 
 **Method decorator** that causes decorated class methods to subscribe to either
 [Event Targets](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget) or
-[signals](https://github.com/preactjs/signals), depending on the arguments.
+[signals](https://github.com/preactjs/signals), depending on the arguments. The
+subscriptions activate when an element's constructor completes.
 
 #### `@subscribe(target, eventName, predicate?)`
 
@@ -562,9 +572,17 @@ class Test extends HTMLElement {
 }
 ```
 
+The Target-producing factory can be used to work around the fact that Ornament's
+decorators (which are actually decorator-producing functions) run when the
+*class declaration* is evaluated. At this point in time, the event targets we
+want to subscribe to may not yet be available. The Target-producing factory runs
+*after* the classes' constructor has finished and get called with its `this`
+set to the element instance. This makes (non-private) class fields available
+for setting up event targets.
+
 ##### Options for `@subscribe()` for EventTarget
 
-- **`target` (EventTarget)**: The event target to subscribe to
+- **`targetOrTargetFactory` (EventTarget)**: The event target (or event-target-returning function) to subscribe to
 - **`eventName` (string)**: The event name to listen to
 - **`predicate` (function, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the event object and must return a boolean
 
@@ -607,7 +625,7 @@ to throw events around.
 **Method and class field decorator** for debouncing method/function invocation:
 
 ```javascript
-import { define, debounce } from "@sirpepe/ornament"
+import { define, debounce } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -734,13 +752,42 @@ only a few self-contained lines of code. If you want to extend Ornament, you
 should simply clone one of the built-in transformers and modify it to your
 liking.
 
+### Notes for all transformers
+
+Transformers can be used with both `@prop()` and `@attr()`. In the latter case,
+if a matching content attribute with a valid value is present on initialization,
+the content attribute value (parsed into the proper type) will be used as the
+initial value.
+
+As an example:
+
+```javascript
+import { define, attr, string } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @attr(string()) accessor foo = "default value";
+  @attr(string()) accessor bar = "default value";
+  @attr(string()) accessor baz;
+}
+
+document.body.innerHTML += `<my-test foo="other value"></my-test>`
+```
+
+The element initializes with a content attribute `foo`, which will (because it
+uses the string type via the `string()` transformer) cause the `foo` property to
+contain the value `"other value"`. The content attribute `bar` is not set, which
+will result in `bar` containing the accessor's default value `"default value"`.
+The content attribute `baz` is also not set *and* the accessor has no initial
+value, so the `string()` transformer's built-in fallback value `""` gets used.
+
 ### Transformer `string()`
 
 Implements a string attribute or property. Loosely modeled after built-in string
 attributes such as `id` and `lang`.
 
 ```javascript
-import { define, attr, string } from "@sirpepe/ornament"
+import { define, attr, string } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -770,7 +817,7 @@ Implements a string attribute or property that works like the `href` attribute
 on `<a>` in that it automatically turns relative URLs into absolute URLs.
 
 ```javascript
-import { define, attr, href } from "@sirpepe/ornament"
+import { define, attr, href } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -801,7 +848,7 @@ console.log(testEl.foo); // > "https://example.com/foo/bar/"
 Implements a number attribute with optional range constraints.
 
 ```javascript
-import { define, attr, number } from "@sirpepe/ornament"
+import { define, attr, number } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -814,10 +861,7 @@ class Test extends HTMLElement {
 ```
 
 Non-numbers get converted to numbers, but never to `NaN` - the property setter
-throws an exception when its input converts to `NaN`. When used with `@attr()`,
-if the content attribute gets removed or set to some non-numeric value, the
-value that was used to initialize the accessor (in this case `0`) is returned.
-The same happens when the IDL attribute is set to `undefined`.
+throws an exception when its input converts to `NaN`.
 
 #### Options for transformer `number()`
 
@@ -833,7 +877,7 @@ The same happens when the IDL attribute is set to `undefined`.
 | Set out-of-range value     | Error                                              |
 | Set out-of-range attribute | `minmax(ops.min, opts.max, toNumberWithoutNaN(x))` |
 | Set `null`                 | `0`                                                |
-| Set `undefined`            | `0`                                                |
+| Set `undefined`            | Accessor initial value or `0`                      |
 | Set non-numeric attribute  | Previous value                                     |
 | Set attribute              | `minmax(ops.min, opts.max, toNumberWithoutNaN(x))` |
 | Remove attribute           | Accessor initial value or `0`                      |
@@ -844,7 +888,7 @@ Implements a bigint attribute. Content attribute values are expressed as plain
 numeric strings without the tailing `n` used in JavaScript bigints.
 
 ```javascript
-import { define, attr, int } from "@sirpepe/ornament"
+import { define, attr, int } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -857,10 +901,7 @@ class Test extends HTMLElement {
 ```
 
 The IDL attribute setter throws an exception when its input cannot be converted
-to bigint. When used with `@attr()`, if the content attribute gets removed or
-set to some non-integer value, the value that was used to initialize the
-accessor (in the above examples `0n`) is returned. The same happens when the IDL
-attribute is set to `undefined`.
+to bigint.
 
 #### Options for transformer `int()`
 
@@ -878,7 +919,7 @@ attribute is set to `undefined`.
 | Set non-int value          | `BigInt(x)`                                |
 | Set non-int attribute      | Clamp to Int if float, else previous value |
 | Set `null`                 | `0n`                                       |
-| Set `undefined`            | `0n`                                       |
+| Set `undefined`            | Accessor initial value or `0n`             |
 | Set attribute              | `minmax(ops.min, opts.max, toBigInt(x))`   |
 | Remove attribute           | Accessor initial value or `0n`             |
 
@@ -889,7 +930,7 @@ as `disabled`. Changes to the IDL attribute values toggle the content attribute
 and do not just change the content attribute's value.
 
 ```javascript
-import { define, attr, bool } from "@sirpepe/ornament"
+import { define, attr, bool } from "@sirpepe/ornament";
 
 class DemoElement extends HTMLElement {
   @attr(bool()) accessor foo = false;
@@ -899,10 +940,21 @@ class DemoElement extends HTMLElement {
 In this case, the IDL attribute `foo` always represents a boolean. Any
 non-boolean value gets coerced to booleans. If the content attribute `foo` gets
 set to any value (including the empty string), `foo` returns `true` - only a
-missing content attribute counts as `false`.
+missing content attribute counts as `false`. Conversely, the content attribute
+will be set to the empty string when the IDL attribute is `true` and the
+attribute will be removed when the IDL attribute is `false`.
 
 If you want your content attribute to represent `"false"` as a string value,
 you can use the `literal()` transformer with the strings `"true"` and `"false"`.
+
+#### Behavior overview for transformer `bool()`
+
+| Operation                  | Value                  |
+| ---------------------------| -----------------------|
+| Initialization             | hasAttribute(attrName) |
+| Set value `x`              | `Boolean(x)`           |
+| Set attribute to `x`       | `true`                 |
+| Remove attribute           | `false`                |
 
 ### Transformer `literal(options?)`
 
@@ -934,6 +986,15 @@ the accessor has no initial value, the first element in `values`.
 - **`values` (array)**: List of valid values. Must contain at least one element.
 - **`transform` (Transformer)**: Transformer to use, eg. `string()` for a list of strings, `number()` for numbers etc.
 
+#### Behavior overview for transformer `literal()`
+
+| Operation        | Value                                             |
+| -----------------| --------------------------------------------------|
+| Initialization   | Accessor initial value or first value in `values` |
+| Set value `x`    | Depends on the behavior of `transformer`          |
+| Set attribute    | Depends on the behavior of `transformer`          |
+| Remove attribute | Depends on the behavior of `transformer`          |
+
 ### Transformer `json()`
 
 Implements an attribute that can take any valid JSON value and gets reflected as
@@ -964,6 +1025,16 @@ are applied to, so you man need to provide a type annotation.
 
 - **`reviver` (function, optional)**: The `reviver` argument to use with `JSON.parse()`, if any
 - **`replacer` (function, optional)**: The `replacer` argument to use with `JSON.stringify()`, if any
+
+#### Behavior overview for transformer `json()`
+
+| Operation                       | Value                                                            |
+| --------------------------------| -----------------------------------------------------------------|
+| Initialization                  | Accessor initial value or `undefined`                            |
+| Set JSON-serializable value `x` | `x`                                                              |
+| Set non-JSON-serializable value | Exception                                                        |
+| Set attribute                   | `JSON.parse(attrValue)` or accessor initial value or `undefined` |
+| Remove attribute                | Accessor initial value or `undefined`                            |
 
 ### Transformer `event()`
 
@@ -1007,6 +1078,11 @@ can be added to *any* element in order to facilitate event delegation. These
 event handlers are considered global event handlers, and all custom inline event
 handlers are obviously not global - they can only be used on the components that
 explicitly implement them.
+
+#### Behavior overview for transformer `event()`
+
+The behavior of `event()` matches the behavior of built-in event handlers like
+`onclick`.
 
 ## Cookbook
 
@@ -1119,6 +1195,56 @@ class Test extends HTMLElement {
 }
 ```
 
+If you'd rather catch event happening in the component's shadow dom, the syntax
+gets a bit gnarly at first:
+
+```javascript
+import { define, subscribe } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  root = this.attachShadow({ mode: "open" });
+  @subscribe(
+    function () {
+      return this.root;
+    },
+    "click",
+    "input",
+    (evt) => evt.target.matches("input[type-number]")
+  )
+  log(evt) {
+    console.log(evt); // "input" events
+  }
+}
+```
+
+Decorators like `@subscribe` run when the class definition initializes, and at
+that point, no class instances (and therefore no shadow DOM to subscribe to)
+exist. We must therefore provide a function that can return the event target on
+initialization. To make this less of an eyesore, it makes sense to create a
+custom decorator for event delegation based on `@subscribe`:
+
+```javascript
+import { define, subscribe } from "@sirpepe/ornament";
+
+const handle = (eventName, selector) =>
+  subscribe(
+    function () {
+      return this.root;
+    },
+    eventName,
+    (evt) => evt.target.matches(selector)
+  );
+
+@define("my-test")
+class Test extends HTMLElement {
+  @handle("input", "input[type-number]") // Much better!
+  log(evt) {
+    console.log(evt); // "input" events
+  }
+}
+```
+
 ### Custom defaults
 
 If you don't like ornament's defaults, remember that decorators and transformers
@@ -1128,7 +1254,7 @@ the default options:
 ```javascript
 import { define, attr, reactive as baseReactive, string } from "@sirpepe/ornament";
 
-// @reactive with initial always set to false
+// @reactive with "initial" always set to false
 const reactive = baseReactive.bind(null, { initial: false });
 
 @define("my-test")
