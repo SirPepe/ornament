@@ -9,10 +9,11 @@
   "scripts": {
     "lint": "eslint --ext .ts src",
     "test": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve",
-    "build": "rollup -c rollup.config.mjs",
+    "build": "clear && npm run lint && rollup -c rollup.config.mjs && npm run size",
     "build-examples": "cd examples/my-greeter && rollup -c rollup.config.mjs",
     "types": "tsc -p tsconfig.build.json",
     "prepareRelease": "rm -rf dist && npm run types && npm run lint && npm run test && npm run build",
+    "size": "gzip -c dist/min/index.min.js | wc -c | numfmt --to iec --format '%8.4f'",
     "release": "npm run prepareRelease && release-it"
   },
   "directories": {

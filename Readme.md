@@ -1,6 +1,7 @@
 # Ornament
 
-Unopinionated, pareto-optimal micro-library for building vanilla web components:
+Unopinionated, pareto-optimal micro-library (< 4k) for building vanilla web
+components:
 
 ```javascript
 import { define, attr, string, number, reactive } from "@sirpepe/ornament";
@@ -181,7 +182,7 @@ any of the following:
 - specialized syntax for every (or any specific) use case
 
 You can (and probably have to) therefore pick or write your own solutions for
-the above features. I would recommend that you
+the above features. I would recommend that you:
 
 - Build one or more base classes with essential logic for your use cases (eg. rendering logic)
 - Partially apply at least some decorators and/or transformers for your use case (eg. a variant of `@subscribe` that automatically subscribes to your global state container)
