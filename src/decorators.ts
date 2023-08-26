@@ -276,19 +276,24 @@ const unsubscribeRegistry = new FinalizationRegistry<() => void>(
   (unsubscribe) => unsubscribe(),
 );
 
+type SubscribeOptions<T, V> = {
+  predicate?: (this: T, value: V) => boolean;
+};
+
 type EventSubscribeDecorator<T, E extends Event> = (
   value: Method<T, [E]>,
   context: ClassMethodDecoratorContext<T>,
 ) => void;
 
-type LazyEventTarget<T extends EventTarget = EventTarget> = () => T;
+type LazyEventTarget<T, E extends EventTarget = EventTarget> = (this: T) => E;
 
 function createEventSubscriberInitializer<T extends object, E extends Event>(
   context: ClassMethodDecoratorContext<T>,
-  target: EventTarget | LazyEventTarget,
+  target: EventTarget | LazyEventTarget<T>,
   eventName: string,
-  predicate: (this: T, evt: E) => boolean = () => true,
+  options: SubscribeOptions<T, E> | undefined = {},
 ): (this: T) => void {
+  const predicate = options.predicate ?? (() => true);
   return function (this: T) {
     const value = context.access.get(this);
     const callback = (evt: any) => {
@@ -297,7 +302,7 @@ function createEventSubscriberInitializer<T extends object, E extends Event>(
       }
     };
     if (typeof target === "function") {
-      target = target();
+      target = target.call(this);
     }
     const unsubscribe = () =>
       (target as EventTarget).removeEventListener(eventName, callback);
@@ -337,8 +342,9 @@ function createSignalSubscriberInitializer<
 >(
   context: ClassMethodDecoratorContext<T>,
   target: S,
-  predicate: (this: T, value: V) => boolean = () => true,
+  options: SubscribeOptions<T, V> | undefined = {},
 ): (this: T) => void {
+  const predicate = options.predicate ?? (() => true);
   return function (this: T) {
     const value = context.access.get(this);
     const callback = () => {
@@ -354,7 +360,7 @@ function createSignalSubscriberInitializer<
 export function subscribe<T extends object, S extends SignalLike<any>>(
   this: unknown,
   target: S,
-  predicate?: (this: T, value: SignalType<S>) => boolean,
+  options?: SubscribeOptions<T, SignalType<S>>,
 ): SignalSubscribeDecorator<T>;
 export function subscribe<
   T extends object,
@@ -364,37 +370,37 @@ export function subscribe<
   this: unknown,
   target: U | LazyEventTarget<U>,
   event: string,
-  predicate?: (this: T, evt: E) => boolean,
+  options?: SubscribeOptions<T, E>,
 ): EventSubscribeDecorator<T, E>;
 export function subscribe<T extends object>(
   this: unknown,
   target: EventTarget | LazyEventTarget<any> | SignalLike<any>,
-  eventOrPredicate?: ((this: T, arg: any) => boolean) | string,
-  predicate?: (this: T, arg: any) => boolean,
+  eventOrOptions?: SubscribeOptions<T, any> | string,
+  options?: SubscribeOptions<T, any>,
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
   return function (_: unknown, context: ClassMethodDecoratorContext<T>): void {
     assertContext(context, "@subscribe", "method", { private: true });
     if (
       (typeof target === "function" || target instanceof EventTarget) &&
-      typeof eventOrPredicate === "string"
+      typeof eventOrOptions === "string"
     ) {
       context.addInitializer(
         createEventSubscriberInitializer(
           context,
           target,
-          eventOrPredicate,
-          predicate,
+          eventOrOptions,
+          options,
         ),
       );
       return;
     }
     if (
       isSignalLike(target) &&
-      (typeof eventOrPredicate === "function" ||
-        typeof eventOrPredicate === "undefined")
+      (typeof eventOrOptions === "object" ||
+        typeof eventOrOptions === "undefined")
     ) {
       context.addInitializer(
-        createSignalSubscriberInitializer(context, target, eventOrPredicate),
+        createSignalSubscriberInitializer(context, target, eventOrOptions),
       );
       return;
     }

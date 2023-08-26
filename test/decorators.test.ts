@@ -583,7 +583,7 @@ describe("Decorators", () => {
         const counter = signal(0);
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(counter, (v) => v % 2 === 0)
+          @subscribe(counter, { predicate: (v) => v % 2 === 0 })
           test() {
             fn(this, counter.value);
           }
@@ -668,6 +668,30 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
+      test("subscribe to events on the shadow dom", async () => {
+        const fn = spy();
+        const target = document.createElement("div");
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          root = this.attachShadow({ mode: "open" });
+          constructor() {
+            super();
+            this.root.append(target);
+          }
+          @subscribe(function (this: Test) {
+            return this.root;
+          }, "click")
+          test(event: MouseEvent) {
+            fn(this, event, event.target);
+          }
+        }
+        const instance = new Test();
+        const event = new MouseEvent("click", { bubbles: true });
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
+      });
+
       test("subscribe with a predicate", async () => {
         const fn = spy();
         const target = new EventTarget();
@@ -680,7 +704,7 @@ describe("Decorators", () => {
         }
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(target, "test", (evt) => evt.value === true)
+          @subscribe(target, "test", { predicate: (evt) => evt.value === true })
           test(event: TestEvent) {
             fn(this, event.value);
           }
