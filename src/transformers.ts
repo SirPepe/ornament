@@ -113,7 +113,7 @@ function numberOptions(input: unknown): NumberOptions<number> {
   assertType(min, "min", "number");
   assertType(max, "max", "number");
   if (min >= max) {
-    throw new RangeError(`Expected min to be be less than max`);
+    throw new RangeError(`Expected "min" to be be less than "max"`);
   }
   return { min, max };
 }
@@ -450,10 +450,10 @@ export function event<
       }
       return null;
     },
+    // This function should never be called, as updating event handler IDL
+    // attributes does not change the content attribute value
     stringify() {
-      throw new Error(
-        "This function should never be called, updating event handler properties does not change the attribute value!",
-      );
+      throw new Error();
     },
     init(value, defaultValue, context) {
       if (context.private || typeof context.name === "symbol") {

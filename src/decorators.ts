@@ -8,7 +8,7 @@ import {
   assertContext,
 } from "./types.js";
 
-const eventName = "__ornament-reactivity";
+const eventName = "_o-react";
 
 const identity = <T>(x: T) => x;
 
@@ -38,18 +38,19 @@ const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 // The following callback wrangling code fills the hole left by the
 // non-existence of decorator metadata as of Q3 2023.
 type Callbacks = Record<string | symbol, () => void>;
-const onConnect = new WeakMap<CustomElementConstructor, Callbacks>();
-const onDisconnect = new WeakMap<CustomElementConstructor, Callbacks>();
-const onInit = new WeakMap<CustomElementConstructor, Callbacks>();
+const callbackSources = {
+  connect: new WeakMap<CustomElementConstructor, Callbacks>(),
+  disconnect: new WeakMap<CustomElementConstructor, Callbacks>(),
+  init: new WeakMap<CustomElementConstructor, Callbacks>(),
+};
 
 function setCallback(
   instance: any,
-  on: "connect" | "disconnect" | "init",
+  on: keyof typeof callbackSources,
   name: string | symbol,
   callback: () => void,
 ): void {
-  const source =
-    on === "connect" ? onConnect : on === "disconnect" ? onDisconnect : onInit;
+  const source = callbackSources[on];
   const callbacks = source.get(instance.constructor);
   if (!callbacks) {
     source.set(instance.constructor, { [name]: callback });
@@ -62,15 +63,10 @@ function setCallback(
 
 function getCallbacks(
   instance: any,
-  on: "connect" | "disconnect" | "init",
+  on: keyof typeof callbackSources,
 ): (() => void)[] {
-  const source =
-    on === "connect" ? onConnect : on === "disconnect" ? onDisconnect : onInit;
-  const callbacks = source.get(instance.constructor);
-  if (!callbacks) {
-    return [];
-  }
-  return Object.values(callbacks);
+  const callbacks = callbackSources[on].get(instance.constructor);
+  return Object.values(callbacks ?? []);
 }
 
 // Maps attributes to attribute observer callbacks mapped by custom element
@@ -126,7 +122,7 @@ class ReactivityEvent extends Event {
 
 declare global {
   interface ElementEventMap {
-    "__ornament-reactivity": ReactivityEvent;
+    "_o-react": ReactivityEvent;
   }
 }
 
@@ -161,7 +157,7 @@ export function define<T extends CustomElementConstructor>(
     // constructor T, but as TypeScript can currently not use class decorators
     // to change the type, we don't bother. The changes are really small, too.
     // See https://github.com/microsoft/TypeScript/issues/51347
-    return class Mixin extends target {
+    return class extends target {
       // Component set-up in the constructor (which here is the super
       // constructor) must not trigger reactive methods. Conversely, initial
       // calls to reactive methods must happen immediately after the (super-)
@@ -434,7 +430,7 @@ export function disconnected<T extends HTMLElement>() {
     context.addInitializer(function () {
       setCallback(
         this,
-        "connect",
+        "disconnect",
         context.name,
         context.access.get(this).bind(this),
       );
@@ -639,13 +635,11 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
         return createDebouncedMethod(func, fn).bind(this);
       };
     } else if (context.kind === "method") {
-      // Method decorator
-      if (typeof value === "undefined") {
-        throw new Error("This should never happen");
-      }
-      return createDebouncedMethod(value, fn);
+      // Method decorator. TS does not understand that value is a function at
+      // this point
+      return createDebouncedMethod(value as Method<T, A>, fn);
     }
-    throw new TypeError(); // never happens
+    throw new Error(); // never happens, just to appease TS
   }
   return decorator;
 }
