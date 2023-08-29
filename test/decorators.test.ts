@@ -10,7 +10,7 @@ import {
   reactive,
   subscribe,
 } from "../src/decorators.js";
-import { href, string } from "../src/transformers.js";
+import { href, json, string } from "../src/transformers.js";
 import { generateTagName, wait } from "./helpers.js";
 import { signal } from "@preact/signals-core";
 const test = it;
@@ -422,6 +422,40 @@ describe("Decorators", () => {
       expect(fn.callCount).to.equal(2); // initial + one update
       expect(fn.getCalls()[0].args).to.eql(["A"]);
       expect(fn.getCalls()[1].args).to.eql(["B"]);
+    });
+
+    test("multiple attr changes with the same value only cause one effect to run (primitives)", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(string()) accessor x = "A";
+        @reactive() test() {
+          fn(this.x);
+        }
+      }
+      const el = new Test();
+      el.x = "B";
+      el.x = "B";
+      el.x = "B";
+      expect(fn.callCount).to.equal(2); // initial + one update
+      expect(fn.getCalls()[0].args).to.eql(["A"]);
+      expect(fn.getCalls()[1].args).to.eql(["B"]);
+    });
+
+    test("attr change causes only one effect to run, not also the attributeChangedCallback (objects)", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(json()) accessor x = [1];
+        @reactive() test() {
+          fn(this.x);
+        }
+      }
+      const el = new Test();
+      el.x = [2];
+      expect(fn.callCount).to.equal(2); // initial + one update
+      expect(fn.getCalls()[0].args).to.eql([[1]]);
+      expect(fn.getCalls()[1].args).to.eql([[2]]);
     });
 
     test("keys option", async () => {

@@ -39,9 +39,9 @@ const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 // non-existence of decorator metadata as of Q3 2023.
 type Callbacks = Record<string | symbol, () => void>;
 const callbackSources = {
+  init: new WeakMap<CustomElementConstructor, Callbacks>(),
   connect: new WeakMap<CustomElementConstructor, Callbacks>(),
   disconnect: new WeakMap<CustomElementConstructor, Callbacks>(),
-  init: new WeakMap<CustomElementConstructor, Callbacks>(),
 };
 
 function setCallback(
@@ -164,8 +164,9 @@ export function define<T extends CustomElementConstructor>(
       // constructor's set-up is completed.
       constructor(...args: any[]) {
         super(...args);
-        // Perform the initial calls to reactive methods for this instance. The
-        // callbacks are bound methods, so there is no need to handle "this"
+        // Perform the initial calls to reactive/subscribed methods for this
+        // instance. The callbacks are bound methods, so there is no need to
+        // handle "this"
         for (const callback of getCallbacks(this, "init")) {
           callback();
         }
@@ -443,9 +444,13 @@ export function disconnected<T extends HTMLElement>() {
 // accessors or symbol accessors.
 
 type AttrOptions = {
-  as?: string;
+  as?: string; // defaults to the attribute name
   reflective?: boolean; // defaults to true
 };
+
+// Enables early exits from the attributeChangedCallback for attribute updates
+// that were caused by setters.
+const SKIP_NEXT_ATTRIBUTE_REACTION = new WeakMap<HTMLElement, Set<string>>();
 
 export function attr<T extends HTMLElement, V>(
   this: unknown,
@@ -478,6 +483,8 @@ export function attr<T extends HTMLElement, V>(
     // instance - this initializer is earliest we have access to the instance.
     if (isReflectiveAttribute) {
       context.addInitializer(function () {
+        const skipReactions = new Set<string>();
+        SKIP_NEXT_ATTRIBUTE_REACTION.set(this, skipReactions);
         const attributeChangedCallback = function (
           this: T,
           name: string,
@@ -486,6 +493,10 @@ export function attr<T extends HTMLElement, V>(
         ): void {
           if (name !== attrName || newAttrVal === oldAttrVal) {
             return; // skip irrelevant invocations
+          }
+          if (skipReactions.has(name)) {
+            skipReactions.delete(name);
+            return; // skip attribute reaction caused by a setter
           }
           const oldValue = target.get.call(this);
           let newValue = transformer.parse.call(this, newAttrVal, oldValue);
@@ -523,6 +534,12 @@ export function attr<T extends HTMLElement, V>(
             oldValue,
             newValue,
           );
+          // If an attribute update is about to happen, the next
+          // attributeChangedCallback must be skipped to prevent double calls of
+          // @reactive methods
+          if (updateAttr !== false) {
+            SKIP_NEXT_ATTRIBUTE_REACTION.get(this)?.add(attrName);
+          }
           if (updateAttr === null) {
             this.removeAttribute(attrName);
           } else if (updateAttr === true) {
