@@ -37,7 +37,7 @@ const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 
 // The following callback wrangling code fills the hole left by the
 // non-existence of decorator metadata as of Q3 2023.
-type Callbacks = Record<string | symbol, () => void>;
+type Callbacks = Record<string | symbol, (this: HTMLElement) => void>;
 const callbackSources = {
   init: new WeakMap<CustomElementConstructor, Callbacks>(),
   connect: new WeakMap<CustomElementConstructor, Callbacks>(),
@@ -165,10 +165,9 @@ export function define<T extends CustomElementConstructor>(
       constructor(...args: any[]) {
         super(...args);
         // Perform the initial calls to reactive/subscribed methods for this
-        // instance. The callbacks are bound methods, so there is no need to
-        // handle "this"
+        // instance.
         for (const callback of getCallbacks(this, "init")) {
-          callback();
+          callback.call(this);
         }
         // Mark the end of the constructor and the initial reactive calls,
         // allow the element to receive reactivity events.
@@ -216,7 +215,7 @@ export function define<T extends CustomElementConstructor>(
           originalConnectedCallback.call(this);
         }
         for (const callback of getCallbacks(this, "connect")) {
-          callback();
+          callback.call(this);
         }
       }
 
@@ -225,7 +224,7 @@ export function define<T extends CustomElementConstructor>(
           originalDisconnectedCallback.call(this);
         }
         for (const callback of getCallbacks(this, "disconnect")) {
-          callback();
+          callback.call(this);
         }
       }
     };
@@ -254,7 +253,7 @@ export function reactive<T extends HTMLElement>(
       // Register the callback that performs the initial method call
       if (initial) {
         const method = DEBOUNCED_METHOD_MAP.get(value) ?? value;
-        setCallback(this, "init", context.name, method.bind(this));
+        setCallback(this, "init", context.name, method);
       }
       // Start listening for reactivity events that happen after reactive init
       this.addEventListener(eventName, (evt) => {
@@ -280,29 +279,32 @@ type EventSubscribeDecorator<T, E extends Event> = (
   context: ClassMethodDecoratorContext<T>,
 ) => void;
 
-type LazyEventTarget<T, E extends EventTarget = EventTarget> = (this: T) => E;
+type EventTargetFactory<T, E extends EventTarget = EventTarget> = (
+  this: T,
+) => E;
 
 function createEventSubscriberInitializer<T extends object, E extends Event>(
   context: ClassMethodDecoratorContext<T>,
-  target: EventTarget | LazyEventTarget<T>,
+  targetOrTargetFactory: EventTarget | EventTargetFactory<T>,
   eventName: string,
   predicate: SubscribePredicate<T, E> = () => true,
 ): (this: T) => void {
   return function (this: T) {
-    setCallback(this, "init", context.name, () => {
+    setCallback(this, "init", context.name, function (this: T) {
       const value = context.access.get(this);
       const callback = (evt: any) => {
         if (predicate.call(this, evt)) {
           value.call(this, evt);
         }
       };
-      if (typeof target === "function") {
-        target = target.call(this);
-      }
+      const eventTarget =
+        typeof targetOrTargetFactory === "function"
+          ? targetOrTargetFactory.call(this)
+          : targetOrTargetFactory;
       const unsubscribe = () =>
-        (target as EventTarget).removeEventListener(eventName, callback);
+        eventTarget.removeEventListener(eventName, callback);
       unsubscribeRegistry.register(this, unsubscribe);
-      target.addEventListener(eventName, callback);
+      eventTarget.addEventListener(eventName, callback);
     });
   };
 }
@@ -341,7 +343,7 @@ function createSignalSubscriberInitializer<
   predicate: SubscribePredicate<T, V> = () => true,
 ): (this: T) => void {
   return function (this: T) {
-    setCallback(this, "init", context.name, () => {
+    setCallback(this, "init", context.name, function (this: T) {
       const value = context.access.get(this);
       const callback = () => {
         if (predicate.call(this, target.value)) {
@@ -365,13 +367,13 @@ export function subscribe<
   E extends Event,
 >(
   this: unknown,
-  target: U | LazyEventTarget<U>,
+  target: U | EventTargetFactory<U>,
   event: string,
   predicate?: SubscribePredicate<T, E>,
 ): EventSubscribeDecorator<T, E>;
 export function subscribe<T extends object>(
   this: unknown,
-  target: EventTarget | LazyEventTarget<any> | SignalLike<any>,
+  target: EventTarget | EventTargetFactory<any> | SignalLike<any>,
   eventOrPredicate?: SubscribePredicate<T, any> | string,
   predicate?: SubscribePredicate<T, any>,
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
@@ -412,12 +414,7 @@ export function connected<T extends HTMLElement>() {
   ): void {
     assertContext(context, "@connected", "method", { private: true });
     context.addInitializer(function () {
-      setCallback(
-        this,
-        "connect",
-        context.name,
-        context.access.get(this).bind(this),
-      );
+      setCallback(this, "connect", context.name, context.access.get(this));
     });
   };
 }
@@ -429,12 +426,7 @@ export function disconnected<T extends HTMLElement>() {
   ): void {
     assertContext(context, "@disconnected", "method", { private: true });
     context.addInitializer(function () {
-      setCallback(
-        this,
-        "disconnect",
-        context.name,
-        context.access.get(this).bind(this),
-      );
+      setCallback(this, "disconnect", context.name, context.access.get(this));
     });
   };
 }
