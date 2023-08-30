@@ -617,7 +617,7 @@ describe("Decorators", () => {
         const counter = signal(0);
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(counter, (v) => v % 2 === 0)
+          @subscribe(counter, { predicate: (v) => v % 2 === 0 })
           test() {
             fn(this, counter.value);
           }
@@ -761,7 +761,7 @@ describe("Decorators", () => {
         }
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(target, "test", (evt) => evt.value === true)
+          @subscribe(target, "test", { predicate: (evt) => evt.value })
           test(event: TestEvent) {
             fn(this, event.value);
           }

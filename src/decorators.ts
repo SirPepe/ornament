@@ -8,7 +8,7 @@ import {
   assertContext,
 } from "./types.js";
 
-const eventName = "_o-react";
+const REACT_EVENT_NAME = "_o-react";
 
 const identity = <T>(x: T) => x;
 
@@ -115,7 +115,7 @@ const DEBOUNCED_METHOD_MAP = new WeakMap<Method<any, any>, Method<any, any>>();
 class ReactivityEvent extends Event {
   readonly key: string | symbol;
   constructor(key: string | symbol) {
-    super(eventName);
+    super(REACT_EVENT_NAME);
     this.key = key;
   }
 }
@@ -256,7 +256,7 @@ export function reactive<T extends HTMLElement>(
         setCallback(this, "init", context.name, method);
       }
       // Start listening for reactivity events that happen after reactive init
-      this.addEventListener(eventName, (evt) => {
+      this.addEventListener(REACT_EVENT_NAME, (evt) => {
         if (
           REACTIVE_READY.has(this) &&
           (!options.keys || options.keys?.includes(evt.key))
@@ -274,6 +274,18 @@ const unsubscribeRegistry = new FinalizationRegistry<() => void>(
 
 type SubscribePredicate<T, V> = (this: T, value: V) => boolean;
 
+type EventSubscribeOptions<T, V> = AddEventListenerOptions & {
+  predicate?: SubscribePredicate<T, V>;
+};
+
+type SignalSubscribeOptions<T, V> = {
+  predicate?: SubscribePredicate<T, V>;
+};
+
+type SubscribeOptions<T, V> =
+  | EventSubscribeOptions<T, V>
+  | SignalSubscribeOptions<T, V>;
+
 type EventSubscribeDecorator<T, E extends Event> = (
   value: Method<T, [E]>,
   context: ClassMethodDecoratorContext<T>,
@@ -286,10 +298,11 @@ type EventTargetFactory<T, E extends EventTarget = EventTarget> = (
 function createEventSubscriberInitializer<T extends object, E extends Event>(
   context: ClassMethodDecoratorContext<T>,
   targetOrTargetFactory: EventTarget | EventTargetFactory<T>,
-  eventName: string,
-  predicate: SubscribePredicate<T, E> = () => true,
+  eventNames: string,
+  options: EventSubscribeOptions<T, E> = {},
 ): (this: T) => void {
   return function (this: T) {
+    const predicate = options.predicate ?? (() => true);
     setCallback(this, "init", context.name, function (this: T) {
       const value = context.access.get(this);
       const callback = (evt: any) => {
@@ -302,9 +315,9 @@ function createEventSubscriberInitializer<T extends object, E extends Event>(
           ? targetOrTargetFactory.call(this)
           : targetOrTargetFactory;
       const unsubscribe = () =>
-        eventTarget.removeEventListener(eventName, callback);
+        eventTarget.removeEventListener(eventNames, callback);
       unsubscribeRegistry.register(this, unsubscribe);
-      eventTarget.addEventListener(eventName, callback);
+      eventTarget.addEventListener(eventNames, callback);
     });
   };
 }
@@ -340,9 +353,10 @@ function createSignalSubscriberInitializer<
 >(
   context: ClassMethodDecoratorContext<T>,
   target: S,
-  predicate: SubscribePredicate<T, V> = () => true,
+  options: SignalSubscribeOptions<T, V> = {},
 ): (this: T) => void {
   return function (this: T) {
+    const predicate = options.predicate ?? (() => true);
     setCallback(this, "init", context.name, function (this: T) {
       const value = context.access.get(this);
       const callback = () => {
@@ -359,7 +373,7 @@ function createSignalSubscriberInitializer<
 export function subscribe<T extends object, S extends SignalLike<any>>(
   this: unknown,
   target: S,
-  predicate?: SubscribePredicate<T, SignalType<S>>,
+  options?: SignalSubscribeOptions<T, SignalType<S>>,
 ): SignalSubscribeDecorator<T>;
 export function subscribe<
   T extends object,
@@ -368,38 +382,38 @@ export function subscribe<
 >(
   this: unknown,
   target: U | EventTargetFactory<U>,
-  event: string,
-  predicate?: SubscribePredicate<T, E>,
+  events: string,
+  options?: EventSubscribeOptions<T, E>,
 ): EventSubscribeDecorator<T, E>;
 export function subscribe<T extends object>(
   this: unknown,
   target: EventTarget | EventTargetFactory<any> | SignalLike<any>,
-  eventOrPredicate?: SubscribePredicate<T, any> | string,
-  predicate?: SubscribePredicate<T, any>,
+  eventsOrOptions?: SubscribeOptions<T, any> | string,
+  options?: SubscribeOptions<T, any>,
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
   return function (_: unknown, context: ClassMethodDecoratorContext<T>): void {
     assertContext(context, "@subscribe", "method", { private: true });
     if (
       (typeof target === "function" || target instanceof EventTarget) &&
-      typeof eventOrPredicate === "string"
+      typeof eventsOrOptions === "string"
     ) {
       context.addInitializer(
         createEventSubscriberInitializer(
           context,
           target,
-          eventOrPredicate,
-          predicate,
+          eventsOrOptions,
+          options,
         ),
       );
       return;
     }
     if (
       isSignalLike(target) &&
-      (typeof eventOrPredicate === "function" ||
-        typeof eventOrPredicate === "undefined")
+      (typeof eventsOrOptions === "object" ||
+        typeof eventsOrOptions === "undefined")
     ) {
       context.addInitializer(
-        createSignalSubscriberInitializer(context, target, eventOrPredicate),
+        createSignalSubscriberInitializer(context, target, eventsOrOptions),
       );
       return;
     }

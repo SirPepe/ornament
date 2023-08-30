@@ -496,7 +496,7 @@ testEl.remove();
 [signals](https://github.com/preactjs/signals), depending on the arguments. The
 subscriptions activate when an element's constructor completes.
 
-#### `@subscribe(targetOrTargetFactory, eventName, predicate?)`
+#### `@subscribe(targetOrTargetFactory, eventName, options?)`
 
 Subscribe to an EventTarget. EventTarget is an interface that objects such as
 HTMLElement, Window, Document and *many* more objects implement. You can also
@@ -581,9 +581,14 @@ called each time an element initializes, with `this` set to the instance.
 
 - **`targetOrTargetFactory` (EventTarget | (this: T) => EventTarget)**: The event target (or event-target-returning function) to subscribe to
 - **`eventName` (string)**: The event name to listen to
-- **`predicate` (function, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the event object and must return a boolean
+- **`options` (object, optional)**: Event handling options, consisting of...
+  - **predicate (function, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the event object and must return a boolean
+  - **capture (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
+  - **once (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
+  - **passive (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
+  - **signal (AbortSignal, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
 
-#### `@subscribe(signal, predicate?)`
+#### `@subscribe(signal, options?)`
 
 Subscribe to a signal. Any signal implementation that roughly follows
 [Preact's implementation](https://github.com/preactjs/signals) should work:
@@ -615,7 +620,8 @@ to throw events around.
 ##### Options for `@subscribe()` for signals
 
 - **`signal` (Signal)**: The signal to subscribe to
-- **`predicate` (function, optional)**: If provided, controls whether or not the decorated method is called for a given signal update. Gets passed the signal's value and must return a boolean
+- **`options` (object, optional)**: Update handling options, consisting of...
+  - **predicate (function, optional)**: If provided, controls whether or not the decorated method is called for a given signal update. Gets passed the signal's value and must return a boolean
 
 ### `@debounce(options?)`
 
@@ -1206,9 +1212,8 @@ class Test extends HTMLElement {
     function () {
       return this.root;
     },
-    "click",
     "input",
-    (evt) => evt.target.matches("input[type-number]")
+    { predicate: (evt) => evt.target.matches("input[type-number]") }
   )
   log(evt) {
     console.log(evt); // "input" events
@@ -1231,7 +1236,7 @@ const handle = (eventName, selector) =>
       return this.root;
     },
     eventName,
-    (evt) => evt.target.matches(selector)
+    { predicate: (evt) => evt.target.matches(selector) }
   );
 
 @define("my-test")
