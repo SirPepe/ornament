@@ -15,39 +15,24 @@ import {
 import { signal, computed } from "@preact/signals-core";
 import { render, html } from "uhtml";
 
-// A proper signal to store the application state. As far as ornament is
-// concerned, this could also by an (or any) Event Target.
-let id = 0;
-const filter = signal("all"); // "all" | "done" | "open"
-const allItems = signal([
-  { id: id++, text: "Check out Ornament", done: true },
-  { id: id++, text: "Ditch legacy frameworks", done: false },
-  { id: id++, text: "Use the platform", done: false },
-]);
-const filteredItems = computed(() =>
-  allItems.value.filter((item) => {
-    if (item.done && filter.value === "open") {
-      return false;
-    }
-    if (!item.done && filter.value === "done") {
-      return false;
-    }
-    return true;
-  }),
-);
-
 // Custom base class to provide some common functionality, in this case
-// rendering to shadow DOM with uhtml. This could in theory contain even more
-// features, use an entirely different rendering library, or do anything else,
-// really.
+// rendering to shadow DOM with uhtml This class could in theory contain even
+// more features, use an entirely different rendering library, render to light
+// DOM instead of shadow DOM, or do anything else really.
 class BaseComponent extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
   }
+
+  // Wraps uhtml's render() function to make it available to every subclass
+  // without importing extra libraries.
   html(strings, ...values) {
     return html(strings, ...values);
   }
+
+  // Essentially wraps uhtml's render() function. If the class has a `css`
+  // property, its contents is added in a style tag next to the actual content.
   render(content) {
     if (this.css) {
       return render(
@@ -60,16 +45,18 @@ class BaseComponent extends HTMLElement {
 }
 
 // This application goes down the SPA rabbit hole and therefore has to deal with
-// event delegation in shadow roots. To make this palatable, I cribbed the
-// following decorator from the readme.
+// event delegation in shadow roots. To make this palatable, the following
+// decorator (which is just a wrapper around @subscribe) has been cribbed from
+// the readme.
 const handle = (eventName, selector = "*") =>
   subscribe(
     function () {
-      // this works because all shadow roots are open, see base class
+      // this works because all shadow roots in this project are open, see base
+      // class.
       return this.shadowRoot;
     },
     eventName,
-    (evt) => evt.target.matches(selector),
+    { predicate: (evt) => evt.target.matches(selector) },
   );
 
 // We need a whole lot of events for this application, so we better build a
@@ -78,11 +65,42 @@ function createEventClass(name) {
   return class extends Event {
     constructor(args) {
       super(name, { bubbles: true, composed: true });
-      Object.assign(this, args);
+      Object.assign(this, args); // ¯\_(ツ)_/¯
     }
   };
 }
 
+// Everything above this line counts as the "framework" for the application, all
+// that follows is state management and the actual component code that builds
+// on top of the framework and Ornament's decorators.
+
+// Some signals to store the application state. As far as ornament is concerned,
+// this could also be implemented with Event Targets, bot those are way less
+// cool these days.
+let id = 0;
+
+const filter = signal("all"); // "all" | "done" | "open"
+
+const allItems = signal([
+  { id: id++, text: "Check out Ornament", done: true },
+  { id: id++, text: "Ditch legacy frameworks", done: false },
+  { id: id++, text: "Use the platform", done: false },
+]);
+
+const filteredItems = computed(() =>
+  allItems.value.filter((item) => {
+    if (item.done && filter.value === "open") {
+      return false;
+    }
+    if (!item.done && filter.value === "done") {
+      return false;
+    }
+    return true;
+  }),
+);
+
+// Events that can lead to state changes. Components dispatch the events, they
+// bubble up to the app-
 const NewItemEvent = createEventClass("todonew");
 const DeleteItemEvent = createEventClass("tododelete");
 const DoneItemEvent = createEventClass("tododone");
@@ -114,7 +132,7 @@ class TodoInput extends BaseComponent {
     }
   }
 
-  // User submitting something via button click
+  // User submitting something via button click... you get the idea.
   @handle("click", "button")
   #handleSend() {
     if (this.#submittable) {
@@ -146,8 +164,7 @@ class TodoItem extends BaseComponent {
   @attr(bool()) accessor done = false;
 
   get css() {
-    return `
-:host([done]) { text-decoration: line-through }`;
+    return `:host([done]) { text-decoration: line-through }`;
   }
 
   @handle("change", "input")
@@ -177,7 +194,7 @@ class TodoItem extends BaseComponent {
 }
 
 // The actual list of todo items. For some reason eslint does not like the
-// template.
+// template string.
 @define("todo-list")
 class TodoList extends BaseComponent {
   @attr(json()) accessor items = [];
@@ -244,14 +261,36 @@ class TodoFilter extends BaseComponent {
   }
 }
 
+// The root UI component that ties all other UI components together. A state
+// container can wrap this component and pass the actual data (taken from
+// signals in this example) as attributes.
+@define("todo-app")
+class TodoApp extends BaseComponent {
+  // Expressing data as giant JSON strings is a bit silly, so this component
+  // takes its data as plain objects in IDL properties, rather than as content
+  // attributes.
+  @prop(json()) accessor allItems = [];
+  @prop(json()) accessor filteredItems = [];
+
+  @reactive()
+  #update() {
+    this.render(this.html`
+      <todo-input></todo-input>
+      <todo-list .items=${filteredItems.value}></todo-list>
+      <todo-stats .items=${allItems.value}></todo-stats>
+      <todo-filter></todo-filter>
+    `);
+  }
+}
+
 // The root component. I call components like this "applets", because they don't
 // really behave like the ideal "web component" at all: they are not
 // particularly reusable because they talk to the state stores, they don't have
 // much in the way of attributes and they only exist to compose a bunch of
 // proper reusable web components (and maybe some HTML) into a useful slice of
 // the entire application.
-@define("todo-app")
-class TodoApp extends BaseComponent {
+@define("todo-applet")
+class TodoApplet extends BaseComponent {
   @handle("todonew")
   #handleNew(evt) {
     allItems.value = [...allItems.value, { id: id++, text: evt.text }];
@@ -285,16 +324,12 @@ class TodoApp extends BaseComponent {
   @subscribe(allItems)
   @subscribe(filteredItems)
   #update() {
-    this.render(this.html`
-      <div>
-        <todo-input></todo-input>
-        <todo-list .items=${filteredItems.value}></todo-list>
-        <todo-stats .items=${allItems.value}></todo-stats>
-        <todo-filter></todo-filter>
-      </div>
-    `);
+    this.render(
+      this
+        .html`<todo-app .allItems=${allItems.value} .filteredItems=${filteredItems.value}></todo-app>`,
+    );
   }
 }
 
 // Go!
-document.body.append(document.createElement("todo-app"));
+document.body.append(document.createElement("todo-applet"));

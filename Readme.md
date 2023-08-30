@@ -9,6 +9,8 @@ import { define, attr, string, number, reactive } from "@sirpepe/ornament";
 // Register the element with the specified tag name
 @define("my-greeter")
 class MyGreeter extends HTMLElement {
+  // No built-in rendering functionality. Shadow DOM or light DOM? Template
+  // library A, B, or C? Pick your own poison!
   #shadow = this.attachShadow({ mode: "open" });
 
   // Define content attributes alongside corresponding getter/setter pairs
@@ -51,7 +53,7 @@ class MyGreeter extends HTMLElement {
   constructor() {
     super(); // mandatory boilerplate
     let age = Number(this.getAttribute("age"));
-    if (Number.isNaN(age)) {
+    if (Number.isNaN(age)) { // Remember to keep NaN in check
       age = 0;
     }
     this.#age = 0;
@@ -63,13 +65,13 @@ class MyGreeter extends HTMLElement {
     this.#shadow.innerHTML = `Hello! My name is ${this.#name}, my age is ${this.#age}`;
   }
 
-  // DOM getter for the IDL property, required to make JS operations like
+  // DOM getter for the IDL attribute, required to make JS operations like
   // `console.log(el.name)` work
   get name() {
     return this.#name;
   }
 
-  // DOM setter for the IDL property with type checking and/or conversion *and*
+  // DOM setter for the IDL attribute with type checking and/or conversion *and*
   // attribute updates, required to make JS operations like `el.name = "Alice"`
   // work.
   set name(value) {
@@ -79,13 +81,13 @@ class MyGreeter extends HTMLElement {
     this.greet(); // Remember to run the method!
   }
 
-  // DOM getter for the IDL property, required to make JS operations like
+  // DOM getter for the IDL attribute, required to make JS operations like
   // `console.log(el.age)` work
   get age() {
     return this.#age;
   }
 
-  // DOM setter for the IDL property with type checking and/or conversion *and*
+  // DOM setter for the IDL attribute with type checking and/or conversion *and*
   // attribute updates, required to make JS operations like `el.age = 42` work.
   set age(value) {
     value = Number(value); // Remember to convert/check the type!
@@ -98,7 +100,7 @@ class MyGreeter extends HTMLElement {
   }
 
   // Attribute change handling, required to make JS operations like
-  // `el.setAttribute("name", "Bob")` update the internal element state
+  // `el.setAttribute("name", "Bob")` update the internal element state.
   attributeChangedCallback(name, oldValue, newValue) {
     // Because `#name` is a string, and attribute values are always strings as
     // well we don't need to convert the types at this stage, but we still need
@@ -136,22 +138,26 @@ window.customElements.define("my-greeter", MyGreeter);
 
 Ornament aims to make the most tedious bits of building vanilla web components
 (attribute handling and reactions to attribute handling) easy. This makes
-full-blown framework either superfluous or easy to build on top of Ornament when
-required. Ornament uses
-[the latest ECMAScript Decorators API](https://2ality.com/2022/10/javascript-decorators.html)
-as supported by [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
-(with option `version` set to `""2023-05""`) and
-[TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
-(with the option `experimentalDecorators` turned *off*).
+full-blown framework either superfluous or easy to build on top of Ornament.
 
 ## Guide
+
+### Installation
+
+Install [@sirpepe/ornament](https://www.npmjs.com/package/@sirpepe/ornament)
+with your favorite package manager. To get the decorator syntax working, you
+will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
+(with option `version` set to `""2023-05""`) or
+[TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
+(with the option `experimentalDecorators` turned *off*).
 
 ### General philosophy
 
 The native APIs for web components are verbose and imperative, but lend
-themselves to quite a bit of streamlining. And a bit of streamlining the native
-APIs is the entire goal here. Ornament is **decidedly *not* a framework** but
-instead aims to be:
+themselves to quite a bit of streamlining with
+[the upcoming syntax for ECMAScript Decorators](https://2ality.com/2022/10/javascript-decorators.html).
+And a bit of streamlining the native APIs is the entire goal here. Ornament is
+**decidedly *not* a framework** but instead aims to be:
 
 - tiny
 - dependency-free
@@ -167,6 +173,30 @@ replace with hand-written logic, your own decorators, or a future replacement
 for Ornament. Ornaments decorators co-exist with eg. regular attribute change
 handling logic just fine. Ornament still wants you to have full control over
 your components' behavior, just with less *mandatory* boilerplate.
+
+### Exit strategy
+
+Every good library should come with an exit strategy as well as install
+instructions. Here is how you can get rid of Ornament if you want to migrate
+away:
+
+- Components built with Ornament will generally turn out to be very close to
+  vanilla web components, so **they will most probably just keep working** when
+  used with other frameworks/libraries. You can theoretically just keep your
+  components and replace them only when the need for change arises. A
+  compatibility wrapper for frameworks that are not quite friendly to web
+  components (eg. React) may be required.
+- If you want to replace Ornament with hand-written logic, you can
+  **replace all attribute and update handling piecemeal.** Ornament's decorators
+  co-exist with native `attributeChangedCallback()` and friends just fine.
+- Much of your migration will depend on **how you build on top of Ornament.**
+  You should keep reusable components and app-specific state containers
+  separate, just as you would do in React. This will make maintenance and
+  eventual migration much easier.
+
+In general, migrating away should not be too problematic. The components that
+you will build with Ornament will naturally tend to be self-contained and
+universal, and will therefore more or less always keep chugging along.
 
 ### Some assembly required
 
@@ -1254,6 +1284,30 @@ Note that the function that `@subscribe` takes to access event targets can *not*
 access a classes private fields. The shadow root has therefore to be publicly
 accessible (unless you want to mess around with WeakMaps storing ShadowRoots
 indexed by element instances or something similar).
+
+Also note that not all events bubble, so you might want to use event capturing
+instead:
+
+```javascript
+import { define, subscribe } from "@sirpepe/ornament";
+
+// This can now handle all events from the shadow root
+const capture = (eventName, selector) =>
+  subscribe(
+    function () {
+      return this.root;
+    },
+    eventName,
+    {
+      predicate: (evt) => evt.target.matches(selector),
+      capture: true,
+    }
+  );
+```
+
+Also also note that only composed events propagate through shadow boundaries,
+which may become important if you want to nest components with shadow dom and
+also want to use event delegation
 
 ### Custom defaults
 
