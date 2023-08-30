@@ -3,7 +3,7 @@
     "allowSyntheticDefaultImports": true,
     "moduleResolution": "nodenext",
     "target": "esnext",
-    "module": "esnext",
+    "module": "nodenext",
     "outDir": "dist",
     "strict": true
   },

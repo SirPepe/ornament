@@ -1,6 +1,6 @@
 {
   "name": "@sirpepe/ornament",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "Micro-library for building vanilla web components",
   "type": "module",
   "main": "dist/esm/index.js",
@@ -9,10 +9,10 @@
   "scripts": {
     "lint": "eslint --ext .ts src",
     "test": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve",
-    "build": "clear && npm run lint && rollup -c rollup.config.mjs && npm run size",
+    "build": "npm run lint && rollup -c rollup.config.mjs && npm run size",
     "build-examples": "cd examples && rollup -c rollup.config.mjs",
     "types": "tsc -p tsconfig.build.json",
-    "prepareRelease": "rm -rf dist && npm run types && npm run lint && npm run test && npm run build",
+    "prepareRelease": "rm -rf dist && npm run types && npm run lint && npm run test && npm run build && npm run build-examples",
     "size": "gzip -c dist/min/index.min.js | wc -c | numfmt --to iec --format '%8.4f'",
     "release": "npm run prepareRelease && release-it"
   },
