@@ -24,16 +24,23 @@ export default [
       file: "dist/esm/index.js",
       format: "esm",
     },
-    external: ["zod"],
     ...commonConfig,
   },
   {
     input: "src/index.ts",
     output: {
       file: "dist/min/index.min.js",
-      format: "umd",
+      format: "iife",
       name: "Ornament",
-      plugins: [terser()],
+      plugins: [
+        terser({
+          compress: {
+            passes: 3,
+            unsafe_arrows: true,
+            booleans_as_integers: true,
+          },
+        }),
+      ],
     },
     ...commonConfig,
   },

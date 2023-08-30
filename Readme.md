@@ -156,7 +156,7 @@ instead aims to be:
 - tiny
 - dependency-free
 - treeshake-friendly
-- equipped with useful type definitions
+- equipped with useful type definitions (and work within the constraints of TypeScript)
 - adherent to (the spirit of) web standards
 - easy to extend
 - easy to get rid of
@@ -190,7 +190,7 @@ the above features. I would recommend that you:
 
 This gets you 90% of the features of a frontend-framework without tying you down
 on any specific architecture, feature set, or general approach to web
-components.
+components. Check out `main.js` in `examples/todo-list/src` for an example!
 
 ### Component registration
 
@@ -496,7 +496,7 @@ testEl.remove();
 [signals](https://github.com/preactjs/signals), depending on the arguments. The
 subscriptions activate when an element's constructor completes.
 
-#### `@subscribe(target, eventName, predicate?)`
+#### `@subscribe(targetOrTargetFactory, eventName, predicate?)`
 
 Subscribe to an EventTarget. EventTarget is an interface that objects such as
 HTMLElement, Window, Document and *many* more objects implement. You can also
@@ -573,17 +573,13 @@ class Test extends HTMLElement {
 }
 ```
 
-The Target-producing factory can be used to work around the fact that Ornament's
-decorators (which are actually decorator-producing functions) run when the
-*class declaration* is evaluated. At this point in time, the event targets we
-want to subscribe to may not yet be available. The Target-producing factory runs
-*after* the classes' constructor has finished and get called with its `this`
-set to the element instance. This makes (non-private) class fields available
-for setting up event targets.
+The Target-producing factory can be used to access targets that depend on the
+element instance, such as the element's shadow root. The factory function gets
+called each time an element initializes, with `this` set to the instance.
 
 ##### Options for `@subscribe()` for EventTarget
 
-- **`targetOrTargetFactory` (EventTarget)**: The event target (or event-target-returning function) to subscribe to
+- **`targetOrTargetFactory` (EventTarget | (this: T) => EventTarget)**: The event target (or event-target-returning function) to subscribe to
 - **`eventName` (string)**: The event name to listen to
 - **`predicate` (function, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the event object and must return a boolean
 
@@ -1015,7 +1011,8 @@ Content attribute values are parsed with `JSON.parse()`. Invalid JSON is
 represented with the data used to initialize the accessor. Using the IDL
 attribute's setter with inputs than can't be serialized with JSON.`stringify()`
 throws errors. This transformer is really just a wrapper around `JSON.parse()`
-and `JSON.stringify()` without any object validation.
+and `JSON.stringify()` without any object validation. Two values are considered
+equal when their JSON representations equal.
 
 **Note for TypeScript:** Even though the transformer will accept literally any
 value at runtime, TS may infer a more restrictive type from the accessor's
@@ -1189,7 +1186,7 @@ import { define, subscribe } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
-  @subscribe(document.documentElement, "input", (evt) => evt.target.matches("input[type-number]"))
+  @subscribe(document.documentElement, "input", (evt) => evt.target.matches("input[type=number]"))
   log(evt) {
     console.log(evt); // "input" events
   }
@@ -1239,12 +1236,19 @@ const handle = (eventName, selector) =>
 
 @define("my-test")
 class Test extends HTMLElement {
+  root = this.attachShadow({ mode: "open" });
+
   @handle("input", "input[type-number]") // Much better!
   log(evt) {
     console.log(evt); // "input" events
   }
 }
 ```
+
+Note that the function that `@subscribe` takes to access event targets can *not*
+access a classes private fields. The shadow root has therefore to be publicly
+accessible (unless you want to mess around with WeakMaps storing ShadowRoots
+indexed by element instances or something similar).
 
 ### Custom defaults
 
