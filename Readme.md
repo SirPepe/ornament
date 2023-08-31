@@ -1394,7 +1394,7 @@ let nullableString = {
 
 @define("my-test")
 class Test extends HTMLElement {
-  @attr(nonnegativeNumber())
-  accessor foo = 42;
+  @attr(nullableString())
+  accessor foo = "Hello";
 }
 ```
