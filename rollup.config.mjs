@@ -30,7 +30,7 @@ export default [
     input: "src/index.ts",
     output: {
       file: "dist/min/index.min.js",
-      format: "iife",
+      format: "umd",
       name: "Ornament",
       plugins: [
         terser({
