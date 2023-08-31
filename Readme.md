@@ -1363,7 +1363,7 @@ class Test extends HTMLElement {
 import { define, attr, number } from "@sirpepe/ornament";
 
 function nonnegativeNumber(otherOptions) {
-  return number({ ...otherOptions, min: 0 })
+  return number({ ...otherOptions, min: 0 });
 }
 
 @define("my-test")
@@ -1388,8 +1388,8 @@ let nullableString = {
       return value;
     }
     return String(value);
-  }
-}
+  },
+};
 
 @define("my-test")
 class Test extends HTMLElement {
