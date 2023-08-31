@@ -3,9 +3,9 @@
   "version": "0.0.2",
   "description": "Micro-library for building vanilla web components",
   "type": "module",
-  "main": "./dist/esm/index.js",
-  "browser": "./dist/min/index.min.js",
-  "types": "./dist/types",
+  "main": "dist/esm/index.js",
+  "browser": "dist/min/index.min.js",
+  "types": "dist/types",
   "exports": {
     ".": {
       "require": "./dist/min/index.min.js",
