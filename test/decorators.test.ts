@@ -249,6 +249,28 @@ describe("Decorators", () => {
       expect(fn.getCalls()[0].args).to.eql([3, el]);
     });
 
+    test("debouncing private class field functions", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) }) #test = (x: number) => {
+          fn(x, this);
+          return x;
+        };
+        runTest() {
+          this.#test(1);
+          this.#test(2);
+          this.#test(3);
+        }
+      }
+      const el = new Test();
+      el.runTest();
+      await wait(100);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([3, el]);
+    });
+
     test("debouncing class methods", async () => {
       const fn = spy();
       @define(generateTagName())
@@ -266,6 +288,26 @@ describe("Decorators", () => {
       await wait(100);
       expect(fn.callCount).to.equal(1);
       expect(fn.getCalls()[0].args).to.eql([3, el]);
+    });
+
+    test("access to private fields", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        #foo = 42;
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) }) test(x: number): number {
+          fn(x, this.#foo, this);
+          return x;
+        }
+      }
+      const el = new Test();
+      el.test(1);
+      el.test(2);
+      el.test(3);
+      await wait(100);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([3, 42, el]);
     });
   });
 
@@ -577,7 +619,7 @@ describe("Decorators", () => {
       expect(fn.getCalls()[1].args).to.eql(["B", 42]);
     });
 
-    test("reject on static fields", async () => {
+    test("reject on static methods", async () => {
       expect(() => {
         class Test extends HTMLElement {
           // @ts-expect-error for testing runtime checks
@@ -810,6 +852,20 @@ describe("Decorators", () => {
       await wait(25);
       expect(fn.callCount).to.equal(2); // initial + one update
       expect(fn.getCalls()[1].args).to.eql(["D"]);
+    });
+  });
+
+  describe("Regressions", () => {
+    test.skip("co-existence on private fields does not blow up", async () => {
+      // This problem only manifests itself when @debounce is applied to a
+      // private field and a private method is decorated with @reactive
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) }) #a = () => {};
+        @reactive() #test() {}
+      }
+      new Test();
     });
   });
 });
