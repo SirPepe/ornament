@@ -1,6 +1,6 @@
 {
   "name": "@sirpepe/ornament",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Micro-library for building vanilla web components",
   "type": "module",
   "main": "dist/esm/index.js",
@@ -30,8 +30,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com//SirPepe/ornament.git"
+    "url": "https://github.com/SirPepe/ornament.git"
   },
+  "bugs": {
+    "url": "https://github.com/SirPepe/ornament/issues"
+  },
+  "homepage": "https://github.com/SirPepe/ornament#readme",
   "author": "peter@peterkroener.de",
   "license": "MIT",
   "devDependencies": {

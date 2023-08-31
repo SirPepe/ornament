@@ -147,7 +147,7 @@ full-blown framework either superfluous or easy to build on top of Ornament.
 Install [@sirpepe/ornament](https://www.npmjs.com/package/@sirpepe/ornament)
 with your favorite package manager. To get the decorator syntax working, you
 will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
-(with option `version` set to `""2023-05""`) or
+(with option `version` set to `"2023-05"`) or
 [TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
 (with the option `experimentalDecorators` turned *off*).
 
@@ -720,7 +720,6 @@ side effects.
 | `number()`        | `number`            | ✕        | `min`, `max`          |
 | `int()`           | `bigint`            | ✕        | `min`, `max`          |
 | `json()`          | JSON serializable   | ✕        | `reviver`, `replacer` |
-| `schema()`        | JSON serializable   | ✕        | `reviver`, `replacer` |
 | `literal()`       | Any                 | ✓        | `values`, `transform` |
 | `event()`         | `function`          | ✓        |                       |
 
