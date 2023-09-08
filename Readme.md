@@ -309,9 +309,7 @@ for something else, or combine any of the above with hand-written logic.
 
 **Class decorator** to register a class as a custom element. This also sets up
 attribute observation for use with the [@attr()](#attrtransformer-options)
-decorator and installs an automatic
-[string tag getter](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/toStringTag)
-(unless your component has its own string tag getter).
+decorator.
 
 ```javascript
 import { define } from "@sirpepe/ornament";
@@ -319,8 +317,7 @@ import { define } from "@sirpepe/ornament";
 @define("my-test")
 class MyTest extends HTMLElement {}
 
-console.log(document.createElement("my-test").toString());
-// > "[object HTMLMyTestElement]"
+console.log(document.createElement("my-test")); // instance of MyTest
 ```
 
 **Note for TypeScript:** you should add your custom element's interface to

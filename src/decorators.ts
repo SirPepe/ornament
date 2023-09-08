@@ -134,10 +134,6 @@ export function define<T extends CustomElementConstructor>(
       target.prototype.attributeChangedCallback;
     const originalConnectedCallback = target.prototype.connectedCallback;
     const originalDisconnectedCallback = target.prototype.disconnectedCallback;
-    const originalToStringTag = Object.getOwnPropertyDescriptor(
-      target.prototype,
-      Symbol.toStringTag,
-    );
 
     // Installs the mixin class. This kindof changes the type of the input
     // constructor T, but as TypeScript can currently not use class decorators
@@ -158,20 +154,6 @@ export function define<T extends CustomElementConstructor>(
         // Mark the end of the constructor and the initial reactive calls,
         // allow the element to receive reactivity events.
         REACTIVE_READY.add(this);
-      }
-
-      // Automatic string tag, unless the base class provides an implementation
-      get [Symbol.toStringTag](): string {
-        if (originalToStringTag && originalToStringTag.get) {
-          return originalToStringTag.get.call(this);
-        }
-        const stringTag = this.tagName
-          .split("-")
-          .map(
-            (str) => str.slice(0, 1).toUpperCase() + str.slice(1).toLowerCase(),
-          )
-          .join("");
-        return "HTML" + stringTag + "Element";
       }
 
       static get observedAttributes(): string[] {
