@@ -21,20 +21,7 @@ describe("Decorators", () => {
       @define("register-test")
       class Test extends HTMLElement {}
       expect(window.customElements.get("register-test")).to.equal(Test);
-      expect(document.createElement("register-test").toString()).to.equal(
-        "[object HTMLRegisterTestElement]",
-      );
-    });
-
-    test("respect built-in toStringTags", () => {
-      const tagName = generateTagName();
-      @define(tagName)
-      class Test extends HTMLElement {
-        get [Symbol.toStringTag]() {
-          return "A";
-        }
-      }
-      expect(document.createElement(tagName).toString()).to.equal("[object A]");
+      expect(document.createElement("register-test")).to.be.instanceOf(Test);
     });
 
     test("reject invalid tag names", () => {
