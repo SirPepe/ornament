@@ -1,10 +1,11 @@
 {
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "nodenext",
+    "moduleResolution": "bundler",
     "target": "esnext",
-    "module": "nodenext",
+    "module": "esnext",
     "outDir": "dist",
+    "rootDir": "./",
     "strict": true
   },
   "include": [

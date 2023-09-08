@@ -5,11 +5,17 @@
   "type": "module",
   "main": "dist/esm/index.js",
   "browser": "dist/min/index.min.js",
-  "types": "dist/types",
+  "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
-      "require": "./dist/min/index.min.js",
-      "default": "./dist/esm/index.js"
+      "require": {
+        "default": "./dist/min/index.min.js",
+        "types": "./dist/types/index.d.ts"
+      },
+      "default": {
+        "default": "./dist/esm/index.js",
+        "types": "./dist/types/index.d.ts"
+      }
     }
   },
   "scripts": {
@@ -58,14 +64,12 @@
     "eslint": "^8.41.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
-    "install": "^0.13.0",
-    "npm": "^9.7.1",
     "prettier": "^3.0.0",
     "release-it": "^16.0.0",
     "rollup": "^3.25.1",
     "sinon": "^15.2.0",
     "typescript": "^5.0.4",
-    "uhtml": "^3.2.1",
+    "uhtml": "^3.2.2",
     "zod": "^3.21.4"
   }
 }
