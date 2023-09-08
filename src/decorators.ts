@@ -1,4 +1,4 @@
-import { Nil } from "./lib.js";
+import { MetaMap, Nil, identity } from "./lib.js";
 import {
   type ClassAccessorDecorator,
   type FunctionFieldOrMethodDecorator,
@@ -8,9 +8,17 @@ import {
   assertContext,
 } from "./types.js";
 
-const REACT_EVENT_NAME = "_o-react";
+class ReactivityEvent extends Event {
+  readonly key: string | symbol;
+  constructor(key: string | symbol) {
+    super("");
+    this.key = key;
+  }
+}
 
-const identity = <T>(x: T) => x;
+const eventTargetMap = new MetaMap<HTMLElement, EventTarget>(
+  () => new EventTarget(),
+);
 
 function withDefaults<T extends HTMLElement, V>(
   source: Transformer<T, V>,
@@ -39,9 +47,9 @@ const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 // non-existence of decorator metadata as of Q3 2023.
 type Callbacks = Record<string | symbol, (this: HTMLElement) => void>;
 const callbackSources = {
-  init: new WeakMap<CustomElementConstructor, Callbacks>(),
-  connect: new WeakMap<CustomElementConstructor, Callbacks>(),
-  disconnect: new WeakMap<CustomElementConstructor, Callbacks>(),
+  init: new MetaMap<CustomElementConstructor, Callbacks>(Object),
+  connect: new MetaMap<CustomElementConstructor, Callbacks>(Object),
+  disconnect: new MetaMap<CustomElementConstructor, Callbacks>(Object),
 };
 
 function setCallback(
@@ -50,12 +58,7 @@ function setCallback(
   name: string | symbol,
   callback: () => void,
 ): void {
-  const source = callbackSources[on];
-  const callbacks = source.get(instance.constructor);
-  if (!callbacks) {
-    source.set(instance.constructor, { [name]: callback });
-    return;
-  }
+  const callbacks = callbackSources[on].get(instance.constructor);
   if (!callbacks[name]) {
     callbacks[name] = callback;
   }
@@ -66,7 +69,7 @@ function getCallbacks(
   on: keyof typeof callbackSources,
 ): (() => void)[] {
   const callbacks = callbackSources[on].get(instance.constructor);
-  return Object.values(callbacks ?? []);
+  return Object.values(callbacks);
 }
 
 // Maps attributes to attribute observer callbacks mapped by custom element
@@ -78,7 +81,9 @@ type ObserverCallback = (
   newValue: string | null,
 ) => void;
 type ObserverMap = Record<string, ObserverCallback>; // attr name -> cb
-const observerCallbacks = new WeakMap<CustomElementConstructor, ObserverMap>();
+const observerCallbacks = new MetaMap<CustomElementConstructor, ObserverMap>(
+  Object,
+);
 
 function setObserver(
   instance: any,
@@ -86,10 +91,6 @@ function setObserver(
   callback: ObserverCallback,
 ): void {
   const callbacks = observerCallbacks.get(instance.constructor);
-  if (!callbacks) {
-    observerCallbacks.set(instance.constructor, { [attribute]: callback });
-    return;
-  }
   if (!callbacks[attribute]) {
     callbacks[attribute] = callback;
   }
@@ -110,21 +111,6 @@ const REACTIVE_READY = new WeakSet<HTMLElement>();
 // Maps debounced methods to original methods. Needed for initial calls of
 // @reactive() methods, which are not supposed to be async.
 const DEBOUNCED_METHOD_MAP = new WeakMap<Method<any, any>, Method<any, any>>();
-
-// Reactivity notifications for @reactive
-class ReactivityEvent extends Event {
-  readonly key: string | symbol;
-  constructor(key: string | symbol) {
-    super(REACT_EVENT_NAME);
-    this.key = key;
-  }
-}
-
-declare global {
-  interface ElementEventMap {
-    "_o-react": ReactivityEvent;
-  }
-}
 
 // The class decorator @define() defines a custom element and also injects a
 // mixin class that hat deals with attribute observation and reactive
@@ -148,10 +134,6 @@ export function define<T extends CustomElementConstructor>(
       target.prototype.attributeChangedCallback;
     const originalConnectedCallback = target.prototype.connectedCallback;
     const originalDisconnectedCallback = target.prototype.disconnectedCallback;
-    const originalToStringTag = Object.getOwnPropertyDescriptor(
-      target.prototype,
-      Symbol.toStringTag,
-    );
 
     // Installs the mixin class. This kindof changes the type of the input
     // constructor T, but as TypeScript can currently not use class decorators
@@ -172,20 +154,6 @@ export function define<T extends CustomElementConstructor>(
         // Mark the end of the constructor and the initial reactive calls,
         // allow the element to receive reactivity events.
         REACTIVE_READY.add(this);
-      }
-
-      // Automatic string tag, unless the base class provides an implementation
-      get [Symbol.toStringTag](): string {
-        if (originalToStringTag && originalToStringTag.get) {
-          return originalToStringTag.get.call(this);
-        }
-        const stringTag = this.tagName
-          .split("-")
-          .map(
-            (str) => str.slice(0, 1).toUpperCase() + str.slice(1).toLowerCase(),
-          )
-          .join("");
-        return "HTML" + stringTag + "Element";
       }
 
       static get observedAttributes(): string[] {
@@ -256,14 +224,16 @@ export function reactive<T extends HTMLElement>(
         setCallback(this, "init", context.name, method);
       }
       // Start listening for reactivity events that happen after reactive init
-      this.addEventListener(REACT_EVENT_NAME, (evt) => {
-        if (
-          REACTIVE_READY.has(this) &&
-          (!options.keys || options.keys?.includes(evt.key))
-        ) {
-          value.call(this);
-        }
-      });
+      eventTargetMap
+        .get(this)
+        .addEventListener("", (evt: any /*ReactivityEvent*/) => {
+          if (
+            REACTIVE_READY.has(this) &&
+            (!options.keys || options.keys?.includes(evt.key))
+          ) {
+            value.call(this);
+          }
+        });
     });
   };
 }
@@ -511,7 +481,9 @@ export function attr<T extends HTMLElement, V>(
           }
           newValue = transformer.set.call(this, newValue, newAttrVal, context);
           target.set.call(this, newValue);
-          this.dispatchEvent(new ReactivityEvent(context.name));
+          eventTargetMap
+            .get(this)
+            .dispatchEvent(new ReactivityEvent(context.name));
         };
         setObserver(this, attrName, attributeChangedCallback);
       });
@@ -555,7 +527,9 @@ export function attr<T extends HTMLElement, V>(
             );
           }
         }
-        this.dispatchEvent(new ReactivityEvent(context.name));
+        eventTargetMap
+          .get(this)
+          .dispatchEvent(new ReactivityEvent(context.name));
       },
       get() {
         return transformer.get.call(this, target.get.call(this), context);
@@ -586,7 +560,9 @@ export function prop<T extends HTMLElement, V>(
         }
         newValue = set.call(this, newValue, Nil, context);
         target.set.call(this, newValue);
-        this.dispatchEvent(new ReactivityEvent(context.name));
+        eventTargetMap
+          .get(this)
+          .dispatchEvent(new ReactivityEvent(context.name));
       },
       get() {
         return get.call(this, target.get.call(this), context);
