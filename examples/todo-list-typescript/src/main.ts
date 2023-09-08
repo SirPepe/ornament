@@ -15,12 +15,20 @@ import {
 import { signal, computed } from "@preact/signals-core";
 import { render, html, type Renderable } from "uhtml";
 
+function fail(): never {
+  throw new Error("This should never happen");
+}
+
+const shadowRoots = new WeakMap<HTMLElement, ShadowRoot>();
+
 // Custom base class to provide some common functionality, in this case
-// rendering to shadow DOM with uhtml.
+// rendering to shadow DOM with uhtml. For extra fun, let's make the shadow root
+// private and closed. But i can't use #private, because we need to access it in
+// the target factory in @subscribe... Weak Map it is!
 class BaseComponent extends HTMLElement {
   constructor() {
     super();
-    this.attachShadow({ mode: "open" });
+    shadowRoots.set(this, this.attachShadow({ mode: "closed" }));
   }
 
   // Wraps uhtml's render() function to make it available to every subclass
@@ -32,7 +40,7 @@ class BaseComponent extends HTMLElement {
   // Essentially wraps uhtml's render() function. If the class has a `css`
   // property, its contents is added in a style tag next to the actual content.
   render(content: Renderable) {
-    const root = this.shadowRoot as ShadowRoot;
+    const root = shadowRoots.get(this) ?? fail();
     if ("css" in this) {
       return render(root, this.html`${content}<style>${this.css}</style>`);
     }
@@ -44,29 +52,24 @@ class BaseComponent extends HTMLElement {
 // event delegation in shadow roots. To make this palatable, the following
 // decorator (which is just a wrapper around @subscribe) has been cribbed from
 // the readme.
-const handle = (eventName, selector = "*") =>
+const capture = (eventName: string, selector = "*") =>
   subscribe(
-    function () {
-      // this works because all shadow roots in this project are open, see base
-      // class.
-      return this.shadowRoot;
+    function (this: HTMLElement) {
+      return shadowRoots.get(this) ?? fail();
     },
     eventName,
-    { predicate: (evt) => evt.target.matches(selector) },
+    {
+      predicate: (evt) =>
+        evt.target instanceof HTMLElement && evt.target.matches(selector),
+    },
   );
 
-// We need a whole lot of events for this application, so we better build a
-// small factory to save on boilerplate!
-function createEventClass<A extends Record<string | symbol, any>>(
-  name: string,
-): new (args: A) => Event & A {
-  class EventClass extends Event implements A {
-    constructor(args: A) {
-      super(name, { bubbles: true, composed: true });
-      Object.assign(this, args); // ¯\_(ツ)_/¯
-    }
+// We need a whole lot of new events for this application, and they will all
+// have to bubble and be composed. So...
+class AppEvent extends Event {
+  constructor(name: string) {
+    super(name, { bubbles: true, composed: true });
   }
-  return EventClass;
 }
 
 // Everything above this line counts as the "framework" for the application, all
@@ -98,12 +101,32 @@ const filteredItems = computed(() =>
   }),
 );
 
-// Events that can lead to state changes. Components dispatch the events, they
-// bubble up to the app-
-const NewItemEvent = createEventClass("todonew");
-const DeleteItemEvent = createEventClass("tododelete");
-const DoneItemEvent = createEventClass("tododone");
-const FilterChangeEvent = createEventClass("filterchange");
+// App-specific events that can lead to state changes.
+class NewItemEvent extends AppEvent {
+  readonly text: string;
+  constructor(text: string) {
+    super("todonew");
+    this.text = text;
+  }
+}
+
+class DeleteItemEvent extends AppEvent {
+  constructor() {
+    super("tododelete");
+  }
+}
+
+class DoneItemEvent extends AppEvent {
+  constructor() {
+    super("tododone");
+  }
+}
+
+class FilterChangeEvent extends AppEvent {
+  constructor() {
+    super("filterchange");
+  }
+}
 
 // Input element plus submit button for new todo items
 @define("todo-input")
@@ -117,9 +140,9 @@ class TodoInput extends BaseComponent {
   @prop(bool()) accessor #submittable = false;
 
   // User typing something
-  @handle("input")
-  #handleInput(evt) {
-    this.#text = evt.target.value;
+  @capture("input")
+  #handleInput(evt: InputEvent) {
+    this.#text = evt.target?.value;
     this.#submittable = this.#text !== "";
   }
 
@@ -132,10 +155,10 @@ class TodoInput extends BaseComponent {
   }
 
   // User submitting something via button click... you get the idea.
-  @handle("click", "button")
+  @capture("click", "button")
   #handleSend() {
     if (this.#submittable) {
-      this.dispatchEvent(new NewItemEvent({ text: this.#text }));
+      this.dispatchEvent(new NewItemEvent(this.#text));
       this.shadowRoot.querySelector("input").value = ""; // ¯\_(ツ)_/¯
     }
   }
