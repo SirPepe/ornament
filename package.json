@@ -1,6 +1,6 @@
 {
   "name": "@sirpepe/ornament",
-  "version": "0.0.4",
+  "version": "0.0.6",
   "description": "Micro-library for building vanilla web components",
   "type": "module",
   "main": "dist/esm/index.js",
@@ -8,14 +8,9 @@
   "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
-      "require": {
-        "default": "./dist/min/index.min.js",
-        "types": "./dist/types/index.d.ts"
-      },
-      "default": {
-        "default": "./dist/esm/index.js",
-        "types": "./dist/types/index.d.ts"
-      }
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/esm/index.js",
+      "require": "./dist/min/index.min.js"
     }
   },
   "scripts": {
@@ -64,10 +59,11 @@
     "eslint": "^8.41.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
+    "install": "^0.13.0",
     "prettier": "^3.0.0",
     "release-it": "^16.0.0",
     "rollup": "^3.25.1",
-    "sinon": "^15.2.0",
+    "sinon": "^16.0.0",
     "typescript": "^5.0.4",
     "uhtml": "^3.2.2",
     "zod": "^3.21.4"
