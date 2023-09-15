@@ -59,11 +59,10 @@
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
     "install": "^0.13.0",
-    "npm": "^9.7.1",
     "prettier": "^3.0.0",
     "release-it": "^16.0.0",
     "rollup": "^3.25.1",
-    "sinon": "^15.2.0",
+    "sinon": "^16.0.0",
     "typescript": "^5.0.4",
     "uhtml": "^3.2.1",
     "zod": "^3.21.4"
