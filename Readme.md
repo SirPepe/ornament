@@ -191,7 +191,7 @@ away:
   co-exist with native `attributeChangedCallback()` and friends just fine.
 - Much of your migration will depend on **how you build on top of Ornament.**
   You should keep reusable components and app-specific state containers
-  separate, just as you would do in React. This will make maintenance and
+  separate, just as you would do in e.g. React. This will make maintenance and
   eventual migration much easier.
 
 In general, migrating away should not be too problematic. The components that
