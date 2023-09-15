@@ -5,7 +5,6 @@
     "target": "esnext",
     "module": "esnext",
     "outDir": "dist",
-    "rootDir": "./",
     "strict": true
   },
   "include": [
