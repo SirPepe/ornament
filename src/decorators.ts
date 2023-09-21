@@ -199,9 +199,10 @@ export function define<T extends CustomElementConstructor>(
   };
 }
 
-type ReactiveOptions = {
+type ReactiveOptions<T> = {
   initial?: boolean;
   keys?: (string | symbol)[];
+  predicate?: (this: T) => boolean;
 };
 
 type ReactiveDecorator<T extends HTMLElement> = (
@@ -211,24 +212,29 @@ type ReactiveDecorator<T extends HTMLElement> = (
 
 export function reactive<T extends HTMLElement>(
   this: unknown,
-  options: ReactiveOptions = {},
+  options: ReactiveOptions<T> = {},
 ): ReactiveDecorator<T> {
   const initial = options.initial ?? true;
   return function (_, context): void {
     assertContext(context, "@reactive", "method", { private: true });
     context.addInitializer(function () {
       const value = context.access.get(this);
-      // Register the callback that performs the initial method call
+      // Register the callback that performs the initial method call. Uses the
+      // non-debounced method if required and wraps it in predicate logic.
       if (initial) {
-        const method = DEBOUNCED_METHOD_MAP.get(value) ?? value;
-        setCallback(this, "init", context.name, method);
+        setCallback(this, "init", context.name, function (this: T) {
+          if (!options.predicate || options.predicate.call(this)) {
+            (DEBOUNCED_METHOD_MAP.get(value) ?? value).call(this);
+          }
+        });
       }
       // Start listening for reactivity events that happen after reactive init
       eventTargetMap
         .get(this)
-        .addEventListener("", (evt: any /*ReactivityEvent*/) => {
+        .addEventListener("", (evt: any /* ReactivityEvent */) => {
           if (
             REACTIVE_READY.has(this) &&
+            (!options.predicate || options.predicate.call(this)) &&
             (!options.keys || options.keys?.includes(evt.key))
           ) {
             value.call(this);

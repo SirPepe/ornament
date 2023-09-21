@@ -465,15 +465,26 @@ Reactive methods are called with no arguments. They react to changes to the
 instances' internal state and should therefore be able to access all relevant
 data through `this`.
 
-Unless the `initial` option is set to `false` the decorated method will run once
-the element's constructor finishes. In many cases you may want to apply
+Unless the `initial` option is set to `false` (provided `options.predicate` was
+omitted or returns `true`), the decorated method will run once upon the
+element's constructor finishing. In many cases you may want to apply
 `@reactive()` to methods decorated with [@debounce()](#reactiveoptions) to
 prevent excessive calls.
+
+The `predicate` and/or `keys` options can be used to control whether the
+function reacts to an update. For the function to run, the following needs to be
+true:
+
+1. `options.keys` must either have been omitted or must contain the IDL or
+   content attribute name that changed
+2. `options.predicate` must either have been omitted or must return true when
+   called immediately before the function is scheduled to run
 
 #### Options for `@reactive()`
 
 - **`initial` (boolean, optional)**: Whether or not to run the function when the element's constructor finishes, before any actual changes to any decorated accessor. Defaults to `true`
 - **`keys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) to monitor. Can include private names and symbols. Defaults to monitoring all content and IDL attributes defined by `@prop()` or `@attr()`.
+- **`predicate` (Function `(this: T) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change
 
 ### `@connected()`
 
@@ -609,7 +620,7 @@ called each time an element initializes, with `this` set to the instance.
 - **`targetOrTargetFactory` (EventTarget | (this: T) => EventTarget)**: The event target (or event-target-returning function) to subscribe to
 - **`eventName` (string)**: The event name to listen to
 - **`options` (object, optional)**: Event handling options, consisting of...
-  - **predicate (function, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the event object and must return a boolean
+  - **predicate (function `(this: T, event: Event) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the event object and must return a boolean
   - **capture (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
   - **once (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
   - **passive (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
@@ -648,7 +659,7 @@ to throw events around.
 
 - **`signal` (Signal)**: The signal to subscribe to
 - **`options` (object, optional)**: Update handling options, consisting of...
-  - **predicate (function, optional)**: If provided, controls whether or not the decorated method is called for a given signal update. Gets passed the signal's value and must return a boolean
+  - **predicate (function `(this: T, value) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given signal update. Gets passed the signal's value and must return a boolean
 
 ### `@debounce(options?)`
 

@@ -10,7 +10,7 @@ import {
   reactive,
   subscribe,
 } from "../src/decorators.js";
-import { href, json, string } from "../src/transformers.js";
+import { href, json, number, string } from "../src/transformers.js";
 import { generateTagName, wait } from "./helpers.js";
 import { signal } from "@preact/signals-core";
 const test = it;
@@ -487,6 +487,36 @@ describe("Decorators", () => {
       expect(fn.getCalls()[1].args).to.eql([[2]]);
     });
 
+    test("predicate option", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(number()) accessor value = 0;
+        @reactive({
+          initial: false,
+          predicate() {
+            return this.value % 2 === 0;
+          },
+        })
+        test() {
+          fn(this.value);
+        }
+      }
+      const el = new Test();
+      el.value++;
+      expect(fn.callCount).to.equal(0);
+      el.value++;
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([2]);
+      el.value++;
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([2]);
+      el.value++;
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[0].args).to.eql([2]);
+      expect(fn.getCalls()[1].args).to.eql([4]);
+    });
+
     test("keys option", async () => {
       const fnX = spy();
       const fnY = spy();
@@ -580,6 +610,29 @@ describe("Decorators", () => {
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
         @reactive({ initial: false }) test() {
+          fn(this.x);
+        }
+      }
+      const el = new Test();
+      el.x = "B";
+      expect(fn.callCount).to.equal(1); // one update
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
+    });
+
+    test("skip initial call when options.predicate returns false", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        value = false;
+        @prop(string()) accessor x = "A";
+        @reactive({
+          predicate() {
+            const result = this.value;
+            this.value = true;
+            return result;
+          },
+        })
+        test() {
           fn(this.x);
         }
       }
