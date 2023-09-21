@@ -55,6 +55,7 @@
     "@typescript-eslint/eslint-plugin": "^6.3.0",
     "@typescript-eslint/parser": "^6.3.0",
     "@web/dev-server-rollup": "^0.5.2",
+    "@web/test-runner-playwright": "^0.10.1",
     "@web/test-runner": "^0.17.0",
     "eslint": "^8.41.0",
     "eslint-config-prettier": "^9.0.0",
@@ -67,8 +68,5 @@
     "typescript": "^5.0.4",
     "uhtml": "^3.2.2",
     "zod": "^3.21.4"
-  },
-  "dependencies": {
-    "@web/test-runner-playwright": "^0.10.1"
   }
 }
