@@ -15,7 +15,7 @@
   },
   "scripts": {
     "lint": "eslint --ext .ts src",
-    "test": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve",
+    "test": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve --playwright --browsers chromium firefox",
     "build": "npm run lint && rollup -c rollup.config.mjs && npm run size",
     "build-examples": "cd examples && rollup -c rollup.config.mjs",
     "types": "rm -rf dist/types && tsc -p tsconfig.build.json",
@@ -67,5 +67,8 @@
     "typescript": "^5.0.4",
     "uhtml": "^3.2.2",
     "zod": "^3.21.4"
+  },
+  "dependencies": {
+    "@web/test-runner-playwright": "^0.10.1"
   }
 }
