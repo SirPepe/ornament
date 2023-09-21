@@ -46,8 +46,7 @@ class BaseComponent extends HTMLElement {
 
 // This application goes down the SPA rabbit hole and therefore has to deal with
 // event delegation in shadow roots. To make this palatable, the following
-// decorator (which is just a wrapper around @subscribe) has been cribbed from
-// the readme.
+// simple decorator is built around @subscribe().
 const handle = (eventName, selector = "*") =>
   subscribe(
     function () {
@@ -65,7 +64,7 @@ function createEventClass(name) {
   return class extends Event {
     constructor(args) {
       super(name, { bubbles: true, composed: true });
-      Object.assign(this, args); // ¯\_(ツ)_/¯
+      Object.assign(this, args); // ¯\_(ツ)_/¯ better than writing 9000 classes
     }
   };
 }
@@ -293,7 +292,10 @@ class TodoApp extends BaseComponent {
 class TodoApplet extends BaseComponent {
   @handle("todonew")
   #handleNew(evt) {
-    allItems.value = [...allItems.value, { id: id++, text: evt.text }];
+    allItems.value = [
+      ...allItems.value,
+      { id: id++, text: evt.text, done: false },
+    ];
   }
 
   @handle("tododone")
