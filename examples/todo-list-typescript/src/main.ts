@@ -13,74 +13,90 @@ import {
   subscribe,
 } from "@sirpepe/ornament";
 import { signal, computed } from "@preact/signals-core";
-import { render, html } from "uhtml";
+import { render, html, type Renderable } from "uhtml";
+
+function fail(): never {
+  throw new Error("This should never happen");
+}
+
+// For extra fun, let's make the shadow roots in the components of this example
+// private and closed. But we can't use private class fields, because we do need
+// to access the shadow roots in decorators... so let's go the weak map route!
+const shadowRoots = new WeakMap<HTMLElement, ShadowRoot>();
 
 // Custom base class to provide some common functionality, in this case
-// rendering to shadow DOM with uhtml This class could in theory contain even
-// more features, use an entirely different rendering library, render to light
-// DOM instead of shadow DOM, or do anything else really.
+// rendering to shadow DOM with uhtml. Apart from type annotations, this is the
+// same as the base class in the plain JS example.
 class BaseComponent extends HTMLElement {
   constructor() {
     super();
-    this.attachShadow({ mode: "open" });
+    shadowRoots.set(this, this.attachShadow({ mode: "closed" }));
   }
 
   // Wraps uhtml's render() function to make it available to every subclass
   // without importing extra libraries.
-  html(strings, ...values) {
-    return html(strings, ...values);
+  html(...args: Parameters<typeof html>): ReturnType<typeof html> {
+    return html(...args);
   }
 
   // Essentially wraps uhtml's render() function. If the class has a `css`
   // property, its contents is added in a style tag next to the actual content.
-  render(content) {
-    if (this.css) {
-      return render(
-        this.shadowRoot,
-        this.html`${content}<style>${this.css}</style>`,
-      );
+  render(content: Renderable) {
+    const root = shadowRoots.get(this) ?? fail();
+    if ("css" in this) {
+      return render(root, this.html`${content}<style>${this.css}</style>`);
     }
-    return render(this.shadowRoot, content);
+    return render(root, content);
   }
 }
 
 // This application goes down the SPA rabbit hole and therefore has to deal with
 // event delegation in shadow roots. To make this palatable, the following
-// simple decorator is built around @subscribe().
-const handle = (eventName, selector = "*") =>
-  subscribe(
-    function () {
-      // this works because all shadow roots in this project are open, see base
-      // class.
-      return this.shadowRoot;
+// decorator (which is just a wrapper around @subscribe) has been cribbed from
+// the readme.
+const capture = <T extends object, U extends HTMLElement, E extends Event>(
+  eventName: string,
+  selector = "*",
+) =>
+  subscribe<T, U, E>(
+    function (this: U) {
+      return shadowRoots.get(this) ?? fail();
     },
     eventName,
-    { predicate: (evt) => evt.target.matches(selector) },
+    {
+      predicate: (evt) =>
+        evt.target instanceof HTMLElement && evt.target.matches(selector),
+    },
   );
 
-// We need a whole lot of events for this application, so we better build a
-// small factory to save on boilerplate!
-function createEventClass(name) {
-  return class extends Event {
-    constructor(args) {
-      super(name, { bubbles: true, composed: true });
-      Object.assign(this, args); // ¯\_(ツ)_/¯ better than writing 9000 classes
-    }
-  };
+// We need a whole lot of new events for this application, and they will all
+// have to bubble and be composed. So...
+class AppEvent extends Event {
+  constructor(name: string) {
+    super(name, { bubbles: true, composed: true });
+  }
 }
 
 // Everything above this line counts as the "framework" for the application, all
 // that follows is state management and the actual component code that builds
 // on top of the framework and Ornament's decorators.
 
+type Item = {
+  id: number;
+  text: string;
+  done: boolean;
+};
+
+type Filter = "all" | "done" | "open";
+
 // Some signals to store the application state. As far as ornament is concerned,
 // this could also be implemented with Event Targets, bot those are way less
 // cool these days.
 let id = 0;
 
-const filter = signal("all"); // "all" | "done" | "open"
+const filter = signal<Filter>("all");
 
-const allItems = signal([
+const allItems = signal<Item[]>([
   { id: id++, text: "Check out Ornament", done: true },
   { id: id++, text: "Ditch legacy frameworks", done: false },
   { id: id++, text: "Use the platform", done: false },
@@ -98,45 +114,73 @@ const filteredItems = computed(() =>
   }),
 );
 
-// Events that can lead to state changes. Components dispatch the events, they
-// bubble up to the app-
-const NewItemEvent = createEventClass("todonew");
-const DeleteItemEvent = createEventClass("tododelete");
-const DoneItemEvent = createEventClass("tododone");
-const FilterChangeEvent = createEventClass("filterchange");
+// App-specific events that can lead to state changes.
+class NewItemEvent extends AppEvent {
+  readonly text: string;
+  constructor(text: string) {
+    super("todonew");
+    this.text = text;
+  }
+}
 
-// Input element plus submit button for new todo items
+class DeleteItemEvent extends AppEvent {
+  readonly id: number;
+  constructor(id: number) {
+    super("tododelete");
+    this.id = id;
+  }
+}
+
+class DoneItemEvent extends AppEvent {
+  readonly id: number;
+  constructor(id: number) {
+    super("tododone");
+    this.id = id;
+  }
+}
+
+class FilterChangeEvent extends AppEvent {
+  readonly value: Filter;
+  constructor(value: Filter) {
+    super("filterchange");
+    this.value = value;
+  }
+}
+
+// Input element plus submit button for new todo items. This class does not
+// actually create a proper new form element, but just wraps one and then throws
+// events around.
 @define("todo-input")
 class TodoInput extends BaseComponent {
-  // Tracks the current input value. Not reactive because there is no need for
-  // this to cause re-rendering (no "controlled inputs")
-  #text = "";
+  // Keeps a reference to the text input using react-style refs
+  #input: { current: null | HTMLInputElement } = { current: null };
 
   // Toggles whether or not the submit button is enabled. Reactive in order to
   // trigger re-renders on change.
   @prop(bool()) accessor #submittable = false;
 
   // User typing something
-  @handle("input")
-  #handleInput(evt) {
-    this.#text = evt.target.value;
-    this.#submittable = this.#text !== "";
+  @capture("input", "input")
+  #handleInput() {
+    if (this.#input.current) {
+      this.#submittable = this.#input.current.value !== "";
+    }
   }
 
   // User pressing enter
-  @handle("keydown", "input")
-  #handleEnter(evt) {
-    if (evt.keyCode === 13) {
+  @capture("keydown", "input")
+  #handleEnter(evt: KeyboardEvent) {
+    if (evt.code === "Enter") {
       this.#handleSend();
     }
   }
 
-  // User submitting something via button click... you get the idea.
-  @handle("click", "button")
+  // User submitting something via button click
+  @capture("click", "button")
   #handleSend() {
-    if (this.#submittable) {
-      this.dispatchEvent(new NewItemEvent({ text: this.#text }));
-      this.shadowRoot.querySelector("input").value = ""; // ¯\_(ツ)_/¯
+    if (this.#submittable && this.#input.current) {
+      this.dispatchEvent(new NewItemEvent(this.#input.current.value));
+      this.#input.current.value = "";
     }
   }
 
@@ -146,7 +190,10 @@ class TodoInput extends BaseComponent {
       this.html`
         <label>
           New item:
-          <input type="text" placeholder="What needs to be done?">
+          <input
+          type="text"
+            ref=${this.#input}
+            placeholder="What needs to be done?">
         </label>
         <button ?disabled=${!this.#submittable}>
           Add
@@ -166,17 +213,17 @@ class TodoItem extends BaseComponent {
     return `:host([done]) { text-decoration: line-through }`;
   }
 
-  @handle("change", "input")
+  @capture("change", "input")
   #handleToggle() {
     if (this.itemId !== -1) {
-      this.dispatchEvent(new DoneItemEvent({ id: this.itemId }));
+      this.dispatchEvent(new DoneItemEvent(this.itemId));
     }
   }
 
-  @handle("click", "button")
+  @capture("click", "button")
   #handleDelete() {
     if (this.itemId !== -1) {
-      this.dispatchEvent(new DeleteItemEvent({ id: this.itemId }));
+      this.dispatchEvent(new DeleteItemEvent(this.itemId));
     }
   }
 
@@ -224,7 +271,7 @@ ul { list-style: none; margin: 0; padding: 0 }`;
 
 @define("todo-stats")
 class TodoStats extends BaseComponent {
-  @attr(json()) accessor items = [];
+  @attr(json()) accessor items: Item[] = [];
 
   @reactive()
   #update() {
@@ -240,9 +287,16 @@ class TodoStats extends BaseComponent {
 
 @define("todo-filter")
 class TodoFilter extends BaseComponent {
-  @handle("change", "input")
-  #handleChange(evt) {
-    this.dispatchEvent(new FilterChangeEvent({ value: evt.target.value }));
+  @capture("change", "input")
+  #handleChange(evt: Event) {
+    if (
+      evt.target instanceof HTMLInputElement &&
+      (evt.target.value === "all" ||
+        evt.target.value === "done" ||
+        evt.target.value === "open")
+    ) {
+      this.dispatchEvent(new FilterChangeEvent(evt.target.value));
+    }
   }
 
   constructor() {
@@ -268,8 +322,8 @@ class TodoApp extends BaseComponent {
   // Expressing data as giant JSON strings is a bit silly, so this component
   // takes its data as plain objects in IDL properties, rather than as content
   // attributes.
-  @prop(json()) accessor allItems = [];
-  @prop(json()) accessor filteredItems = [];
+  @prop(json()) accessor allItems: Item[] = [];
+  @prop(json()) accessor filteredItems: Item[] = [];
 
   @reactive()
   #update() {
@@ -290,16 +344,16 @@ class TodoApp extends BaseComponent {
 // the entire application.
 @define("todo-applet")
 class TodoApplet extends BaseComponent {
-  @handle("todonew")
-  #handleNew(evt) {
+  @capture<TodoApplet, any, NewItemEvent>("todonew")
+  #handleNew(evt: NewItemEvent): void {
     allItems.value = [
       ...allItems.value,
       { id: id++, text: evt.text, done: false },
     ];
   }
 
-  @handle("tododone")
-  #handleDone(evt) {
+  @capture<TodoApplet, any, DoneItemEvent>("tododone")
+  #handleDone(evt: DoneItemEvent): void {
     allItems.value = allItems.value.map((item) => {
       if (item.id === evt.id) {
         return { ...item, done: !item.done };
@@ -308,8 +362,8 @@ class TodoApplet extends BaseComponent {
     });
   }
 
-  @handle("tododelete")
-  #handleDelete(evt) {
+  @capture<TodoApplet, any, DeleteItemEvent>("tododelete")
+  #handleDelete(evt: DeleteItemEvent): void {
     allItems.value = allItems.value.filter((item) => {
       if (item.id === evt.id) {
         return false;
@@ -318,8 +372,8 @@ class TodoApplet extends BaseComponent {
     });
   }
 
-  @handle("filterchange")
-  #handleFilterChange(evt) {
+  @capture<TodoApplet, any, FilterChangeEvent>("filterchange")
+  #handleFilterChange(evt: FilterChangeEvent): void {
     filter.value = evt.value;
   }
 

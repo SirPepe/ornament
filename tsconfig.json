@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
+    "rootDir": "./",
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "nodenext",
+    "moduleResolution": "bundler",
     "target": "esnext",
-    "module": "nodenext",
+    "module": "esnext",
     "outDir": "dist",
     "strict": true
   },

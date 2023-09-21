@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/esm/index.js",
   "browser": "dist/min/index.min.js",
-  "types": "dist/types",
+  "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
@@ -18,7 +18,7 @@
     "test": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve",
     "build": "npm run lint && rollup -c rollup.config.mjs && npm run size",
     "build-examples": "cd examples && rollup -c rollup.config.mjs",
-    "types": "tsc -p tsconfig.build.json",
+    "types": "rm -rf dist/types && tsc -p tsconfig.build.json",
     "prepareRelease": "rm -rf dist && npm run types && npm run lint && npm run test && npm run build && npm run build-examples",
     "size": "gzip -c dist/min/index.min.js | wc -c | numfmt --to iec --format '%8.4f'",
     "release": "npm run prepareRelease && release-it"
@@ -65,7 +65,7 @@
     "rollup": "^3.25.1",
     "sinon": "^16.0.0",
     "typescript": "^5.0.4",
-    "uhtml": "^3.2.1",
+    "uhtml": "^3.2.2",
     "zod": "^3.21.4"
   }
 }

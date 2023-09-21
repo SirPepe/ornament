@@ -34,4 +34,11 @@ export default [
     },
     plugins,
   },
+  {
+    input: "todo-list-typescript/src/main.ts",
+    output: {
+      file: "todo-list-typescript/lib/main.js",
+    },
+    plugins,
+  },
 ];
