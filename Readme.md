@@ -757,16 +757,17 @@ side effects.
 
 ### Transformers overview
 
-| Transformer       | Type                | Nullable | Options               |
-| ------------------| --------------------|----------|-----------------------|
-| `string()`        | `string`            | ✕        |                       |
-| `href()`          | `string` (URL)      | ✕        |                       |
-| `bool()`          | `boolean`           | ✕        |                       |
-| `number()`        | `number`            | ✕        | `min`, `max`          |
-| `int()`           | `bigint`            | ✕        | `min`, `max`          |
-| `json()`          | JSON serializable   | ✕        | `reviver`, `replacer` |
-| `literal()`       | Any                 | ✓        | `values`, `transform` |
-| `event()`         | `function`          | ✓        |                       |
+| Transformer       | Type                | Nullable   | Options                  |
+| ------------------| --------------------|------------|--------------------------|
+| `string()`        | `string`            | ✕          |                          |
+| `href()`          | `string` (URL)      | ✕          |                          |
+| `bool()`          | `boolean`           | ✕          |                          |
+| `number()`        | `number`            | ✕          | `min`, `max`             |
+| `int()`           | `bigint`            | ✕          | `min`, `max`             |
+| `json()`          | JSON serializable   | ✕          | `reviver`, `replacer`    |
+| `list()`          | Array               | ✕          | `separator`, `transform` |
+| `literal()`       | Any                 | Possibly   | `values`, `transform`    |
+| `event()`         | `function`          | By default |                          |
 
 A transformers is just a bag of functions with the following type signature:
 
@@ -1032,6 +1033,59 @@ you can use the `literal()` transformer with the strings `"true"` and `"false"`.
 | Set value `x`              | `Boolean(x)`           |
 | Set attribute to `x`       | `true`                 |
 | Remove attribute           | `false`                |
+
+### Transformer `list(options?)`
+
+Implements an attribute with an array of values, defined by another transformer.
+The `list()` transformer passes individual items to the transformer passed in
+the options and deals with content attributes by splitting and/joining
+stringified array contents:
+
+```javascript
+import { define, attr, list, number } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @attr(list({ transform: number(), separator: "," })) accessor numbers = [0];
+}
+```
+
+This parses the content attribute `numbers` as a comma-separated list of
+strings, which are in turn parsed into numbers by the `number()` transformer
+passed to the `list()` transformers options. If the content attribute gets set
+to something other than a comma-separated list of numeric strings,
+the attribute's value resets back to the initial value `[0]`. Any attempt at
+setting the IDL attribute to values other arrays of numbers will result in an
+exception.
+
+Note that when parsing a content attribute string, values are trimmed and empty
+strings are filtered out before they are passed on to the inner transformer:
+
+```javascript
+import { define, attr, list, number } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @attr(list({ transform: number() })) accessor foo = [0];
+}
+const el = new Test();
+el.setAttribute("foo", "   1, , ,,2   ,3     ");
+console.log(el.foo); // > [1, 2, 3]
+```
+
+#### Options for `list(options?)`
+
+- **`separator` (string, optional)**: Seperator string. Defaults to `","`
+- **`transform` (Transformer)**: Transformer to use, eg. `string()` for a list of strings, `number()` for numbers etc.
+
+#### Behavior overview for transformer `list()`
+
+| Operation        | Value                                                                                                                          |
+| -----------------| -------------------------------------------------------------------------------------------------------------------------------|
+| Initialization   | Accessor initial value or empty array                                                                                          |
+| Set value `x`    | Exception is not an array, otherwise dependent on the behavior of `transformer`                                                |
+| Set attribute    | Attribute value is split gets split on the separator, then trimmed, then non-empty strings are passed into `transformer.parse` |
+| Remove attribute | Accessor initial value or empty array                                                                                          |
 
 ### Transformer `literal(options?)`
 

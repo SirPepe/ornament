@@ -351,9 +351,8 @@ type LiteralOptions<T extends HTMLElement, V> = {
 };
 
 function literalOptions<T extends HTMLElement, V>(
-  input: unknown,
+  input: unknown = {},
 ): LiteralOptions<T, V> {
-  input = input ?? {};
   assertRecord(input, "options");
   const { values, transform } = input as Record<any, any>;
   assertTransformer<T, V>(transform);
@@ -405,6 +404,88 @@ export function literal<T extends HTMLElement, V>(
     eql: options.transform.eql,
     init(value, defaultValue) {
       if (options.values.includes(defaultValue)) {
+        fallbackValues.set(this, defaultValue);
+      }
+      return value;
+    },
+  };
+}
+
+type ListOptions<T extends HTMLElement, V> = {
+  separator?: string;
+  transform: Transformer<T, V>;
+};
+
+function listOptions<T extends HTMLElement, V>(
+  input: unknown = {},
+): Required<ListOptions<T, V>> {
+  assertRecord(input, "options");
+  assertTransformer<T, V>(input.transform);
+  if (!("separator" in input)) {
+    input.separator = ",";
+  }
+  if (typeof input.separator !== "string") {
+    throw new Error(`Invalid separator ${input.separator}`);
+  }
+  return input as Required<ListOptions<T, V>>;
+}
+
+export function list<T extends HTMLElement, V>(
+  inputOptions: ListOptions<T, V>,
+): Transformer<T, V[]> {
+  const fallbackValues = new WeakMap<HTMLElement, V[]>();
+  const options = listOptions<T, V>(inputOptions);
+  return {
+    parse(rawValues) {
+      if (typeof rawValues === "string") {
+        return rawValues.split(options.separator).flatMap((rawValue) => {
+          rawValue = rawValue.trim();
+          if (rawValue !== "") {
+            return [options.transform.parse.call(this, rawValue, Nil)];
+          }
+          return [];
+        });
+      }
+      return fallbackValues.get(this) ?? [];
+    },
+    validate(newValues) {
+      if (typeof newValues === "undefined") {
+        return fallbackValues.get(this) ?? [];
+      }
+      if (Array.isArray(newValues)) {
+        return newValues.map((newValue) =>
+          options.transform.validate.call(this, newValue, Nil),
+        );
+      } else {
+        throw new Error(`Invalid value: ${String(newValues)}`);
+      }
+    },
+    stringify(value) {
+      if (value) {
+        return value
+          .map((value) =>
+            (options.transform.stringify ?? String).call(this, value),
+          )
+          .join(options.separator);
+      }
+      return "";
+    },
+    eql(a, b) {
+      if (a.length !== b.length) {
+        return false;
+      }
+      if (!options.transform.eql) {
+        return a === b;
+      }
+      for (let i = 0; i < a.length; i++) {
+        if (options.transform.eql.call(this, a[i], b[i]) === false) {
+          return false;
+        }
+      }
+      return true;
+    },
+    init(value, defaultValue) {
+      if (Array.isArray(defaultValue)) {
         fallbackValues.set(this, defaultValue);
       }
       return value;

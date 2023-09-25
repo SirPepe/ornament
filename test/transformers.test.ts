@@ -12,6 +12,7 @@ import {
   json,
   string,
   schema,
+  list,
 } from "../src/transformers.js";
 import { generateTagName, wait } from "./helpers.js";
 const test = it;
@@ -455,6 +456,56 @@ describe("Transformers", () => {
       expect(el.getAttribute("foo")).to.equal('{"a":1}');
       el.foo = undefined;
       expect(el.getAttribute("foo")).to.equal("undefined");
+    });
+  });
+
+  describe("list()", () => {
+    test("list of comma-separated numbers as attribute", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(list({ transform: number() })) accessor foo = [0];
+      }
+      const el = new Test();
+      expect(el.foo).to.eql([0]);
+      el.setAttribute("foo", "2, 4, 8");
+      expect(el.foo).to.eql([2, 4, 8]);
+      el.foo = [1, 2, 3];
+      expect(el.foo).to.eql([1, 2, 3]);
+      expect(el.getAttribute("foo")).to.eql("1,2,3");
+      expect(() => {
+        (el as any).foo = "asdf";
+      }).to.throw();
+      expect(() => {
+        (el as any).foo = ["asdf"];
+      }).to.throw();
+      expect(el.foo).to.eql([1, 2, 3]);
+      expect(el.getAttribute("foo")).to.eql("1,2,3");
+      el.setAttribute("foo", "7");
+      expect(el.foo).to.eql([7]);
+      el.setAttribute("foo", "asdf");
+      expect(el.foo).to.eql([0]);
+      el.setAttribute("foo", "   1, , ,,2   ,3     ");
+      expect(el.foo).to.eql([1, 2, 3]);
+      el.removeAttribute("foo");
+      expect(el.foo).to.eql([0]);
+    });
+
+    test("list of space-separated strings as attribute", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(list({ transform: string(), separator: " " })) accessor foo = [
+          "a",
+        ];
+      }
+      const el = new Test();
+      expect(el.foo).to.eql(["a"]);
+      el.setAttribute("foo", " a  b  c   ");
+      expect(el.foo).to.eql(["a", "b", "c"]);
+      expect(() => {
+        (el as any).foo = 1;
+      }).to.throw();
+      (el as any).foo = [1, 2, 3];
+      expect(el.foo).to.eql(["1", "2", "3"]);
     });
   });
 
