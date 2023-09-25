@@ -1,7 +1,7 @@
 # Ornament
 
 Unopinionated, pareto-optimal micro-library (< 4k) for building vanilla web
-components:
+component infrastructure:
 
 ```javascript
 import { define, attr, string, number, reactive } from "@sirpepe/ornament";
@@ -137,42 +137,50 @@ window.customElements.define("my-greeter", MyGreeter);
 ```
 
 Ornament aims to make the most tedious bits of building vanilla web components
-(attribute handling and reactions to attribute handling) easy. This makes
-full-blown framework either superfluous or easy to build on top of Ornament.
+(attribute handling and reactions to attribute handling) easy. This makes your
+custom architecture easy to build on top of Ornament.
 
 ## Guide
 
 ### Installation
 
 Install [@sirpepe/ornament](https://www.npmjs.com/package/@sirpepe/ornament)
-with your favorite package manager. To get the decorator syntax working, you
-will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
+with your favorite package manager. To get the decorator syntax working in 2023,
+you will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
 (with option `version` set to `"2023-05"`) or
 [TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
 (with the option `experimentalDecorators` turned *off*).
+
+Apart from that, Ornament is just a bunch of functions. No further setup
+required.
 
 ### General philosophy
 
 The native APIs for web components are verbose and imperative, but lend
 themselves to quite a bit of streamlining with
 [the upcoming syntax for ECMAScript Decorators](https://2ality.com/2022/10/javascript-decorators.html).
-And a bit of streamlining the native APIs is the entire goal here. Ornament is
-**decidedly *not* a framework** but instead aims to be:
+And streamlining the native APIs is the *entire* goal here. Ornament is
+**not a framework** but instead aims to be:
 
-- tiny
-- dependency-free
-- treeshake-friendly
+- **as stable as possible** by remaining dependency-free and keeping its own code to an absolute minimum
+- **fast and lean** by being nothing more than just a bag of relatively small and simple functions
+- **malleable** by being easy to extend, easy to customize (through partial application) and easy to get rid of
+- **universal** by adhering to (the spirit of) web standards, thereby staying compatible with vanilla web component code as well as all sorts of web frameworks
 - equipped with useful type definitions (and work within the constraints of TypeScript)
-- adherent to (the spirit of) web standards
-- easy to extend
-- easy to get rid of
 
-Ornaments decorators are meant to be easy to add (either to existing components
-or greenfield projects), easy to extend, but also *very* easy to remove or
-replace with hand-written logic, your own decorators, or a future replacement
-for Ornament. Ornaments decorators co-exist with eg. regular attribute change
-handling logic just fine. Ornament still wants you to have full control over
-your components' behavior, just with less *mandatory* boilerplate.
+Ornament is *infrastructure for web components* and not a framework. It makes
+dealing with the native APIs bearable and leaves building something actually
+sophisticated up to you. Ornament does not come with *any* of the following:
+
+- state management (even though it is simple to connect components to signals or event targets)
+- rendering (but it works well with [uhtml](https://github.com/WebReflection/uhtml) and similar libraries)
+- built-in solutions for client-side routing, data fetching, or anything beyond the components themselves
+- any preconceived notions about what should be going on server-side
+- specialized syntax for every (or any specific) use case
+
+You can (and probably have to) therefore pick or write your own solutions for
+the above features. Check out `main.js` in `examples/todo-list/src` for an
+example!
 
 ### Exit strategy
 
@@ -198,30 +206,6 @@ In general, migrating away should not be too problematic. The components that
 you will build with Ornament will naturally tend to be self-contained and
 universal, and will therefore more or less always keep chugging along.
 
-### Some assembly required
-
-Ornament is not a framework and if you want to do anything more that just write
-three independent components you will probably want to combine it with some
-additional framework-like logic or other libraries. Ornament does not come with
-any of the following:
-
-- state management (even though it is simple to connect components to signals or event targets)
-- rendering (but it works well with [uhtml](https://github.com/WebReflection/uhtml) and similar libraries)
-- built-in solutions for client-side routing, data fetching, or anything beyond the components themselves
-- any preconceived notions about what should be going on server-side
-- specialized syntax for every (or any specific) use case
-
-You can (and probably have to) therefore pick or write your own solutions for
-the above features. I would recommend that you:
-
-- Build one or more base classes with essential logic for your use cases (eg. rendering logic)
-- Partially apply at least some decorators and/or transformers for your use case (eg. a variant of `@subscribe` that automatically subscribes to your global state container)
-- Apply common sense when designing components (eg. have some reusable components wrapped by application-specific components)
-
-This gets you 90% of the features of a frontend-framework without tying you down
-on any specific architecture, feature set, or general approach to web
-components. Check out `main.js` in `examples/todo-list/src` for an example!
-
 ### Component registration
 
 Using [`customElements.define()`](https://developer.mozilla.org/en-US/docs/Web/API/CustomElementRegistry/define)
@@ -237,20 +221,20 @@ class MyTest extends HTMLElement {}
 
 ### Attribute handling
 
-[To paraphrase MDN:](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes?retiredLocale=de#content_versus_idl_attributes)
-Attributes have two faces: the *content attribute* and the *IDL attribute* (also
-known as "JavaScript properties"). Content attributes are always strings and are
-defined either via HTML or via JavaScript methods like `setAttribute()`. IDL
-attributes can be accessed via properties such as `someElement.foo` and may be
-of any type. Both faces of attributes need to be implemented and properly synced
-up for an element to be truly compatible with any software out there - a JS
-frontend framework may work primarily with IDL attributes, while HTML authors or
-server-side rendering software will work with content attributes.
-
 Getting attribute handling on Web Components right is hard, because many
 different APIs and states need to interact in just the right way and the related
-code tends to end up scattered across various class members. Keeping content and
-IDL attributes in sync can entail any of the following tasks:
+code tends to end up scattered across various class members. Attributes on HTML
+elements have two faces: the *content attribute* and the *IDL attribute*.
+Content attributes are always strings and are defined either via HTML or via DOM
+methods like `setAttribute()`. IDL attributes can be accessed via object
+properties such as `someElement.foo` and may be of any type. Both faces of
+attributes need to be implemented and properly synced up for an element to be
+truly compatible with any software out there - a JS frontend framework may work
+primarily with IDL attributes, while HTML authors or server-side rendering
+software will work with content attributes.
+
+Keeping content and IDL attributes in sync can entail any of the following
+tasks:
 
 - Updating the content attribute when the IDL attribute gets changed (eg. update the HTML attribute `id` when running `element.id = "foo"` in JS)
 - Updating the IDL attribute when the content attribute gets changed (eg. `element.id` should return `"bar"` after `element.setAttribute("id", "bar")`)
@@ -1473,7 +1457,7 @@ class Test extends HTMLElement {
 ```
 
 Also, remember that transformer functions return plain objects that you can
-modify for on-off custom transformers:
+modify for one-off custom transformers:
 
 ```javascript
 import { define, attr, string } from "@sirpepe/ornament";
