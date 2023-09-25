@@ -8,6 +8,20 @@ import {
   assertContext,
 } from "./types.js";
 
+// Un-clobber an accessor if the element upgrades after a property with
+// a matching name has already been set
+function initAccessor(
+  instance: any,
+  name: string | symbol,
+  defaultValue: any,
+): any {
+  if (Object.hasOwn(instance, name)) {
+    defaultValue = (instance as any)[name];
+    delete (instance as any)[name];
+  }
+  return defaultValue;
+}
+
 class ReactivityEvent extends Event {
   readonly key: string | symbol;
   constructor(key: string | symbol) {
@@ -497,6 +511,7 @@ export function attr<T extends HTMLElement, V>(
 
     return {
       init(input) {
+        input = initAccessor(this, attrName, input);
         const attrValue = this.getAttribute(attrName);
         const value =
           attrValue !== null
@@ -555,6 +570,7 @@ export function prop<T extends HTMLElement, V>(
     assertContext(context, "@prop", "accessor", { private: true });
     return {
       init(input) {
+        input = initAccessor(this, context.name, input);
         input = init.call(this, input, input, context);
         return transformer.validate.call(this, input, Nil);
       },

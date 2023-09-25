@@ -290,6 +290,43 @@ You can use `@prop()` for standalone IDL attribute (that is, DOM properties
 without an associated content attributes), swap out the `number()` transformer
 for something else, or combine any of the above with hand-written logic.
 
+### Safe upgrades
+
+HTML tags can be used even if the browser does not (yet) know about them, and
+this also works with web components.
+[This can lead to unexpected behavior](https://codepen.io/SirPepe/pen/poqLege?editors=0010)
+when properties are set on elements that have not yet been properly defined,
+shadowing relevant accessors on the prototype:
+
+```javascript
+const x = document.createElement("hello-world");
+// "x" = unknown element = object with "HTMLElement.prototype" as prototype
+
+x.data = 42;
+// "x" now has an _own_ property data=42
+
+// Implements an accessor for hello-world. The getters and
+// setters end up as properties on the prototype
+class HelloWorld extends HTMLElement {
+  accessor data = 23;
+}
+
+window.customElements.define("hello-world", HelloWorld);
+// It is now clear that "x" should have had "HelloWorld.prototype" as its
+// prototype all along
+
+window.customElements.upgrade(x);
+// "x" now gets "HelloWorld.prototype" as its prototype (with the accessor)
+
+console.log(x.data);
+// logs 42, bypassing the getter - "x" itself has an own property "data", the
+// accessor on the prototype is shadowed
+```
+
+Ornament ensures safe upgrades, always making sure that no prototype accessors
+for attributes are ever shadowed by properties defined before an element was
+properly upgraded.
+
 ## Decorators
 
 ### API overview

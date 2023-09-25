@@ -81,6 +81,22 @@ describe("Decorators", () => {
       expect(el[key]).to.equal("B");
     });
 
+    test("accessor is resistant against clobbering", async () => {
+      const tagName = generateTagName();
+      // Clobber x before the element has been defined
+      const el = document.createElement(tagName);
+      (el as any).x = "X";
+      // Create the element definition
+      @define(tagName)
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+      }
+      // Upgrade and test the instance
+      window.customElements.upgrade(el);
+      expect(Object.hasOwn(el, "x")).to.equal(false);
+      expect((el as any).x).to.equal("X");
+    });
+
     test("reject on static", () => {
       expect(() => {
         @define(generateTagName())
@@ -189,6 +205,39 @@ describe("Decorators", () => {
       el.setAttribute("y", "C");
       expect(el.x).to.equal("C");
       expect(el.getAttribute("y")).to.equal("C");
+    });
+
+    test("accessor is resistant against clobbering", async () => {
+      const tagName = generateTagName();
+      // Clobber x before the element has been defined
+      const el = document.createElement(tagName);
+      (el as any).x = "X";
+      // Create the element definition
+      @define(tagName)
+      class Test extends HTMLElement {
+        @attr(string()) accessor x = "A";
+      }
+      // Upgrade and test the instance
+      window.customElements.upgrade(el);
+      expect(Object.hasOwn(el, "x")).to.equal(false);
+      expect((el as any).x).to.equal("X");
+    });
+
+    test("un-clobbering gives precedence to attribute values", async () => {
+      const tagName = generateTagName();
+      // Clobber x before the element has been defined
+      const el = document.createElement(tagName);
+      (el as any).x = "X";
+      el.setAttribute("x", "Y");
+      // Create the element definition
+      @define(tagName)
+      class Test extends HTMLElement {
+        @attr(string()) accessor x = "A";
+      }
+      // Upgrade and test the instance
+      window.customElements.upgrade(el);
+      expect(Object.hasOwn(el, "x")).to.equal(false);
+      expect((el as any).x).to.equal("Y");
     });
 
     test("reject on non-public fields", async () => {
