@@ -120,7 +120,7 @@ export function define<T extends CustomElementConstructor>(
   tagName: string,
 ): (target: T, context: ClassDecoratorContext<T>) => T {
   return function (target: T, context: ClassDecoratorContext<T>): T {
-    assertContext(context, "@define", "class");
+    assertContext(context, "define", "class");
     const originalObservedAttributes = (target as any).observedAttributes ?? [];
 
     // Define the custom element after all other decorators have been applied
@@ -212,7 +212,7 @@ export function reactive<T extends HTMLElement>(
   options: ReactiveOptions<T> = {},
 ): ReactiveDecorator<T> {
   return function (_, context): void {
-    assertContext(context, "@reactive", "method");
+    assertContext(context, "reactive", "method");
     context.addInitializer(function () {
       const value = context.access.get(this);
       // Register the callback that performs the initial method call. Uses the
@@ -363,7 +363,7 @@ export function subscribe<T extends object>(
   options?: SubscribeOptions<T, any>,
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
   return function (_: unknown, context: ClassMethodDecoratorContext<T>): void {
-    assertContext(context, "@subscribe", "method");
+    assertContext(context, "subscribe", "method");
     if (
       (typeof target === "function" || target instanceof EventTarget) &&
       typeof eventsOrOptions === "string"
@@ -397,7 +397,7 @@ export function connected<T extends HTMLElement>() {
     _: Method<T, []>,
     context: ClassMethodDecoratorContext<T>,
   ): void {
-    assertContext(context, "@connected", "method");
+    assertContext(context, "connected", "method");
     context.addInitializer(function () {
       setCallback(this, "connect", context.name, context.access.get(this));
     });
@@ -409,7 +409,7 @@ export function disconnected<T extends HTMLElement>() {
     _: Method<T, []>,
     context: ClassMethodDecoratorContext<T>,
   ): void {
-    assertContext(context, "@disconnected", "method");
+    assertContext(context, "disconnected", "method");
     context.addInitializer(function () {
       setCallback(this, "disconnect", context.name, context.access.get(this));
     });
@@ -436,7 +436,7 @@ export function attr<T extends HTMLElement, V>(
 ): ClassAccessorDecorator<T, V> {
   const isReflectiveAttribute = options.reflective !== false;
   return function (target, context): ClassAccessorDecoratorResult<T, V> {
-    assertContext(context, "@attr", "accessor");
+    assertContext(context, "attr", "accessor");
 
     // Accessor decorators can be applied to symbol accessors, but IDL attribute
     // names must a) be strings and b) exist. The following checks ensure that
@@ -561,7 +561,7 @@ export function prop<T extends HTMLElement, V>(
   transformer: Transformer<T, V>,
 ): ClassAccessorDecorator<T, V> {
   return function (target, context): ClassAccessorDecoratorResult<T, V> {
-    assertContext(context, "@prop", "accessor");
+    assertContext(context, "prop", "accessor");
     return {
       init(input) {
         input = initAccessor(this, context.name, input);
@@ -631,7 +631,7 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
     value: Method<T, A> | undefined,
     context: FunctionFieldOrMethodContext<T, A>,
   ): Method<T, A> | ((init: Method<unknown, A>) => Method<unknown, A>) {
-    assertContext(context, "@debounce", ["field", "method"], { static: true });
+    assertContext(context, "debounce", ["field", "method"], { static: true });
     if (context.kind === "field") {
       // Field decorator (bound methods)
       return function init(

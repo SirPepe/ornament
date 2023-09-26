@@ -160,9 +160,9 @@ export function assertContext(
     const expected = kinds
       .map((k) => k.slice(0, 1).toUpperCase() + k.slice(1))
       .join("/");
-    throw new TypeError(`${expected} decorator ${name} used on ${ctx.kind}`);
+    throw new TypeError(`${expected} decorator @${name} used on ${ctx.kind}`);
   }
   if (ctx.static && !accept.static) {
-    throw new TypeError(`Decorator ${name} can't be used on static members`);
+    throw new TypeError(`Decorator @${name} can't be used on static members`);
   }
 }
