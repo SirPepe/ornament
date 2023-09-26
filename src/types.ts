@@ -162,9 +162,6 @@ export function assertContext(
       .join("/");
     throw new TypeError(`${expected} decorator ${name} used on ${ctx.kind}`);
   }
-  if (kind === "class") {
-    return;
-  }
   if (ctx.static && !accept.static) {
     throw new TypeError(`Decorator ${name} can't be used on static members`);
   }
