@@ -135,19 +135,12 @@ export function define<T extends CustomElementConstructor>(
 ): (target: T, context: ClassDecoratorContext<T>) => T {
   return function (target: T, context: ClassDecoratorContext<T>): T {
     assertContext(context, "@define", "class");
+    const originalObservedAttributes = (target as any).observedAttributes ?? [];
 
     // Define the custom element after all other decorators have been applied
     context.addInitializer(function () {
       window.customElements.define(tagName, this);
     });
-
-    // User-defined custom element behaviors that need to be integrated into the
-    // mixin class.
-    const originalObservedAttributes = (target as any).observedAttributes ?? [];
-    const originalAttributeChangedCallback =
-      target.prototype.attributeChangedCallback;
-    const originalConnectedCallback = target.prototype.connectedCallback;
-    const originalDisconnectedCallback = target.prototype.disconnectedCallback;
 
     // Installs the mixin class. This kindof changes the type of the input
     // constructor T, but as TypeScript can currently not use class decorators
@@ -181,10 +174,14 @@ export function define<T extends CustomElementConstructor>(
         newVal: string | null,
       ): void {
         if (
-          originalAttributeChangedCallback &&
+          // eslint-disable-next-line
+          // @ts-ignore
+          super.attributeChangedCallback &&
           originalObservedAttributes.includes(name)
         ) {
-          originalAttributeChangedCallback.call(this, name, oldVal, newVal);
+          // eslint-disable-next-line
+          // @ts-ignore
+          super.attributeChangedCallback.call(this, name, oldVal, newVal);
         }
         const callback = getObservers(this)[name];
         if (callback) {
@@ -193,18 +190,18 @@ export function define<T extends CustomElementConstructor>(
       }
 
       connectedCallback(): void {
-        if (originalConnectedCallback) {
-          originalConnectedCallback.call(this);
-        }
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.connectedCallback?.call(this);
         for (const callback of getCallbacks(this, "connect")) {
           callback.call(this);
         }
       }
 
       disconnectedCallback(): void {
-        if (originalDisconnectedCallback) {
-          originalDisconnectedCallback.call(this);
-        }
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.disconnectedCallback?.call(this);
         for (const callback of getCallbacks(this, "disconnect")) {
           callback.call(this);
         }
@@ -556,7 +553,7 @@ export function attr<T extends HTMLElement, V>(
           }
           if (updateAttr === null) {
             this.removeAttribute(contentAttrName);
-          } else if (updateAttr === true) {
+          } else if (updateAttr) {
             this.setAttribute(
               contentAttrName,
               transformer.stringify.call(this, newValue),

@@ -146,7 +146,7 @@ export function number(
         throw new Error(`Invalid number NaN`);
       }
       if (asNumber < min || asNumber > max) {
-        throw new Error(`${asNumber} is out of range [${min}, ${max}]`);
+        throw new RangeError(`${asNumber} is out of range [${min}, ${max}]`);
       }
       return asNumber;
     },
@@ -225,11 +225,11 @@ export function int(
         return 0n;
       }
       const asInt = BigInt(value as any);
-      if (typeof min !== "undefined" && asInt < min) {
-        throw new Error(`${asInt} is less than minimum value ${min}`);
-      }
-      if (typeof max !== "undefined" && asInt > max) {
-        throw new Error(`${asInt} is greater than maximum value ${max}`);
+      if (
+        (typeof min !== "undefined" && asInt < min) ||
+        (typeof max !== "undefined" && asInt > max)
+      ) {
+        throw new RangeError(`${asInt} is out of range [${min}, ${max}]`);
       }
       return asInt;
     },
@@ -368,42 +368,37 @@ function literalOptions<T extends HTMLElement, V>(
 }
 
 export function literal<T extends HTMLElement, V>(
-  inputOptions: LiteralOptions<T, V>,
+  options: LiteralOptions<T, V>,
 ): Transformer<T, V> {
   const fallbackValues = new WeakMap<HTMLElement, V>();
-  const options = literalOptions<T, V>(inputOptions);
+  const { transform, values } = literalOptions<T, V>(options);
   return {
     parse(rawValue, oldValue) {
-      const parsed = options.transform.parse.call(this, rawValue, oldValue);
-      if (options.values.includes(parsed)) {
+      const parsed = transform.parse.call(this, rawValue, oldValue);
+      if (values.includes(parsed)) {
         return parsed;
       }
-      return fallbackValues.get(this) ?? options.values[0];
+      return fallbackValues.get(this) ?? values[0];
     },
     validate(newValue, oldValue) {
       if (typeof newValue === "undefined") {
-        return fallbackValues.get(this) ?? options.values[0];
+        return fallbackValues.get(this) ?? values[0];
       }
-      const validated = options.transform.validate.call(
-        this,
-        newValue,
-        oldValue,
-      );
-      if (options.values.includes(validated)) {
+      const validated = transform.validate.call(this, newValue, oldValue);
+      if (values.includes(validated)) {
         return validated;
       }
-      if (options.transform.stringify) {
+      if (transform.stringify) {
         throw new Error(
-          `Invalid value: ${options.transform.stringify.call(this, validated)}`,
+          `Invalid value: ${transform.stringify.call(this, validated)}`,
         );
-      } else {
-        throw new Error(`Invalid value: ${String(validated)}`);
       }
+      throw new Error(`Invalid value: ${validated}`);
     },
-    stringify: options.transform.stringify,
-    eql: options.transform.eql,
+    stringify: transform.stringify,
+    eql: transform.eql,
     init(value, defaultValue) {
-      if (options.values.includes(defaultValue)) {
+      if (values.includes(defaultValue)) {
         fallbackValues.set(this, defaultValue);
       }
       return value;
@@ -434,14 +429,14 @@ export function list<T extends HTMLElement, V>(
   inputOptions: ListOptions<T, V>,
 ): Transformer<T, V[]> {
   const fallbackValues = new WeakMap<HTMLElement, V[]>();
-  const options = listOptions<T, V>(inputOptions);
+  const { transform, separator } = listOptions<T, V>(inputOptions);
   return {
     parse(rawValues) {
       if (typeof rawValues === "string") {
-        return rawValues.split(options.separator).flatMap((rawValue) => {
+        return rawValues.split(separator).flatMap((rawValue) => {
           rawValue = rawValue.trim();
-          if (rawValue !== "") {
-            return [options.transform.parse.call(this, rawValue, Nil)];
+          if (rawValue) {
+            return [transform.parse.call(this, rawValue, Nil)];
           }
           return [];
         });
@@ -454,19 +449,16 @@ export function list<T extends HTMLElement, V>(
       }
       if (Array.isArray(newValues)) {
         return newValues.map((newValue) =>
-          options.transform.validate.call(this, newValue, Nil),
+          transform.validate.call(this, newValue, Nil),
         );
-      } else {
-        throw new Error(`Invalid value: ${String(newValues)}`);
       }
+      throw new Error(`Invalid value: ${newValues}`);
     },
     stringify(value) {
       if (value) {
         return value
-          .map((value) =>
-            (options.transform.stringify ?? String).call(this, value),
-          )
-          .join(options.separator);
+          .map((value) => (transform.stringify ?? String).call(this, value))
+          .join(separator);
       }
       return "";
     },
@@ -474,11 +466,11 @@ export function list<T extends HTMLElement, V>(
       if (a.length !== b.length) {
         return false;
       }
-      if (!options.transform.eql) {
+      if (!transform.eql) {
         return a === b;
       }
       for (let i = 0; i < a.length; i++) {
-        if (options.transform.eql.call(this, a[i], b[i]) === false) {
+        if (!transform.eql.call(this, a[i], b[i])) {
           return false;
         }
       }
@@ -536,7 +528,7 @@ export function event<
     stringify() {
       throw new Error();
     },
-    init(value, defaultValue, context) {
+    init(value, _, context) {
       if (context.private || typeof context.name === "symbol") {
         throw new Error("Event handler name must be a non-private non-symbol");
       }

@@ -96,15 +96,24 @@ export function assertRecord(
   }
 }
 
+function is<K extends keyof Types>(
+  value: unknown,
+  ...types: K[]
+): value is Types[K] {
+  return types.some(
+    (type) =>
+      (value === null && type === "null") ||
+      (value !== null && typeof value === type),
+  );
+}
+
 export function assertType<K extends keyof Types>(
   value: unknown,
   name: string,
   ...types: K[]
 ): asserts value is Types[K] {
-  for (const type of types) {
-    if ((type === "null" && value === null) || typeof value === type) {
-      return;
-    }
+  if (is(value, ...types)) {
+    return;
   }
   throw new TypeError(
     `Expected "${name}" to "${types.join("/")}" but got ${typeof value}`,
@@ -116,10 +125,8 @@ export function assertPropType<K extends keyof Types>(
   prop: string,
   ...types: K[]
 ): void {
-  for (const type of types) {
-    if ((type === "null" && obj[prop] === null) || typeof obj[prop] === type) {
-      return;
-    }
+  if (is(obj[prop], ...types)) {
+    return;
   }
   throw new TypeError(
     `Expected "${prop}" to be "${types.join("/")}" but got ${typeof obj[prop]}`,
@@ -158,7 +165,7 @@ export function assertContext(
   if (kind === "class") {
     return;
   }
-  if (ctx.static && accept.static !== true) {
+  if (ctx.static && !accept.static) {
     throw new TypeError(`Decorator ${name} can't be used on static members`);
   }
 }
