@@ -1,4 +1,4 @@
-import { Nil } from "./lib.js";
+import { Nil, isArray } from "./lib.js";
 
 export type Transformer<T extends HTMLElement, V> = {
   // parse() turns attribute values (usually string | null) into property
@@ -11,15 +11,15 @@ export type Transformer<T extends HTMLElement, V> = {
   // Turns IDL attribute values into content attribute values (strings), thereby
   // controlling the attribute representation of an accessor together with
   // updateContentAttr(). Must never throw, defaults to the String() function
-  stringify?: (this: T, value?: V) => string;
+  stringify: (this: T, value?: V) => string;
   // Determines whether a new attribute value is equal to the old value. If this
   // method returns true, reactive callbacks will not be triggered. Defaults to
   // simple strict equality (===).
-  eql?: (this: T, newValue: V, oldValue: V) => boolean;
+  eql: (this: T, newValue: V, oldValue: V) => boolean;
   // Optionally transforms a value before it is used to initialize the accessor.
   // Can also be used to run a side effect when the accessor initializes.
   // Defaults to the identity function.
-  init?: (
+  init: (
     this: T,
     value: V,
     defaultValue: V,
@@ -28,13 +28,13 @@ export type Transformer<T extends HTMLElement, V> = {
   // Optionally transforms a value before it is returned from the getter. Can
   // also be used to run a side effect when the setter gets used. Defaults to
   // the identity function.
-  get?: (this: T, value: V, context: ClassAccessorDecoratorContext<T, V>) => V;
+  get: (this: T, value: V, context: ClassAccessorDecoratorContext<T, V>) => V;
   // Optionally transforms a value before it is set by either the setter or a
   // content attribute update. Can also be used to run a side effect when the
   // setter gets used. Defaults to the identity function. If the raw value is
   // not Nil, the set operation was caused by a content attribute update and the
   // content attribute value is reflected in the raw value (string | null).
-  set?: (
+  set: (
     this: T,
     value: V,
     rawValue: unknown,
@@ -44,7 +44,7 @@ export type Transformer<T extends HTMLElement, V> = {
   // new value (true/false) or removed (null). Only gets called when the
   // transformer's eql() method returns false. Defaults to a function that
   // always returns true.
-  updateContentAttr?: (
+  updateContentAttr: (
     this: T,
     oldValue: V | null,
     newValue: V | null,
@@ -155,7 +155,7 @@ export function assertContext(
   kind: DecoratorContext["kind"] | DecoratorContext["kind"][],
   accept: Partial<AcceptOptions> = {},
 ): void {
-  const kinds = Array.isArray(kind) ? kind : [kind];
+  const kinds = isArray(kind) ? kind : [kind];
   if (!kinds.includes(ctx.kind)) {
     const expected = kinds
       .map((k) => k.slice(0, 1).toUpperCase() + k.slice(1))

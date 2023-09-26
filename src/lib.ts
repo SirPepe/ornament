@@ -1,6 +1,6 @@
 export const Nil: unique symbol = Symbol();
 
-export const identity = <T>(x: T) => x;
+export const isArray = Array.isArray;
 
 export class MetaMap<K extends object, V extends object> {
   #initValue: () => V;

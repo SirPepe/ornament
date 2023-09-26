@@ -1,4 +1,4 @@
-import { MetaMap, Nil, identity } from "./lib.js";
+import { MetaMap, Nil } from "./lib.js";
 import {
   type ClassAccessorDecorator,
   type FunctionFieldOrMethodDecorator,
@@ -33,20 +33,6 @@ class ReactivityEvent extends Event {
 const eventTargetMap = new MetaMap<HTMLElement, EventTarget>(
   () => new EventTarget(),
 );
-
-function withDefaults<T extends HTMLElement, V>(
-  source: Transformer<T, V>,
-): Required<Transformer<T, V>> {
-  return {
-    ...source,
-    stringify: source.stringify ?? String,
-    eql: source.eql ?? ((a: any, b: any) => a === b),
-    init: source.init ?? identity,
-    get: source.get ?? identity,
-    set: source.set ?? identity,
-    updateContentAttr: source.updateContentAttr ?? (() => true),
-  };
-}
 
 // Accessor decorators initialize *after* custom elements access their
 // observedAttributes getter. This means that, in the absence of the decorators
@@ -225,14 +211,13 @@ export function reactive<T extends HTMLElement>(
   this: unknown,
   options: ReactiveOptions<T> = {},
 ): ReactiveDecorator<T> {
-  const initial = options.initial ?? true;
   return function (_, context): void {
     assertContext(context, "@reactive", "method");
     context.addInitializer(function () {
       const value = context.access.get(this);
       // Register the callback that performs the initial method call. Uses the
       // non-debounced method if required and wraps it in predicate logic.
-      if (initial) {
+      if (options.initial !== false) {
         setCallback(this, "init", context.name, function (this: T) {
           if (!options.predicate || options.predicate.call(this)) {
             (DEBOUNCED_METHOD_MAP.get(value) ?? value).call(this);
@@ -291,10 +276,9 @@ function createEventSubscriberInitializer<T extends object, E extends Event>(
   return function (this: T) {
     const predicate = options.predicate ?? (() => true);
     setCallback(this, "init", context.name, function (this: T) {
-      const value = context.access.get(this);
       const callback = (evt: any) => {
         if (predicate.call(this, evt)) {
-          value.call(this, evt);
+          context.access.get(this).call(this, evt);
         }
       };
       const eventTarget =
@@ -447,10 +431,9 @@ const SKIP_NEXT_ATTRIBUTE_REACTION = new WeakMap<HTMLElement, Set<string>>();
 
 export function attr<T extends HTMLElement, V>(
   this: unknown,
-  inputTransformer: Transformer<T, V>,
+  transformer: Transformer<T, V>,
   options: AttrOptions = {},
 ): ClassAccessorDecorator<T, V> {
-  const transformer = withDefaults(inputTransformer);
   const isReflectiveAttribute = options.reflective !== false;
   return function (target, context): ClassAccessorDecoratorResult<T, V> {
     assertContext(context, "@attr", "accessor");
@@ -577,29 +560,27 @@ export function prop<T extends HTMLElement, V>(
   this: unknown,
   transformer: Transformer<T, V>,
 ): ClassAccessorDecorator<T, V> {
-  const { eql, get, set, init } = withDefaults(transformer);
   return function (target, context): ClassAccessorDecoratorResult<T, V> {
     assertContext(context, "@prop", "accessor");
     return {
       init(input) {
         input = initAccessor(this, context.name, input);
-        input = init.call(this, input, input, context);
+        input = transformer.init.call(this, input, input, context);
         return transformer.validate.call(this, input, Nil);
       },
       set(input) {
-        const oldValue = target.get.call(this);
         let newValue = transformer.validate.call(this, input, Nil);
-        if (eql.call(this, newValue, oldValue)) {
+        if (transformer.eql.call(this, newValue, target.get.call(this))) {
           return;
         }
-        newValue = set.call(this, newValue, Nil, context);
+        newValue = transformer.set.call(this, newValue, Nil, context);
         target.set.call(this, newValue);
         eventTargetMap
           .get(this)
           .dispatchEvent(new ReactivityEvent(context.name));
       },
       get() {
-        return get.call(this, target.get.call(this), context);
+        return transformer.get.call(this, target.get.call(this), context);
       },
     };
   };
@@ -664,12 +645,9 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
         }
         return createDebouncedMethod(func, fn).bind(this);
       };
-    } else if (context.kind === "method") {
-      // Method decorator. TS does not understand that value is a function at
-      // this point
-      return createDebouncedMethod(value as Method<T, A>, fn);
     }
-    throw new Error(); // never happens, just to appease TS
+    // if it's not a field decorator, it must be a method decorator
+    return createDebouncedMethod(value as Method<T, A>, fn);
   }
   return decorator;
 }
