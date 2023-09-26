@@ -1517,7 +1517,7 @@ import { define, attr, string } from "@sirpepe/ornament";
 let nullableString = {
   ...string(),
   validate(value) {
-    if (value === null || typeof value === undefined) {
+    if (value === null || typeof value === "undefined") {
       return value;
     }
     return String(value);
