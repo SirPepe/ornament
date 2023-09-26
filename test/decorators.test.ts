@@ -240,18 +240,84 @@ describe("Decorators", () => {
       expect((el as any).x).to.equal("Y");
     });
 
-    test("reject on non-public fields", async () => {
-      expect(() => {
-        class Test extends HTMLElement {
-          @attr(string()) accessor #x = "A";
-        }
-      }).to.throw(TypeError);
+    test("reject on symbol fields without a name for a public facade", async () => {
       expect(() => {
         const key = Symbol();
         class Test extends HTMLElement {
           @attr(string()) accessor [key] = "A";
         }
       }).to.throw(TypeError);
+    });
+
+    test("reject on symbol fields without a public facade", async () => {
+      const key = Symbol();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(string(), { as: "x" }) accessor [key] = "A";
+      }
+      // checks happen on accessor init at the earliest
+      expect(() => new Test()).to.throw(TypeError);
+    });
+
+    test("works with symbol fields with a public facade", async () => {
+      const key = Symbol();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(string(), { as: "x" }) accessor [key] = "A";
+        get x() {
+          return this[key];
+        }
+        set x(value: string) {
+          this[key] = value;
+        }
+      }
+      const el = new Test();
+      expect(el.x).to.equal("A");
+      el.x = "B";
+      expect(el.x).to.equal("B");
+      expect(el[key]).to.equal("B");
+      expect(el.getAttribute("x")).to.equal("B");
+      el.setAttribute("x", "C");
+      expect(el.x).to.equal("C");
+      expect(el[key]).to.equal("C");
+    });
+
+    test("rejects on private fields without a name for a public facade", async () => {
+      expect(() => {
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @attr(string()) accessor #x = "A";
+        }
+      }).to.throw(TypeError);
+    });
+
+    test("rejects on private fields without a public facade", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(string(), { as: "y" }) accessor #x = "A";
+      }
+      // checks happen on accessor init at the earliest
+      expect(() => new Test()).to.throw(TypeError);
+    });
+
+    test("works with private fields with a public facade", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(string(), { as: "x" }) accessor #x = "A";
+        get x() {
+          return this.#x;
+        }
+        set x(value: string) {
+          this.#x = value;
+        }
+      }
+      const el = new Test();
+      expect(el.x).to.equal("A");
+      el.x = "B";
+      expect(el.x).to.equal("B");
+      expect(el.getAttribute("x")).to.equal("B");
+      el.setAttribute("x", "C");
+      expect(el.x).to.equal("C");
     });
 
     test("reject on static fields", async () => {

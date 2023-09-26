@@ -139,7 +139,6 @@ export function assertTransformer<T extends HTMLElement, V>(
 }
 
 type AcceptOptions = {
-  private?: boolean;
   static?: boolean;
 };
 
@@ -158,9 +157,6 @@ export function assertContext(
   }
   if (kind === "class") {
     return;
-  }
-  if (ctx.private && accept.private !== true) {
-    throw new TypeError(`Decorator ${name} can't be used on private members`);
   }
   if (ctx.static && accept.static !== true) {
     throw new TypeError(`Decorator ${name} can't be used on static members`);

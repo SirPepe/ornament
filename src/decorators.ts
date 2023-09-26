@@ -230,7 +230,7 @@ export function reactive<T extends HTMLElement>(
 ): ReactiveDecorator<T> {
   const initial = options.initial ?? true;
   return function (_, context): void {
-    assertContext(context, "@reactive", "method", { private: true });
+    assertContext(context, "@reactive", "method");
     context.addInitializer(function () {
       const value = context.access.get(this);
       // Register the callback that performs the initial method call. Uses the
@@ -382,7 +382,7 @@ export function subscribe<T extends object>(
   options?: SubscribeOptions<T, any>,
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
   return function (_: unknown, context: ClassMethodDecoratorContext<T>): void {
-    assertContext(context, "@subscribe", "method", { private: true });
+    assertContext(context, "@subscribe", "method");
     if (
       (typeof target === "function" || target instanceof EventTarget) &&
       typeof eventsOrOptions === "string"
@@ -416,7 +416,7 @@ export function connected<T extends HTMLElement>() {
     _: Method<T, []>,
     context: ClassMethodDecoratorContext<T>,
   ): void {
-    assertContext(context, "@connected", "method", { private: true });
+    assertContext(context, "@connected", "method");
     context.addInitializer(function () {
       setCallback(this, "connect", context.name, context.access.get(this));
     });
@@ -428,7 +428,7 @@ export function disconnected<T extends HTMLElement>() {
     _: Method<T, []>,
     context: ClassMethodDecoratorContext<T>,
   ): void {
-    assertContext(context, "@disconnected", "method", { private: true });
+    assertContext(context, "@disconnected", "method");
     context.addInitializer(function () {
       setCallback(this, "disconnect", context.name, context.access.get(this));
     });
@@ -458,20 +458,28 @@ export function attr<T extends HTMLElement, V>(
   return function (target, context): ClassAccessorDecoratorResult<T, V> {
     assertContext(context, "@attr", "accessor");
 
-    // Accessor decorators can be applied to symbol accessors, but DOM attribute
-    // names must be strings. As attributes always go along with public getters
-    // and setters, the following check throws even if an alternative attribute
-    // name was provided via the "as" option.
-    if (typeof context.name === "symbol") {
-      throw new TypeError("Attribute backends for @attr() must not be symbols");
+    // Accessor decorators can be applied to symbol accessors, but IDL attribute
+    // names must a) be strings and b) exist. The following checks ensure that
+    // the accessor, if it is a symbol or a private property, has a content
+    // attribute name and a name for a public API.
+    let contentAttrName: string;
+    let idlAttrName: string;
+    if (typeof context.name === "symbol" || context.private) {
+      if (typeof options.as === "undefined") {
+        throw new TypeError(
+          "Attribute names for @attr() must not be symbols. Provide the `as` option and a public facade for your accessor or use a regular property name.",
+        );
+      }
+      contentAttrName = idlAttrName = options.as;
+    } else {
+      contentAttrName = options.as ?? context.name;
+      idlAttrName = context.name;
     }
-
-    const attrName = options.as ?? context.name;
 
     // If the attribute needs to be observed, add the name to the set of all
     // observed attributes.
     if (isReflectiveAttribute) {
-      ALL_OBSERVABLE_ATTRIBUTES.add(attrName);
+      ALL_OBSERVABLE_ATTRIBUTES.add(contentAttrName);
     }
 
     // If the attribute needs to be observed and the accessor initializes,
@@ -487,7 +495,7 @@ export function attr<T extends HTMLElement, V>(
           oldAttrVal: string | null,
           newAttrVal: string | null,
         ): void {
-          if (name !== attrName || newAttrVal === oldAttrVal) {
+          if (name !== contentAttrName || newAttrVal === oldAttrVal) {
             return; // skip irrelevant invocations
           }
           if (skipReactions.has(name)) {
@@ -505,14 +513,21 @@ export function attr<T extends HTMLElement, V>(
             .get(this)
             .dispatchEvent(new ReactivityEvent(context.name));
         };
-        setObserver(this, attrName, attributeChangedCallback);
+        setObserver(this, contentAttrName, attributeChangedCallback);
       });
     }
 
     return {
       init(input) {
-        input = initAccessor(this, attrName, input);
-        const attrValue = this.getAttribute(attrName);
+        // Final sanity check: does a public api for this attribute exist? This
+        // needs to be added manually for private or symbol accessors.
+        if (!(idlAttrName in this)) {
+          throw new TypeError(
+            `Content attribute '${contentAttrName}' is missing its public API`,
+          );
+        }
+        input = initAccessor(this, contentAttrName, input);
+        const attrValue = this.getAttribute(contentAttrName);
         const value =
           attrValue !== null
             ? transformer.parse.call(this, attrValue, Nil)
@@ -537,13 +552,13 @@ export function attr<T extends HTMLElement, V>(
           // attributeChangedCallback must be skipped to prevent double calls of
           // @reactive methods
           if (updateAttr !== false) {
-            SKIP_NEXT_ATTRIBUTE_REACTION.get(this)?.add(attrName);
+            SKIP_NEXT_ATTRIBUTE_REACTION.get(this)?.add(contentAttrName);
           }
           if (updateAttr === null) {
-            this.removeAttribute(attrName);
+            this.removeAttribute(contentAttrName);
           } else if (updateAttr === true) {
             this.setAttribute(
-              attrName,
+              contentAttrName,
               transformer.stringify.call(this, newValue),
             );
           }
@@ -567,7 +582,7 @@ export function prop<T extends HTMLElement, V>(
 ): ClassAccessorDecorator<T, V> {
   const { eql, get, set, init } = withDefaults(transformer);
   return function (target, context): ClassAccessorDecoratorResult<T, V> {
-    assertContext(context, "@prop", "accessor", { private: true });
+    assertContext(context, "@prop", "accessor");
     return {
       init(input) {
         input = initAccessor(this, context.name, input);
@@ -638,10 +653,7 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
     value: Method<T, A> | undefined,
     context: FunctionFieldOrMethodContext<T, A>,
   ): Method<T, A> | ((init: Method<unknown, A>) => Method<unknown, A>) {
-    assertContext(context, "@debounce", ["field", "method"], {
-      private: true,
-      static: true,
-    });
+    assertContext(context, "@debounce", ["field", "method"], { static: true });
     if (context.kind === "field") {
       // Field decorator (bound methods)
       return function init(

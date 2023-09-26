@@ -138,7 +138,7 @@ window.customElements.define("my-greeter", MyGreeter);
 
 Ornament aims to make the most tedious bits of building vanilla web components
 (attribute handling and reactions to attribute handling) easy. This makes your
-custom architecture easy to build on top of Ornament.
+custom architecture or framework easy to build on top of Ornament.
 
 ## Guide
 
@@ -315,16 +315,20 @@ properly upgraded.
 
 ### API overview
 
-| Decorator         | Class element       | `static` | `#private` |
-| ------------------| --------------------|----------|------------|
-| `@define()`       | Class               | -        | -          |
-| `@attr()`         | Accessor            | ✕        | ✕          |
-| `@prop()`         | Accessor            | ✕        | ✓          |
-| `@reactive()`     | Method              | ✕        | ✓          |
-| `@connected()`    | Method              | ✕        | ✓          |
-| `@disconnected()` | Method              | ✕        | ✓          |
-| `@subscribe()`    | Method              | ✕        | ✓          |
-| `@debounce()`     | Method, Class Field | ✕        | ✓          |
+| Decorator         | Class element       | `static` | `#private` | Symbols          |
+| ------------------| --------------------|----------|------------|------------------|
+| `@define()`       | Class               | -        | -          | -                |
+| `@attr()`         | Accessor            | ✕        | ✓[^1]      | ✓[^1]            |
+| `@prop()`         | Accessor            | ✕        | ✓          | ✓                |
+| `@reactive()`     | Method              | ✕        | ✓          | -                |
+| `@connected()`    | Method              | ✕        | ✓          | -                |
+| `@disconnected()` | Method              | ✕        | ✓          | -                |
+| `@subscribe()`    | Method              | ✕        | ✓          | -                |
+| `@debounce()`     | Method, Class Field | ✕        | ✓          | ✓ (Class fields) |
+
+[^1]: Can be `#private` or a symbol *if* a non-private non-symbol getter/setter
+      pair for the attribute name exists and a content attribute name has been
+      set using the `as` option.
 
 ### `@define(tagName: string)`
 
@@ -395,8 +399,8 @@ testEl.foo = "asdf"; // throw exception (thanks to the number transformer)
 
 Accessors defined with `@prop()` work as a *JavaScript-only API*. Values can
 only be accessed through the accessor's getter, invalid values are rejected by
-the setter with exceptions. `@prop()` *can* be used on private accessors or
-symbols.
+the setter with exceptions. `@prop()` can be used on private accessors or
+symbols without problem.
 
 Note that you can still define your own accessors, getters, setters etc. as you
 would usually do. They will still work as expected, but they will not cause
@@ -444,7 +448,19 @@ built-in elements. Content attribute values (which are always strings) get
 parsed by the transformer, which also deals with invalid values in a graceful
 way (ie without throwing exceptions). Values can also be accessed through the
 IDL property's accessor, where invalid values *are* rejected with exceptions by
-the setter. `@attr()` can *not* be used on private accessors or symbols.
+the setter.
+
+`@attr()` can only be used on private accessors or symbols only if the following
+holds true:
+
+1. The option `as` *must* be set
+2. A non-private, non-symbol getter/setter pair for the attribute name defined in the option `as` *must* exist on the custom element class
+
+Content attributes always have public IDL attribute APIs, and ornament enforces
+this. A private/symbol attribute accessor with a manually-provided public facade
+may be useful if you want to attach some additional logic to the public API
+(= hand-written getters and setters) while still having the convenience of of
+using `@attr` on an `accessor`.
 
 Note that you can still define your own attribute handling with
 `attributeChangedCallback()` and `static get observedAttributes()` as you would
@@ -453,7 +469,7 @@ attributes will not cause `@reactive()` methods to run.
 
 #### Options for `@attr()`
 
-- **`as` (string, optional)**: Sets an attribute name different from the accessor's name, similar to how the `class` content attribute works for the `className` IDL attribute on built-in elements. If `as` is not set, the content attribute's name will be equal to the accessor's name.
+- **`as` (string, optional)**: Sets an attribute name different from the accessor's name, similar to how the `class` content attribute works for the `className` IDL attribute on built-in elements. If `as` is not set, the content attribute's name will be equal to the accessor's name. `as` is required when the decorator is applied to a symbol or private property.
 - **`reflective` (boolean, optional)**: If `false`, prevents the content attribute from updating when the IDL attribute is updated, similar to how `value` works on `input` elements. Defaults to true.
 
 ### `@reactive(options?)`
@@ -1293,6 +1309,40 @@ class Test extends HTMLElement {
   }
 }
 ```
+
+### Custom logic in IDL attributes
+
+The point of the `accessor` keyword is to generate a getter, setter, and private
+property in a way that makes it easy to apply a decorator to everything at once.
+But because the getters and setters are auto-generated, there is no
+non-decorator way to attach custom logic to `accessor` members. To work around
+this for IDL attributes defined via `@attr()` or `@prop()`, you can build a
+and decorate a private or symbol accessor that you then expose with a custom
+facade:
+
+```javascript
+@define("my-test")
+class Test extends HTMLElement {
+  // Implements a content attribute "foo" with getters and setters at #secret
+  @attr(string(), { as: "foo" }) accessor #secret = "A";
+
+  // To provide public IDL attributes, we just write a getter/setter pair with
+  // names matching the content attribute
+  get foo() {
+    console.log("Custom logic!");
+    return this.#secret; // accesses the getter decorated with @attr()
+  }
+  set foo(value) {
+    console.log("Custom logic!");
+    this.#secret = value; // accesses the setter decorated with @attr()
+  }
+}
+```
+
+Notes for `@attr()`:
+
+1. The option `as` is *mandatory* when you use `@attr()` on a private or symbol accessor
+1. Ornament throws exceptions if the class does not implement a public API for a content attribute defined with `@attr()` on a private or symbol accessor
 
 ### Event delegation
 
