@@ -153,6 +153,29 @@ export function define<T extends CustomElementConstructor>(
         return [...originalObservedAttributes, ...ALL_OBSERVABLE_ATTRIBUTES];
       }
 
+      connectedCallback(): void {
+        // The base class may or may not have its own connectedCallback, but the
+        // type CustomElementConstructor does not reflect that. TS won't allow
+        // us to access the property speculatively, so we need to tell it to
+        // shut up... and then tell ESLint to shut up about us telling TS to
+        // shut up. The same happens for the other lifecycle callbacks.
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.connectedCallback?.call(this);
+        for (const callback of getCallbacks(this, "connect")) {
+          callback.call(this);
+        }
+      }
+
+      disconnectedCallback(): void {
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.disconnectedCallback?.call(this);
+        for (const callback of getCallbacks(this, "disconnect")) {
+          callback.call(this);
+        }
+      }
+
       attributeChangedCallback(
         this: HTMLElement,
         name: string,
@@ -172,24 +195,6 @@ export function define<T extends CustomElementConstructor>(
         const callback = getObservers(this)[name];
         if (callback) {
           callback.call(this, name, oldVal, newVal);
-        }
-      }
-
-      connectedCallback(): void {
-        // eslint-disable-next-line
-        // @ts-ignore
-        super.connectedCallback?.call(this);
-        for (const callback of getCallbacks(this, "connect")) {
-          callback.call(this);
-        }
-      }
-
-      disconnectedCallback(): void {
-        // eslint-disable-next-line
-        // @ts-ignore
-        super.disconnectedCallback?.call(this);
-        for (const callback of getCallbacks(this, "disconnect")) {
-          callback.call(this);
         }
       }
     };
