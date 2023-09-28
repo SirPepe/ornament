@@ -1,4 +1,4 @@
-import { MetaMap, Nil } from "./lib.js";
+import { EMPTY_OBJ, MetaMap, Nil } from "./lib.js";
 import {
   type ClassAccessorDecorator,
   type FunctionFieldOrMethodDecorator,
@@ -42,6 +42,11 @@ declare global {
     connect: Record<string, never>;
     disconnect: Record<string, never>;
     prop: { name: string | symbol };
+    attribute: {
+      name: string;
+      oldValue: string | null;
+      newValue: string | null;
+    };
   }
 }
 
@@ -63,34 +68,6 @@ function listen<T extends HTMLElement, K extends keyof OrnamentReactionMap>(
   eventTargetMap
     .get(instance)
     .addEventListener(name, (evt: any): void => callback.call(instance, evt));
-}
-
-// Maps attributes to attribute observer callbacks mapped by custom element
-// constructor. The mixin classes' actual `attributeChangedCallback()` decides
-// whether an attribute reaction must run an effect defined by @attr().
-type ObserverCallback = (
-  name: string,
-  oldValue: string | null,
-  newValue: string | null,
-) => void;
-type ObserverMap = Record<string, ObserverCallback>; // attr name -> cb
-const observerCallbacks = new MetaMap<CustomElementConstructor, ObserverMap>(
-  Object,
-);
-
-function setObserver(
-  instance: any,
-  attribute: string,
-  callback: ObserverCallback,
-): void {
-  const callbacks = observerCallbacks.get(instance.constructor);
-  if (!callbacks[attribute]) {
-    callbacks[attribute] = callback;
-  }
-}
-
-function getObservers(instance: any): Record<string, ObserverCallback> {
-  return observerCallbacks.get(instance.constructor) ?? {};
 }
 
 // Maps debounced methods to original methods. Needed for initial calls of
@@ -120,7 +97,7 @@ export function define<T extends CustomElementConstructor>(
     return class extends target {
       constructor(...args: any[]) {
         super(...args);
-        trigger(this, "init", {});
+        trigger(this, "init", EMPTY_OBJ);
       }
 
       static get observedAttributes(): string[] {
@@ -136,21 +113,21 @@ export function define<T extends CustomElementConstructor>(
         // eslint-disable-next-line
         // @ts-ignore
         super.connectedCallback?.call(this);
-        trigger(this, "connect", {});
+        trigger(this, "connect", EMPTY_OBJ);
       }
 
       disconnectedCallback(): void {
         // eslint-disable-next-line
         // @ts-ignore
         super.disconnectedCallback?.call(this);
-        trigger(this, "disconnect", {});
+        trigger(this, "disconnect", EMPTY_OBJ);
       }
 
       attributeChangedCallback(
         this: HTMLElement,
         name: string,
-        oldVal: string | null,
-        newVal: string | null,
+        oldValue: string | null,
+        newValue: string | null,
       ): void {
         if (
           // eslint-disable-next-line
@@ -160,12 +137,9 @@ export function define<T extends CustomElementConstructor>(
         ) {
           // eslint-disable-next-line
           // @ts-ignore
-          super.attributeChangedCallback.call(this, name, oldVal, newVal);
+          super.attributeChangedCallback.call(this, name, oldValue, newValue);
         }
-        const callback = getObservers(this)[name];
-        if (callback) {
-          callback.call(this, name, oldVal, newVal);
-        }
+        trigger(this, "attribute", { name, oldValue, newValue });
       }
     };
   };
@@ -184,7 +158,7 @@ type ReactiveDecorator<T extends HTMLElement> = (
 
 export function reactive<T extends HTMLElement>(
   this: unknown,
-  options: ReactiveOptions<T> = {},
+  options: ReactiveOptions<T> = EMPTY_OBJ,
 ): ReactiveDecorator<T> {
   const subscribedElements = new WeakSet();
   return function (_, context): void {
@@ -252,7 +226,7 @@ function createEventSubscriberInitializer<
   context: ClassMethodDecoratorContext<T>,
   targetOrTargetFactory: EventTarget | EventTargetFactory<T>,
   eventNames: string,
-  options: EventSubscribeOptions<T, E> = {},
+  options: EventSubscribeOptions<T, E> = EMPTY_OBJ,
 ): (this: T) => void {
   return function (this: T) {
     const predicate = options.predicate ?? (() => true);
@@ -305,7 +279,7 @@ function createSignalSubscriberInitializer<
 >(
   context: ClassMethodDecoratorContext<T>,
   target: S,
-  options: SignalSubscribeOptions<T, V> = {},
+  options: SignalSubscribeOptions<T, V> = EMPTY_OBJ,
 ): (this: T) => void {
   return function (this: T) {
     const predicate = options.predicate ?? (() => true);
@@ -409,7 +383,7 @@ type AttrOptions = {
 export function attr<T extends HTMLElement, V>(
   this: unknown,
   transformer: Transformer<T, V>,
-  options: AttrOptions = {},
+  options: AttrOptions = EMPTY_OBJ,
 ): ClassAccessorDecorator<T, V> {
   const isReflectiveAttribute = options.reflective !== false;
   // Enables early exits from the attributeChangedCallback for content attribute
@@ -450,11 +424,13 @@ export function attr<T extends HTMLElement, V>(
         skipNextReaction.set(this, false);
         const attributeChangedCallback = function (
           this: T,
-          name: string,
-          oldAttrVal: string | null,
-          newAttrVal: string | null,
+          evt: {
+            name: string;
+            oldValue: string | null;
+            newValue: string | null;
+          },
         ): void {
-          if (name !== contentAttrName || newAttrVal === oldAttrVal) {
+          if (evt.name !== contentAttrName || evt.newValue === evt.oldValue) {
             return; // skip irrelevant invocations
           }
           if (skipNextReaction.get(this) === true) {
@@ -462,15 +438,20 @@ export function attr<T extends HTMLElement, V>(
             return; // skip attribute reaction caused by a setter
           }
           const oldValue = target.get.call(this);
-          let newValue = transformer.parse.call(this, newAttrVal, oldValue);
+          let newValue = transformer.parse.call(this, evt.newValue, oldValue);
           if (transformer.eql.call(this, newValue, oldValue)) {
             return;
           }
-          newValue = transformer.set.call(this, newValue, newAttrVal, context);
+          newValue = transformer.set.call(
+            this,
+            newValue,
+            evt.newValue,
+            context,
+          );
           target.set.call(this, newValue);
           trigger(this, "prop", { name: context.name });
         };
-        setObserver(this, contentAttrName, attributeChangedCallback);
+        listen(this, "attribute", attributeChangedCallback);
       });
     }
 
@@ -589,7 +570,7 @@ function createDebouncedMethod<T extends object, A extends unknown[]>(
 
 export function debounce<T extends HTMLElement, A extends unknown[]>(
   this: unknown,
-  options: DebounceOptions = {},
+  options: DebounceOptions = EMPTY_OBJ,
 ): FunctionFieldOrMethodDecorator<T, A> {
   const fn = options.fn ?? debounce.raf();
   function decorator(

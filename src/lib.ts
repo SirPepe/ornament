@@ -1,6 +1,7 @@
 export const Nil: unique symbol = Symbol();
 
 export const isArray = Array.isArray;
+export const EMPTY_OBJ = {};
 
 export class MetaMap<K extends object, V extends object> {
   #initValue: () => V;

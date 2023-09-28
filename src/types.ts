@@ -1,4 +1,4 @@
-import { Nil, isArray } from "./lib.js";
+import { EMPTY_OBJ, Nil, isArray } from "./lib.js";
 
 export type Transformer<T extends HTMLElement, V> = {
   // parse() turns attribute values (usually string | null) into property
@@ -153,7 +153,7 @@ export function assertContext(
   ctx: any,
   name: string,
   kind: DecoratorContext["kind"] | DecoratorContext["kind"][],
-  accept: Partial<AcceptOptions> = {},
+  accept: Partial<AcceptOptions> = EMPTY_OBJ,
 ): void {
   const kinds = isArray(kind) ? kind : [kind];
   if (!kinds.includes(ctx.kind)) {
