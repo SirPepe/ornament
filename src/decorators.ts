@@ -100,14 +100,6 @@ function getObservers(instance: any): Record<string, ObserverCallback> {
   return observerCallbacks.get(instance.constructor) ?? {};
 }
 
-// A developer might want to initialize properties decorated with @prop() in
-// their custom element constructors. This should NOT trigger reactivity events,
-// as this is initialization and not a *change*. To make sure that reactivity
-// events only happen once an element's constructor has run to completion, the
-// following set tracks all elements where this has happened. Only elements in
-// this set receive reactivity events.
-const REACTIVE_READY = new WeakSet<HTMLElement>();
-
 // Maps debounced methods to original methods. Needed for initial calls of
 // @reactive() methods, which are not supposed to be async.
 const DEBOUNCED_METHOD_MAP = new WeakMap<Method<any, any>, Method<any, any>>();
@@ -133,20 +125,11 @@ export function define<T extends CustomElementConstructor>(
     // to change the type, we don't bother. The changes are really small, too.
     // See https://github.com/microsoft/TypeScript/issues/51347
     return class extends target {
-      // Component set-up in the constructor (which here is the super
-      // constructor) must not trigger reactive methods. Conversely, initial
-      // calls to reactive methods must happen immediately after the (super-)
-      // constructor's set-up is completed.
       constructor(...args: any[]) {
         super(...args);
-        // Perform the initial calls to reactive/subscribed methods for this
-        // instance.
         for (const callback of getCallbacks(this, "init")) {
           callback.call(this);
         }
-        // Mark the end of the constructor and the initial reactive calls,
-        // allow the element to receive reactivity events.
-        REACTIVE_READY.add(this);
       }
 
       static get observedAttributes(): string[] {
@@ -216,25 +199,29 @@ export function reactive<T extends HTMLElement>(
   this: unknown,
   options: ReactiveOptions<T> = {},
 ): ReactiveDecorator<T> {
+  const subscribedElements = new WeakSet();
   return function (_, context): void {
     assertContext(context, "reactive", "method");
     context.addInitializer(function () {
       const value = context.access.get(this);
-      // Register the callback that performs the initial method call. Uses the
-      // non-debounced method if required and wraps it in predicate logic.
-      if (options.initial !== false) {
-        setCallback(this, "init", context.name, function (this: T) {
+      setCallback(this, "init", context.name, function (this: T) {
+        // Active only once elements have initialized. This prevents prop set-up
+        // in the constructor from triggering reactive methods.
+        subscribedElements.add(this);
+        // Register the callback that performs the initial method call. Uses the
+        // non-debounced method if required and wraps it in predicate logic.
+        if (options.initial !== false) {
           if (!options.predicate || options.predicate.call(this)) {
             (DEBOUNCED_METHOD_MAP.get(value) ?? value).call(this);
           }
-        });
-      }
+        }
+      });
       // Start listening for reactivity events that happen after reactive init
       eventTargetMap
         .get(this)
         .addEventListener("", (evt: any /* ReactivityEvent */) => {
           if (
-            REACTIVE_READY.has(this) &&
+            subscribedElements.has(this) &&
             (!options.predicate || options.predicate.call(this)) &&
             (!options.keys || options.keys?.includes(evt.key))
           ) {
