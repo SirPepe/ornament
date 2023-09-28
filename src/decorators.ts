@@ -22,14 +22,6 @@ function initAccessor(
   return defaultValue;
 }
 
-class ReactivityEvent extends Event {
-  readonly key: string | symbol;
-  constructor(key: string | symbol) {
-    super("");
-    this.key = key;
-  }
-}
-
 // Accessor decorators initialize *after* custom elements access their
 // observedAttributes getter. This means that, in the absence of the decorators
 // metadata feature, there is no way to associate observed attributes with
@@ -49,6 +41,7 @@ declare global {
     init: Record<string, never>;
     connect: Record<string, never>;
     disconnect: Record<string, never>;
+    prop: { name: string | symbol };
   }
 }
 
@@ -210,18 +203,17 @@ export function reactive<T extends HTMLElement>(
           }
         }
       });
-      // Start listening for reactivity events that happen after reactive init
-      eventTargetMap
-        .get(this)
-        .addEventListener("", (evt: any /* ReactivityEvent */) => {
-          if (
-            subscribedElements.has(this) &&
-            (!options.predicate || options.predicate.call(this)) &&
-            (!options.keys || options.keys?.includes(evt.key))
-          ) {
-            value.call(this);
-          }
-        });
+      // Start listening for reactivity events if, after the init event, the
+      // element is subscribed.
+      listen(this, "prop", ({ name }) => {
+        if (
+          subscribedElements.has(this) &&
+          (!options.predicate || options.predicate.call(this)) &&
+          (!options.keys || options.keys?.includes(name))
+        ) {
+          value.call(this);
+        }
+      });
     });
   };
 }
@@ -478,9 +470,7 @@ export function attr<T extends HTMLElement, V>(
           }
           newValue = transformer.set.call(this, newValue, newAttrVal, context);
           target.set.call(this, newValue);
-          eventTargetMap
-            .get(this)
-            .dispatchEvent(new ReactivityEvent(context.name));
+          trigger(this, "prop", { name: context.name });
         };
         setObserver(this, contentAttrName, attributeChangedCallback);
       });
@@ -532,9 +522,7 @@ export function attr<T extends HTMLElement, V>(
             );
           }
         }
-        eventTargetMap
-          .get(this)
-          .dispatchEvent(new ReactivityEvent(context.name));
+        trigger(this, "prop", { name: context.name });
       },
       get() {
         return transformer.get.call(this, target.get.call(this), context);
@@ -564,9 +552,7 @@ export function prop<T extends HTMLElement, V>(
         }
         newValue = transformer.set.call(this, newValue, Nil, context);
         target.set.call(this, newValue);
-        eventTargetMap
-          .get(this)
-          .dispatchEvent(new ReactivityEvent(context.name));
+        trigger(this, "prop", { name: context.name });
       },
       get() {
         return transformer.get.call(this, target.get.call(this), context);
