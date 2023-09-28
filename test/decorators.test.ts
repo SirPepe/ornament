@@ -602,6 +602,24 @@ describe("Decorators", () => {
       expect(fn.getCalls()[1].args).to.eql([[2]]);
     });
 
+    test("attr change causes only one effect to run, not also the attributeChangedCallback (two primitive updates)", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(string()) accessor foo = "a";
+        @attr(string()) accessor bar = "x";
+        @reactive({ initial: false }) test() {
+          fn(this.foo, this.bar);
+        }
+      }
+      const el = new Test();
+      el.foo = "b";
+      el.bar = "y";
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[0].args).to.eql(["b", "x"]);
+      expect(fn.getCalls()[1].args).to.eql(["b", "y"]);
+    });
+
     test("predicate option", async () => {
       const fn = spy();
       @define(generateTagName())

@@ -406,16 +406,15 @@ type AttrOptions = {
   reflective?: boolean; // defaults to true
 };
 
-// Enables early exits from the attributeChangedCallback for attribute updates
-// that were caused by setters.
-const SKIP_NEXT_ATTRIBUTE_REACTION = new WeakMap<HTMLElement, Set<string>>();
-
 export function attr<T extends HTMLElement, V>(
   this: unknown,
   transformer: Transformer<T, V>,
   options: AttrOptions = {},
 ): ClassAccessorDecorator<T, V> {
   const isReflectiveAttribute = options.reflective !== false;
+  // Enables early exits from the attributeChangedCallback for content attribute
+  // updates that were caused by invoking IDL setters
+  const skipNextReaction = new WeakMap<HTMLElement, boolean>();
   return function (target, context): ClassAccessorDecoratorResult<T, V> {
     assertContext(context, "attr", "accessor");
 
@@ -448,8 +447,7 @@ export function attr<T extends HTMLElement, V>(
     // instance - this initializer is earliest we have access to the instance.
     if (isReflectiveAttribute) {
       context.addInitializer(function () {
-        const skipReactions = new Set<string>();
-        SKIP_NEXT_ATTRIBUTE_REACTION.set(this, skipReactions);
+        skipNextReaction.set(this, false);
         const attributeChangedCallback = function (
           this: T,
           name: string,
@@ -459,8 +457,8 @@ export function attr<T extends HTMLElement, V>(
           if (name !== contentAttrName || newAttrVal === oldAttrVal) {
             return; // skip irrelevant invocations
           }
-          if (skipReactions.has(name)) {
-            skipReactions.delete(name);
+          if (skipNextReaction.get(this) === true) {
+            skipNextReaction.set(this, false);
             return; // skip attribute reaction caused by a setter
           }
           const oldValue = target.get.call(this);
@@ -511,7 +509,7 @@ export function attr<T extends HTMLElement, V>(
           // attributeChangedCallback must be skipped to prevent double calls of
           // @reactive methods
           if (updateAttr !== false) {
-            SKIP_NEXT_ATTRIBUTE_REACTION.get(this)?.add(contentAttrName);
+            skipNextReaction.set(this, true);
           }
           if (updateAttr === null) {
             this.removeAttribute(contentAttrName);
