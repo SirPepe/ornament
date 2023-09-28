@@ -977,6 +977,7 @@ describe("Decorators", () => {
     test("reject on static fields", async () => {
       expect(() => {
         class Test extends HTMLElement {
+          // @ts-expect-error for testing runtime checks
           @subscribe(new EventTarget(), "foo") static test() {
             return;
           }
