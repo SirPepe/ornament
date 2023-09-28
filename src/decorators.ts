@@ -30,10 +30,6 @@ class ReactivityEvent extends Event {
   }
 }
 
-const eventTargetMap = new MetaMap<HTMLElement, EventTarget>(
-  () => new EventTarget(),
-);
-
 // Accessor decorators initialize *after* custom elements access their
 // observedAttributes getter. This means that, in the absence of the decorators
 // metadata feature, there is no way to associate observed attributes with
@@ -43,33 +39,37 @@ const eventTargetMap = new MetaMap<HTMLElement, EventTarget>(
 // by a given element.
 const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 
-// The following callback wrangling code fills the hole left by the
-// non-existence of decorator metadata as of Q3 2023.
-type Callbacks = Record<string | symbol, (this: HTMLElement) => void>;
-const callbackSources = {
-  init: new MetaMap<CustomElementConstructor, Callbacks>(Object),
-  connect: new MetaMap<CustomElementConstructor, Callbacks>(Object),
-  disconnect: new MetaMap<CustomElementConstructor, Callbacks>(Object),
-};
+// Event targets associated with element instances
+const eventTargetMap = new MetaMap<HTMLElement, EventTarget>(
+  () => new EventTarget(),
+);
 
-function setCallback(
-  instance: any,
-  on: keyof typeof callbackSources,
-  name: string | symbol,
-  callback: () => void,
-): void {
-  const callbacks = callbackSources[on].get(instance.constructor);
-  if (!callbacks[name]) {
-    callbacks[name] = callback;
+declare global {
+  interface OrnamentReactionMap {
+    init: Record<string, never>;
+    connect: Record<string, never>;
+    disconnect: Record<string, never>;
   }
 }
 
-function getCallbacks(
-  instance: any,
-  on: keyof typeof callbackSources,
-): (() => void)[] {
-  const callbacks = callbackSources[on].get(instance.constructor);
-  return Object.values(callbacks);
+function trigger<T extends HTMLElement, K extends keyof OrnamentReactionMap>(
+  instance: T,
+  name: K,
+  args: OrnamentReactionMap[K],
+): void {
+  eventTargetMap
+    .get(instance)
+    .dispatchEvent(Object.assign(new Event(name), args));
+}
+
+function listen<T extends HTMLElement, K extends keyof OrnamentReactionMap>(
+  instance: T,
+  name: K,
+  callback: (this: T, args: Event & OrnamentReactionMap[K]) => void,
+): void {
+  eventTargetMap
+    .get(instance)
+    .addEventListener(name, (evt: any): void => callback.call(instance, evt));
 }
 
 // Maps attributes to attribute observer callbacks mapped by custom element
@@ -127,9 +127,7 @@ export function define<T extends CustomElementConstructor>(
     return class extends target {
       constructor(...args: any[]) {
         super(...args);
-        for (const callback of getCallbacks(this, "init")) {
-          callback.call(this);
-        }
+        trigger(this, "init", {});
       }
 
       static get observedAttributes(): string[] {
@@ -145,18 +143,14 @@ export function define<T extends CustomElementConstructor>(
         // eslint-disable-next-line
         // @ts-ignore
         super.connectedCallback?.call(this);
-        for (const callback of getCallbacks(this, "connect")) {
-          callback.call(this);
-        }
+        trigger(this, "connect", {});
       }
 
       disconnectedCallback(): void {
         // eslint-disable-next-line
         // @ts-ignore
         super.disconnectedCallback?.call(this);
-        for (const callback of getCallbacks(this, "disconnect")) {
-          callback.call(this);
-        }
+        trigger(this, "disconnect", {});
       }
 
       attributeChangedCallback(
@@ -204,7 +198,7 @@ export function reactive<T extends HTMLElement>(
     assertContext(context, "reactive", "method");
     context.addInitializer(function () {
       const value = context.access.get(this);
-      setCallback(this, "init", context.name, function (this: T) {
+      listen(this, "init", () => {
         // Active only once elements have initialized. This prevents prop set-up
         // in the constructor from triggering reactive methods.
         subscribedElements.add(this);
@@ -259,7 +253,10 @@ type EventTargetFactory<T, E extends EventTarget = EventTarget> = (
   this: T,
 ) => E;
 
-function createEventSubscriberInitializer<T extends object, E extends Event>(
+function createEventSubscriberInitializer<
+  T extends HTMLElement,
+  E extends Event,
+>(
   context: ClassMethodDecoratorContext<T>,
   targetOrTargetFactory: EventTarget | EventTargetFactory<T>,
   eventNames: string,
@@ -267,7 +264,7 @@ function createEventSubscriberInitializer<T extends object, E extends Event>(
 ): (this: T) => void {
   return function (this: T) {
     const predicate = options.predicate ?? (() => true);
-    setCallback(this, "init", context.name, function (this: T) {
+    listen(this, "init", () => {
       const callback = (evt: any) => {
         if (predicate.call(this, evt)) {
           context.access.get(this).call(this, evt);
@@ -310,7 +307,7 @@ function isSignalLike(value: unknown): value is SignalLike<any> {
 }
 
 function createSignalSubscriberInitializer<
-  T extends object,
+  T extends HTMLElement,
   V,
   S extends SignalLike<V>,
 >(
@@ -320,7 +317,7 @@ function createSignalSubscriberInitializer<
 ): (this: T) => void {
   return function (this: T) {
     const predicate = options.predicate ?? (() => true);
-    setCallback(this, "init", context.name, function (this: T) {
+    listen(this, "init", () => {
       const value = context.access.get(this);
       const callback = () => {
         if (predicate.call(this, target.value)) {
@@ -333,13 +330,13 @@ function createSignalSubscriberInitializer<
   };
 }
 
-export function subscribe<T extends object, S extends SignalLike<any>>(
+export function subscribe<T extends HTMLElement, S extends SignalLike<any>>(
   this: unknown,
   target: S,
   options?: SignalSubscribeOptions<T, SignalType<S>>,
 ): SignalSubscribeDecorator<T>;
 export function subscribe<
-  T extends object,
+  T extends HTMLElement,
   U extends EventTarget,
   E extends Event,
 >(
@@ -348,7 +345,7 @@ export function subscribe<
   events: string,
   options?: EventSubscribeOptions<T, E>,
 ): EventSubscribeDecorator<T, E>;
-export function subscribe<T extends object>(
+export function subscribe<T extends HTMLElement>(
   this: unknown,
   target: EventTarget | EventTargetFactory<any> | SignalLike<any>,
   eventsOrOptions?: SubscribeOptions<T, any> | string,
@@ -391,7 +388,7 @@ export function connected<T extends HTMLElement>() {
   ): void {
     assertContext(context, "connected", "method");
     context.addInitializer(function () {
-      setCallback(this, "connect", context.name, context.access.get(this));
+      listen(this, "connect", context.access.get(this));
     });
   };
 }
@@ -403,7 +400,7 @@ export function disconnected<T extends HTMLElement>() {
   ): void {
     assertContext(context, "disconnected", "method");
     context.addInitializer(function () {
-      setCallback(this, "disconnect", context.name, context.access.get(this));
+      listen(this, "disconnect", context.access.get(this));
     });
   };
 }
