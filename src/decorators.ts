@@ -22,15 +22,6 @@ function initAccessor(
   return defaultValue;
 }
 
-// Accessor decorators initialize *after* custom elements access their
-// observedAttributes getter. This means that, in the absence of the decorators
-// metadata feature, there is no way to associate observed attributes with
-// specific elements or constructors from inside the @attr() decorator. Instead
-// we simply track *all* attributes defined by @attr() *on any class* and decide
-// *inside the attribute changed callback* whether they are *actually* observed
-// by a given element.
-const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
-
 // Event targets associated with element instances
 const eventTargetMap = new MetaMap<HTMLElement, EventTarget>(
   () => new EventTarget(),
@@ -39,8 +30,9 @@ const eventTargetMap = new MetaMap<HTMLElement, EventTarget>(
 declare global {
   interface OrnamentReactionMap {
     init: Record<string, never>;
-    connect: Record<string, never>;
-    disconnect: Record<string, never>;
+    connected: Record<string, never>;
+    disconnected: Record<string, never>;
+    adopted: Record<string, never>;
     prop: { name: string | symbol };
     attribute: {
       name: string;
@@ -64,11 +56,25 @@ function listen<T extends HTMLElement, K extends keyof OrnamentReactionMap>(
   instance: T,
   name: K,
   callback: (this: T, args: Event & OrnamentReactionMap[K]) => void,
+  options?: AddEventListenerOptions,
 ): void {
   eventTargetMap
     .get(instance)
-    .addEventListener(name, (evt: any): void => callback.call(instance, evt));
+    .addEventListener(
+      name,
+      (evt: any): void => callback.call(instance, evt),
+      options,
+    );
 }
+
+// Accessor decorators initialize *after* custom elements access their
+// observedAttributes getter. This means that, in the absence of the decorators
+// metadata feature, there is no way to associate observed attributes with
+// specific elements or constructors from inside the @attr() decorator. Instead
+// we simply track *all* attributes defined by @attr() *on any class* and decide
+// *inside the attribute changed callback* whether they are *actually* observed
+// by a given element.
+const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 
 // Maps debounced methods to original methods. Needed for initial calls of
 // @reactive() methods, which are not supposed to be async.
@@ -113,14 +119,21 @@ export function define<T extends CustomElementConstructor>(
         // eslint-disable-next-line
         // @ts-ignore
         super.connectedCallback?.call(this);
-        trigger(this, "connect", EMPTY_OBJ);
+        trigger(this, "connected", EMPTY_OBJ);
       }
 
       disconnectedCallback(): void {
         // eslint-disable-next-line
         // @ts-ignore
         super.disconnectedCallback?.call(this);
-        trigger(this, "disconnect", EMPTY_OBJ);
+        trigger(this, "disconnected", EMPTY_OBJ);
+      }
+
+      adoptedCallback(): void {
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.adoptedCallback?.call(this);
+        trigger(this, "adopted", EMPTY_OBJ);
       }
 
       attributeChangedCallback(
@@ -347,26 +360,43 @@ export function subscribe<T extends HTMLElement>(
   };
 }
 
-export function connected<T extends HTMLElement>() {
+type LifecycleDecorator<T extends HTMLElement> = (
+  _: Method<T, []>,
+  context: ClassMethodDecoratorContext<T, (this: T, ...args: any) => any>,
+) => void;
+
+export function connected<T extends HTMLElement>(): LifecycleDecorator<T> {
   return function (
     _: Method<T, []>,
     context: ClassMethodDecoratorContext<T>,
   ): void {
     assertContext(context, "connected", "method");
     context.addInitializer(function () {
-      listen(this, "connect", context.access.get(this));
+      listen(this, "connected", context.access.get(this));
     });
   };
 }
 
-export function disconnected<T extends HTMLElement>() {
+export function disconnected<T extends HTMLElement>(): LifecycleDecorator<T> {
   return function (
     _: Method<T, []>,
     context: ClassMethodDecoratorContext<T>,
   ): void {
     assertContext(context, "disconnected", "method");
     context.addInitializer(function () {
-      listen(this, "disconnect", context.access.get(this));
+      listen(this, "disconnected", context.access.get(this));
+    });
+  };
+}
+
+export function adopted<T extends HTMLElement>(): LifecycleDecorator<T> {
+  return function (
+    _: Method<T, []>,
+    context: ClassMethodDecoratorContext<T>,
+  ): void {
+    assertContext(context, "adopted", "method");
+    context.addInitializer(function () {
+      listen(this, "adopted", context.access.get(this));
     });
   };
 }

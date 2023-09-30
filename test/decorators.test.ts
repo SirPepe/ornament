@@ -1,6 +1,7 @@
 import { expect } from "@esm-bundle/chai";
 import { spy } from "sinon";
 import {
+  adopted,
   attr,
   connected,
   debounce,
@@ -477,6 +478,42 @@ describe("Decorators", () => {
       expect(connectFn.getCalls()[0].args).to.eql([instance, 42]);
       expect(disconnectFn.callCount).to.equal(1);
       expect(disconnectFn.getCalls()[0].args).to.eql([instance, 42]);
+    });
+  });
+
+  describe("@adopted", () => {
+    test("fire on adoption", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @adopted() adopted() {
+          fn(this);
+        }
+      }
+      const instance = new Test();
+      new Document().adoptNode(instance);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([instance]);
+    });
+
+    test("also fires the original adoptedCallback on adoption", async () => {
+      const fn1 = spy();
+      const fn2 = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @adopted() adopted() {
+          fn1(this);
+        }
+        adoptedCallback() {
+          fn2(this);
+        }
+      }
+      const instance = new Test();
+      new Document().adoptNode(instance);
+      expect(fn1.callCount).to.equal(1);
+      expect(fn1.getCalls()[0].args).to.eql([instance]);
+      expect(fn2.callCount).to.equal(1);
+      expect(fn2.getCalls()[0].args).to.eql([instance]);
     });
   });
 

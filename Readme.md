@@ -323,6 +323,7 @@ properly upgraded.
 | `@reactive()`     | Method              | ✕        | ✓          | -                |
 | `@connected()`    | Method              | ✕        | ✓          | -                |
 | `@disconnected()` | Method              | ✕        | ✓          | -                |
+| `@adopted()`      | Method              | ✕        | ✓          | -                |
 | `@subscribe()`    | Method              | ✕        | ✓          | -                |
 | `@debounce()`     | Method, Class Field | ✕        | ✓          | ✓ (Class fields) |
 
@@ -526,14 +527,14 @@ true:
 ### `@connected()`
 
 **Method decorator** that causes decorated class methods to run when the
-component connects to the DOM:
+component connects to the DOM  and the component's `connectedCallback()` fires:
 
 ```javascript
 import { define, connected } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
-  @connected log() {
+  @connected() log() {
     console.log("Connected!");
   }
 }
@@ -546,14 +547,15 @@ document.body.append(testEl);
 ### `@disconnected()`
 
 **Method decorator** that causes decorated class methods to run when the
-component disconnects from the DOM:
+component disconnects from the DOM and the component's `disconnectedCallback()`
+fires:
 
 ```javascript
-import { define, disconnected } from "@sirpepe/ornament";
+import { define, adopted } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
-  @disconnected log() {
+  @disconnected() log() {
     console.log("Disconnected!");
   }
 }
@@ -562,6 +564,28 @@ let testEl = document.createElement("my-test");
 document.body.append(testEl);
 testEl.remove();
 // testEl.log logs "Disconnected!"
+```
+
+### `@adopted()`
+
+**Method decorator** that causes decorated class methods to run when the
+component is moved to a new document and the component's `adoptedCallback()`
+fires:
+
+```javascript
+import { define, adopted } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @adopted() log() {
+    console.log("Adopted!");
+  }
+}
+
+let testEl = document.createElement("my-test");
+const newDocument = new Document();
+newDocument.adoptNode(testEl);
+// testEl.log logs "Adopted!"
 ```
 
 ### `@subscribe(...args)`
