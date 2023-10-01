@@ -560,8 +560,7 @@ export function event<
       // handler must be detached and then re-attached to reflect the new firing
       // order of event handlers. If both the new and old handlers are
       // functions, the swap happens in-place.
-      const func = functions.get(this);
-      if (!func || !value) {
+      if (!functions.get(this) || !value) {
         const name = (context.name as string).slice(2);
         this.removeEventListener(name, handler as any);
         this.addEventListener(name, handler as any);

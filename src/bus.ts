@@ -1,16 +1,14 @@
-import { MetaMap } from "./lib";
-
-const eventTargetMap = new MetaMap<HTMLElement, EventTarget>(
-  () => new EventTarget(),
-);
+const targetMap = new WeakMap<HTMLElement, EventTarget>();
 
 export function trigger<
   T extends HTMLElement,
   K extends keyof OrnamentEventMap,
 >(instance: T, name: K, args: OrnamentEventMap[K]): void {
-  eventTargetMap
-    .get(instance)
-    .dispatchEvent(Object.assign(new Event(name), args));
+  let target = targetMap.get(instance);
+  if (!target) {
+    targetMap.set(instance, (target = new EventTarget()));
+  }
+  target.dispatchEvent(Object.assign(new Event(name), args));
 }
 
 export function listen<T extends HTMLElement, K extends keyof OrnamentEventMap>(
@@ -19,11 +17,13 @@ export function listen<T extends HTMLElement, K extends keyof OrnamentEventMap>(
   callback: (this: T, args: Event & OrnamentEventMap[K]) => void,
   options?: AddEventListenerOptions,
 ): void {
-  eventTargetMap
-    .get(instance)
-    .addEventListener(
-      name,
-      (evt: any): void => callback.call(instance, evt),
-      options,
-    );
+  let target = targetMap.get(instance);
+  if (!target) {
+    targetMap.set(instance, (target = new EventTarget()));
+  }
+  target.addEventListener(
+    name,
+    (evt: any): void => callback.call(instance, evt),
+    options,
+  );
 }
