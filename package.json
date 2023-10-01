@@ -16,6 +16,7 @@
   "scripts": {
     "lint": "eslint --ext .ts src",
     "test": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve --playwright --browsers chromium firefox",
+    "test-dev": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve",
     "build": "npm run lint && rollup -c rollup.config.mjs && npm run size",
     "build-examples": "cd examples && rollup -c rollup.config.mjs",
     "types": "rm -rf dist/types && tsc -p tsconfig.build.json",

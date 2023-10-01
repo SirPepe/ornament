@@ -1,4 +1,4 @@
-import { Nil, isArray } from "./lib.js";
+import { EMPTY_OBJ, Nil, isArray } from "./lib.js";
 import {
   type Transformer,
   assertRecord,
@@ -135,7 +135,7 @@ function numberOptions(input: unknown): NumberOptions<number> {
 }
 
 export function number<T extends HTMLElement>(
-  options: Partial<NumberOptions<number>> = {},
+  options: Partial<NumberOptions<number>> = EMPTY_OBJ,
 ): Transformer<T, number> {
   const fallbackValues = new WeakMap<T, number>();
   const { min, max } = numberOptions(options);
@@ -208,7 +208,7 @@ function toBigInt(value: string | number | bigint | boolean): bigint {
 }
 
 export function int<T extends HTMLElement>(
-  options: Partial<NumberOptions<bigint>> = {},
+  options: Partial<NumberOptions<bigint>> = EMPTY_OBJ,
 ): Transformer<T, bigint> {
   const fallbackValues = new WeakMap<T, bigint>();
   const { min, max } = bigintOptions(options);
@@ -264,7 +264,7 @@ type JSONOptions = {
 };
 
 export function json<T extends HTMLElement>(
-  options: JSONOptions = {},
+  options: JSONOptions = EMPTY_OBJ,
 ): Transformer<T, any> {
   const fallbackValues = new WeakMap<T, any>();
   return createTransformer<T, any>({
@@ -314,7 +314,7 @@ type ZodOptions = {
 
 export function schema<T extends HTMLElement, V>(
   schema: SchemaLike<V>,
-  options: ZodOptions = {},
+  options: ZodOptions = EMPTY_OBJ,
 ): Transformer<T, V> {
   if (typeof schema !== "object") {
     throw new TypeError("First argument of the schema transformer is required");
@@ -367,7 +367,7 @@ type LiteralOptions<T extends HTMLElement, V> = {
 };
 
 function literalOptions<T extends HTMLElement, V>(
-  input: unknown = {},
+  input: unknown = EMPTY_OBJ,
 ): LiteralOptions<T, V> {
   assertRecord(input, "options");
   const { values, transform } = input as Record<any, any>;
@@ -380,7 +380,7 @@ function literalOptions<T extends HTMLElement, V>(
   if (values.length === 0) {
     throw new TypeError(`Expected "values" to not be empty`);
   }
-  return input as LiteralOptions<T, V>;
+  return { values, transform };
 }
 
 export function literal<T extends HTMLElement, V>(
@@ -428,17 +428,15 @@ type ListOptions<T extends HTMLElement, V> = {
 };
 
 function listOptions<T extends HTMLElement, V>(
-  input: unknown = {},
+  input: unknown = EMPTY_OBJ,
 ): Required<ListOptions<T, V>> {
   assertRecord(input, "options");
-  assertTransformer<T, V>(input.transform);
-  if (!("separator" in input)) {
-    input.separator = ",";
+  const { separator = ",", transform } = input as Record<any, any>;
+  assertTransformer<T, V>(transform);
+  if (typeof separator !== "string") {
+    throw new Error(`Invalid separator ${separator}`);
   }
-  if (typeof input.separator !== "string") {
-    throw new Error(`Invalid separator ${input.separator}`);
-  }
-  return input as Required<ListOptions<T, V>>;
+  return { separator, transform };
 }
 
 export function list<T extends HTMLElement, V>(
@@ -562,8 +560,7 @@ export function event<
       // handler must be detached and then re-attached to reflect the new firing
       // order of event handlers. If both the new and old handlers are
       // functions, the swap happens in-place.
-      const func = functions.get(this);
-      if (!func || !value) {
+      if (!functions.get(this) || !value) {
         const name = (context.name as string).slice(2);
         this.removeEventListener(name, handler as any);
         this.addEventListener(name, handler as any);

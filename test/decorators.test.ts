@@ -1,6 +1,7 @@
 import { expect } from "@esm-bundle/chai";
 import { spy } from "sinon";
 import {
+  adopted,
   attr,
   connected,
   debounce,
@@ -480,6 +481,42 @@ describe("Decorators", () => {
     });
   });
 
+  describe("@adopted", () => {
+    test("fire on adoption", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @adopted() adopted() {
+          fn(this);
+        }
+      }
+      const instance = new Test();
+      new Document().adoptNode(instance);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([instance]);
+    });
+
+    test("also fires the original adoptedCallback on adoption", async () => {
+      const fn1 = spy();
+      const fn2 = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @adopted() adopted() {
+          fn1(this);
+        }
+        adoptedCallback() {
+          fn2(this);
+        }
+      }
+      const instance = new Test();
+      new Document().adoptNode(instance);
+      expect(fn1.callCount).to.equal(1);
+      expect(fn1.getCalls()[0].args).to.eql([instance]);
+      expect(fn2.callCount).to.equal(1);
+      expect(fn2.getCalls()[0].args).to.eql([instance]);
+    });
+  });
+
   describe("@reactive", () => {
     test("initial call with reactive property", async () => {
       const fn = spy();
@@ -600,6 +637,24 @@ describe("Decorators", () => {
       expect(fn.callCount).to.equal(2); // initial + one update
       expect(fn.getCalls()[0].args).to.eql([[1]]);
       expect(fn.getCalls()[1].args).to.eql([[2]]);
+    });
+
+    test("attr change causes only one effect to run, not also the attributeChangedCallback (two primitive updates)", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(string()) accessor foo = "a";
+        @attr(string()) accessor bar = "x";
+        @reactive({ initial: false }) test() {
+          fn(this.foo, this.bar);
+        }
+      }
+      const el = new Test();
+      el.foo = "b";
+      el.bar = "y";
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[0].args).to.eql(["b", "x"]);
+      expect(fn.getCalls()[1].args).to.eql(["b", "y"]);
     });
 
     test("predicate option", async () => {
@@ -977,6 +1032,7 @@ describe("Decorators", () => {
     test("reject on static fields", async () => {
       expect(() => {
         class Test extends HTMLElement {
+          // @ts-expect-error for testing runtime checks
           @subscribe(new EventTarget(), "foo") static test() {
             return;
           }
