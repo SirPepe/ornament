@@ -1,5 +1,20 @@
 import { EMPTY_OBJ, Nil, isArray } from "./lib.js";
 
+declare global {
+  interface OrnamentEventMap {
+    init: Record<string, never>;
+    connected: Record<string, never>;
+    disconnected: Record<string, never>;
+    adopted: Record<string, never>;
+    prop: { name: string | symbol };
+    attribute: {
+      name: string;
+      oldValue: string | null;
+      newValue: string | null;
+    };
+  }
+}
+
 export type Transformer<T extends HTMLElement, V> = {
   // parse() turns attribute values (usually string | null) into property
   // values. Must *never* throw exceptions, and instead always deal with its

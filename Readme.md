@@ -233,8 +233,8 @@ truly compatible with any software out there - a JS frontend framework may work
 primarily with IDL attributes, while HTML authors or server-side rendering
 software will work with content attributes.
 
-Keeping content and IDL attributes in sync can entail any of the following
-tasks:
+Keeping content and IDL attributes in sync can entail any or all of the
+following tasks:
 
 - Updating the content attribute when the IDL attribute gets changed (eg. update the HTML attribute `id` when running `element.id = "foo"` in JS)
 - Updating the IDL attribute when the content attribute gets changed (eg. `element.id` should return `"bar"` after `element.setAttribute("id", "bar")`)
@@ -1239,6 +1239,54 @@ explicitly implement them.
 
 The behavior of `event()` matches the behavior of built-in event handlers like
 `onclick`.
+
+## Event Bus
+
+Ornament runs intra-component communication over an internal event bus. You will
+almost certainly never need to access it directly, but there is is an API just
+in case.
+
+| Event                      | Cause                                     | Payload                                                                        |
+| ---------------------------| ------------------------------------------|--------------------------------------------------------------------------------|
+| `init`                     | Constructor ran to completion             | `Event`                                                                        |
+| `connected`                | `connectedCallback()` fired               | `Event`                                                                        |
+| `disconnected`             | `disconnectedCallback()` fired            | `Event`                                                                        |
+| `adopted`                  | `adoptedCallback()` fired                 | `Event`                                                                        |
+| `prop`                     | IDL attribute change (`@prop` or `@attr`) | `Event & { name: string \| symbol }`                                           |
+| `attribute`                | Content attribute change (`@attr`)        | `Event & { name: string; oldValue: string \| null; newValue: string \| null }` |
+
+**Note for TypeScript:** you can declare additions to the global interface
+`OrnamentEventMap` to extend this list with your own events.
+
+### `trigger(instance, name, payload)`
+
+Dispatches an event on the event bus for the component `instance`. `payload`
+must be a record with all the data that must be attached to the event before its
+fired (eg. `{ name: string | symbol }` for `prop`).
+
+```javascript
+import { trigger } from "@sirpepe/ornament";
+
+// Dispatches an "connected" event. This will run all methods on "someElement"
+// that were decorated with @connect().
+trigger(someElement, "connected", {});
+```
+
+### `listen(instance, name, callback, options?)`
+
+Listens to events on the event bus for the component `instance`. The event bus
+is an instance of `EventTarget`, which means that you can pass any and all
+[event listener options](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#options)
+as the last argument.
+
+```javascript
+import { listen } from "@sirpepe/ornament";
+
+// Listen for "prop" event on the event bus for "someElement"
+listen(someElement, "prop", (evt) => {
+  window.alert(`IDL attribute ${evt.name} was changed!`);
+});
+```
 
 ## Cookbook
 

@@ -1,4 +1,5 @@
-import { EMPTY_OBJ, MetaMap, Nil } from "./lib.js";
+import { listen, trigger } from "./bus.js";
+import { EMPTY_OBJ, Nil } from "./lib.js";
 import {
   type ClassAccessorDecorator,
   type FunctionFieldOrMethodDecorator,
@@ -20,51 +21,6 @@ function initAccessor(
     delete (instance as any)[name];
   }
   return defaultValue;
-}
-
-// Event targets associated with element instances
-const eventTargetMap = new MetaMap<HTMLElement, EventTarget>(
-  () => new EventTarget(),
-);
-
-declare global {
-  interface OrnamentReactionMap {
-    init: Record<string, never>;
-    connected: Record<string, never>;
-    disconnected: Record<string, never>;
-    adopted: Record<string, never>;
-    prop: { name: string | symbol };
-    attribute: {
-      name: string;
-      oldValue: string | null;
-      newValue: string | null;
-    };
-  }
-}
-
-function trigger<T extends HTMLElement, K extends keyof OrnamentReactionMap>(
-  instance: T,
-  name: K,
-  args: OrnamentReactionMap[K],
-): void {
-  eventTargetMap
-    .get(instance)
-    .dispatchEvent(Object.assign(new Event(name), args));
-}
-
-function listen<T extends HTMLElement, K extends keyof OrnamentReactionMap>(
-  instance: T,
-  name: K,
-  callback: (this: T, args: Event & OrnamentReactionMap[K]) => void,
-  options?: AddEventListenerOptions,
-): void {
-  eventTargetMap
-    .get(instance)
-    .addEventListener(
-      name,
-      (evt: any): void => callback.call(instance, evt),
-      options,
-    );
 }
 
 // Accessor decorators initialize *after* custom elements access their
