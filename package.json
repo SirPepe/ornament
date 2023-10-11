@@ -9,8 +9,8 @@
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
-      "default": "./dist/esm/index.js",
-      "require": "./dist/min/index.min.js"
+      "require": "./dist/min/index.min.js",
+      "default": "./dist/esm/index.js"
     }
   },
   "scripts": {
