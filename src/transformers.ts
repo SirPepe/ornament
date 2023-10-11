@@ -415,12 +415,9 @@ export function literal<T extends HTMLElement, V>(
       if (values.includes(validated)) {
         return validated;
       }
-      if (transform.stringify) {
-        throw new Error(
-          `Invalid value: ${transform.stringify.call(this, validated)}`,
-        );
-      }
-      throw new Error(`Invalid value: ${validated}`);
+      throw new Error(
+        `Invalid value: ${transform.stringify.call(this, validated)}`,
+      );
     },
     stringify: transform.stringify,
     eql: transform.eql,
