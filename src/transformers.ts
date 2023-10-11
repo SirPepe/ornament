@@ -127,7 +127,7 @@ type NumberOptions<T extends number | bigint | undefined> = {
 
 function numberOptions(input: unknown): NumberOptions<number> {
   assertRecord(input, "options");
-  const { min = -Infinity, max = Infinity } = input as Record<any, any>;
+  const { min = -Infinity, max = Infinity } = input;
   assertType(min, "min", "number");
   assertType(max, "max", "number");
   if (min >= max) {
@@ -376,7 +376,7 @@ function literalOptions<T extends HTMLElement, V>(
   input: unknown = EMPTY_OBJ,
 ): LiteralOptions<T, V> {
   assertRecord(input, "options");
-  const { values, transform } = input as Record<any, any>;
+  const { values, transform } = input;
   assertTransformer<T, V>(transform);
   if (!isArray(values)) {
     throw new TypeError(
@@ -439,7 +439,7 @@ function listOptions<T extends HTMLElement, V>(
   input: unknown = EMPTY_OBJ,
 ): Required<ListOptions<T, V>> {
   assertRecord(input, "options");
-  const { separator = ",", transform } = input as Record<any, any>;
+  const { separator = ",", transform } = input;
   assertTransformer<T, V>(transform);
   if (typeof separator !== "string") {
     throw new Error(`Invalid separator of type ${typeof separator}`);
