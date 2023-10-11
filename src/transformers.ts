@@ -195,7 +195,9 @@ function bigintOptions(input: unknown): NumberOptions<bigint | undefined> {
   const { min, max } = input;
   assertType(min, "min", "bigint", "undefined");
   assertType(max, "max", "bigint", "undefined");
-  if (typeof min === "bigint" && typeof max === "bigint" && min >= max) {
+  // The comparison below can only be true if both min and max are not
+  // undefined. No need to do extra type checks beforehand.
+  if ((min as any) > (max as any)) {
     throw new RangeError(
       `Expected "min" to be be less than "max", but ${min} is larger than ${max}`,
     );
