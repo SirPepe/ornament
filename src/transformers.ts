@@ -217,16 +217,22 @@ export function int<T extends HTMLElement>(
   options: Partial<NumberOptions<bigint>> = EMPTY_OBJ,
 ): Transformer<T, bigint> {
   const fallbackValues = new WeakMap<T, bigint>();
-  const { min, max } = bigintOptions(options);
+  // The type assertion below is a blatant lie, as any or both of min and max
+  // may well be undefined. But in the less/greater than operations that they
+  // are used in they either convert to NaN (in case of undefined), which is NOT
+  // less or greater than anything OR they are not undefined and thus proper
+  // bigints. This is a bit code golf-y, but we are just not gonna worry about
+  // it.
+  const { min, max } = bigintOptions(options) as { min: bigint; max: bigint };
   return createTransformer<T, bigint>({
     parse(value, oldValue) {
       if (isBigIntConvertible(value)) {
         try {
           const asInt = toBigInt(value);
-          if (typeof min !== "undefined" && asInt <= min) {
+          if (asInt <= min) {
             return min;
           }
-          if (typeof max !== "undefined" && asInt >= max) {
+          if (asInt >= max) {
             return max;
           }
           return asInt;
@@ -247,10 +253,7 @@ export function int<T extends HTMLElement>(
         return 0n;
       }
       const asInt = BigInt(value as any);
-      if (
-        (typeof min !== "undefined" && asInt < min) ||
-        (typeof max !== "undefined" && asInt > max)
-      ) {
+      if (asInt < min || asInt > max) {
         throw new RangeError(`${asInt} is out of range [${min}, ${max}]`);
       }
       return asInt;

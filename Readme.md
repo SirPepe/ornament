@@ -1,6 +1,6 @@
 # Ornament
 
-Unopinionated, pareto-optimal micro-library (< 4k) for building vanilla web
+Unopinionated, pareto-optimal micro-library (<= 3.8k) for building vanilla web
 component infrastructure:
 
 ```javascript
