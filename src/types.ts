@@ -66,6 +66,10 @@ export type Transformer<T extends HTMLElement, V> = {
   ) => boolean | null;
 };
 
+export type Optional<Source, Keys extends keyof Source> = {
+  [Key in Keys]?: Source[Key];
+} & Pick<Source, Exclude<keyof Source, Keys>>;
+
 /* eslint-disable */
 export type ClassAccessorDecorator<T extends HTMLElement, V, R extends ClassAccessorDecoratorResult<unknown, unknown> | void = ClassAccessorDecoratorResult<T, V>>
   = (target: ClassAccessorDecoratorTarget<T, V>, context: ClassAccessorDecoratorContext<T, V>) => R;

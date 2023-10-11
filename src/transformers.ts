@@ -1,6 +1,7 @@
 import { EMPTY_OBJ, Nil, isArray } from "./lib.js";
 import {
   type Transformer,
+  type Optional,
   assertRecord,
   assertTransformer,
   assertType,
@@ -17,8 +18,12 @@ const baseTransformer: Omit<Transformer<any, any>, "parse" | "validate"> = {
   updateContentAttr: () => true,
 };
 
-// eslint-disable-next-line
-type InputTransformer<T extends HTMLElement, V> = & Partial<Transformer<T, V>> & Pick<Transformer<any, any>, "parse" | "validate">;
+/* eslint-disable */
+type InputTransformer<T extends HTMLElement, V> = Optional<
+  Transformer<T, V>,
+  Exclude<keyof Transformer<T, V>, "parse" | "validate">
+>;
+/* eslint-enable */
 
 function createTransformer<T extends HTMLElement, V>(
   input: InputTransformer<T, V>,
