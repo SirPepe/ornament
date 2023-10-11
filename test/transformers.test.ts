@@ -379,6 +379,11 @@ describe("Transformers", () => {
       el.setAttribute("foo", "C");
       expect(el.foo).to.equal("A");
       expect(el.getAttribute("foo")).to.equal("C");
+      el.setAttribute("foo", "B");
+      expect(el.foo).to.equal("B");
+      el.setAttribute("foo", "C");
+      expect(el.foo).to.equal("B");
+      expect(el.getAttribute("foo")).to.equal("C");
     });
 
     test("custom fallback value", async () => {
@@ -486,6 +491,8 @@ describe("Transformers", () => {
       expect(el.foo).to.eql([0]);
       el.setAttribute("foo", "   1, , ,,2   ,3     ");
       expect(el.foo).to.eql([1, 2, 3]);
+      el.setAttribute("foo", "");
+      expect(el.foo).to.eql([]);
       el.removeAttribute("foo");
       expect(el.foo).to.eql([0]);
     });

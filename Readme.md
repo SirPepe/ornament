@@ -221,7 +221,7 @@ class MyTest extends HTMLElement {}
 
 ### Attribute handling
 
-Getting attribute handling on Web Components right is hard, because many
+Getting attribute handling on Web Components right is *hard*, because many
 different APIs and states need to interact in just the right way and the related
 code tends to end up scattered across various class members. Attributes on HTML
 elements have two faces: the *content attribute* and the *IDL attribute*.
@@ -277,8 +277,9 @@ for something else, or combine any of the above with hand-written logic.
 ### Safe upgrades
 
 HTML tags can be used even if the browser does not (yet) know about them, and
-this also works with web components.
-[This can lead to unexpected behavior](https://codepen.io/SirPepe/pen/poqLege?editors=0010)
+this also works with web components - the browser can upgrade custom elements
+event after the parser has processed them as unknown elements.
+[But this can lead to unexpected behavior](https://codepen.io/SirPepe/pen/poqLege?editors=0010)
 when properties are set on elements that have not yet been properly defined,
 shadowing relevant accessors on the prototype:
 
@@ -748,7 +749,6 @@ el.test1(2);
 el.test1(3);
 // only logs "3"
 
-
 el.test2("a");
 el.test2("b");
 el.test2("c");
@@ -859,7 +859,7 @@ liking.
 Transformers can be used with both `@prop()` and `@attr()`. In the latter case,
 if a matching content attribute with a valid value is present on initialization,
 the content attribute value (parsed into the proper type) will be used as the
-initial value.
+*initial value*.
 
 As an example:
 
@@ -897,21 +897,20 @@ class Test extends HTMLElement {
 }
 ```
 
-In this case, the attribute `foo` always represents a string. Any non-string
+In this example, the attribute `foo` always represents a string. Any non-string
 value gets converted to strings by the accessor's setter. The attribute's value
 can be unset (to the accessor's initial value or `""`) by setting `undefined` or
 removing the content attribute.
 
 #### Behavior overview for transformer `string()`
 
-| Operation        | Value                          |
-| -----------------| -------------------------------|
-| Initialization   | Accessor initial value or `""` |
-| Set value `x`    | `String(x)`                    |
-| Set `null`       | `"null"`                       |
-| Set `undefined`  | Accessor initial value or `""` |
-| Set attribute    | Current attribute value        |
-| Remove attribute | Accessor initial value or `""` |
+| Operation                        | IDL attribute value      | Content attribute (when used with `@attr()`) |
+| ---------------------------------| -------------------------|----------------------------------------------|
+| Set IDL attribute to `x`         | `String(x)`              | IDL attribute value                          |
+| Set IDL attribute to `null`      | `"null"`                 | IDL attribute value                          |
+| Set IDL attribute to `undefined` | *Initial value* or `""`  | IDL attribute value                          |
+| Set content attribute            | Content attribute value  | As set (equal to IDL attribute value)        |
+| Remove content attribute         | *Initial value* or `""`  | Removed                                      |
 
 ### Transformer `href()`
 
@@ -938,12 +937,13 @@ console.log(testEl.foo); // > "https://example.com/foo/bar/"
 
 #### Behavior overview for transformer `href()`
 
-| Operation               | Value                          |
-| ------------------------| -------------------------------|
-| Initialization          | Accessor initial value or `""` |
-| Set absolute URL        | Absolute URL                   |
-| Set any other value `x` | Relative URL to `String(x)`    |
-| Set attribute           | Absolute or relative URL       |
+| Operation                                      | IDL attribute value         | Content attribute (when used with `@attr()`) |
+| -----------------------------------------------| ----------------------------|----------------------------------------------|
+| Set IDL attribute to absolute URL (string)     | Absolute URL                | IDL attribute value                          |
+| Set IDL attribute to any other value `x`       | Relative URL to `String(x)` | IDL attribute value                          |
+| Set content attribute to absolute URL (string) | Absolute URL                | As set                                       |
+| Set content attribute to any other value `x`   | Relative URL to `x`         | As set                                       |
+| Remove content attribute                       | *Initial value* or `""`     | Removed                                      |
 
 ### Transformer `number(options?)`
 
@@ -972,17 +972,15 @@ throws an exception when its input converts to `NaN`.
 
 #### Behavior overview for transformer `number()`
 
-| Operation                  | Value                                              |
-| ---------------------------| ---------------------------------------------------|
-| Initialization             | Accessor initial value or `0`                      |
-| Set value `x`              | `minmax(ops.min, opts.max, x)`                     |
-| Set out-of-range value     | Error                                              |
-| Set out-of-range attribute | `minmax(ops.min, opts.max, toNumberWithoutNaN(x))` |
-| Set `null`                 | `0`                                                |
-| Set `undefined`            | Accessor initial value or `0`                      |
-| Set non-numeric attribute  | Previous value                                     |
-| Set attribute              | `minmax(ops.min, opts.max, toNumberWithoutNaN(x))` |
-| Remove attribute           | Accessor initial value or `0`                      |
+| Operation                                   | IDL attribute value                                | Content attribute (when used with `@attr()`) |
+| --------------------------------------------| ---------------------------------------------------|----------------------------------------------|
+| Set IDL attribute to value `x`              | `minmax(opts.min, opts.max, x)`                    | String(IDL attribute value)                  |
+| Set IDL attribute to out-of-range value     | Error                                              | String(IDL attribute value)                  |
+| Set IDL attribute to `null`                 | `0`                                                | String(IDL attribute value)                  |
+| Set IDL attribute to `undefined`            | *Initial value* or `0`                             | String(IDL attribute value)                  |
+| Set content attribute to value `x`          | `minmax(opts.min, opts.max, toNumberWithoutNaN(x)) | As set                                       |
+| Set non-numeric content attribute           | Previous value                                     | As set                                       |
+| Remove content attribute                    | *Initial value* or `0`                             | Removed                                      |
 
 ### Transformer `int(options?)`
 
@@ -1012,18 +1010,16 @@ to bigint.
 
 #### Behavior overview for transformer `int()`
 
-| Operation                  | Value                                      |
-| ---------------------------| -------------------------------------------|
-| Initialization             | Accessor initial value or `0n`             |
-| Set value `x`              | `minmax(ops.min, opts.max, x)`             |
-| Set out-of-range value     | Error                                      |
-| Set out-of-range attribute | `minmax(ops.min, opts.max, toBigInt(x))`   |
-| Set non-int value          | `BigInt(x)`                                |
-| Set non-int attribute      | Clamp to Int if float, else previous value |
-| Set `null`                 | `0n`                                       |
-| Set `undefined`            | Accessor initial value or `0n`             |
-| Set attribute              | `minmax(ops.min, opts.max, toBigInt(x))`   |
-| Remove attribute           | Accessor initial value or `0n`             |
+| Operation                                       | IDL attribute value                              | Content attribute (when used with `@attr()`) |
+| ------------------------------------------------| -------------------------------------------------|----------------------------------------------|
+| Set IDL attribute to value `x`                  | `minmax(ops.min, opts.max, x)`                   | String(IDL attribute value)                  |
+| Set IDL attribute to out-of-range value         | Error                                            | String(IDL attribute value)                  |
+| Set IDL attribute to non-int value              | `BigInt(x)`                                      | String(IDL attribute value)                  |
+| Set IDL attribute to `null`                     | `0n`                                             | String(IDL attribute value)                  |
+| Set IDL attribute to `undefined`                | *Initial value* or `0n`                          | String(IDL attribute value)                  |
+| Set content attribute to value `x`              | `minmax(opts.min, opts.max, toBigInt(x))`        | As set                                       |
+| Set non-int content attribute                   | Clamp to Int if float, otherwise previous value  | As set                                       |
+| Remove attribute                                | *Initial value* or `0n`                          | Removed                                      |
 
 ### Transformer `bool()`
 
@@ -1051,12 +1047,11 @@ you can use the `literal()` transformer with the strings `"true"` and `"false"`.
 
 #### Behavior overview for transformer `bool()`
 
-| Operation                  | Value                  |
-| ---------------------------| -----------------------|
-| Initialization             | hasAttribute(attrName) |
-| Set value `x`              | `Boolean(x)`           |
-| Set attribute to `x`       | `true`                 |
-| Remove attribute           | `false`                |
+| Operation                      | IDL attribute value | Content attribute (when used with `@attr()`)                         |
+| -------------------------------| --------------------|----------------------------------------------------------------------|
+| Set IDL attribute to value `x` | `Boolean(x)`        | Removed when IDL attribute is `false`, otherwise set to empty string |
+| Set content attribute to `x`   | `true`              | As set                                                               |
+| Remove content attribute       | `false`             | Removed                                                              |
 
 ### Transformer `list(options?)`
 
@@ -1104,12 +1099,11 @@ console.log(el.foo); // > [1, 2, 3]
 
 #### Behavior overview for transformer `list()`
 
-| Operation        | Value                                                                                                                          |
-| -----------------| -------------------------------------------------------------------------------------------------------------------------------|
-| Initialization   | Accessor initial value or empty array                                                                                          |
-| Set value `x`    | Exception is not an array, otherwise dependent on the behavior of `transformer`                                                |
-| Set attribute    | Attribute value is split gets split on the separator, then trimmed, then non-empty strings are passed into `transformer.parse` |
-| Remove attribute | Accessor initial value or empty array                                                                                          |
+| Operation                | IDL attribute value                                                                                                         | Content attribute (when used with `@attr()`)         |
+| -------------------------|-----------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|
+| Set IDL attribute        | Exception is not an array, otherwise array with content guarded by `options.transformer.validate`                           | IDL attribute values joined with `options.separator` |
+| Set content attribute    | Attribute value is split on the separator, then trimmed, then non-empty strings are passed into `options.transformer.parse` | As set                                               |
+| Remove content attribute | *Initial value* or empty array                                                                                              | Removed                                              |
 
 ### Transformer `literal(options?)`
 
@@ -1143,12 +1137,11 @@ the accessor has no initial value, the first element in `values`.
 
 #### Behavior overview for transformer `literal()`
 
-| Operation        | Value                                             |
-| -----------------| --------------------------------------------------|
-| Initialization   | Accessor initial value or first value in `values` |
-| Set value `x`    | Depends on the behavior of `transformer`          |
-| Set attribute    | Depends on the behavior of `transformer`          |
-| Remove attribute | Depends on the behavior of `transformer`          |
+| Operation                      | IDL attribute value                                                                                           | Content attribute (when used with `@attr()`) |
+| -------------------------------| --------------------------------------------------------------------------------------------------------------|----------------------------------------------|
+| Set IDL attribute value to `x` | Exception if not in `options.values`, otherwise defined by `options.transformer.validate`                     | Defined by `options.transformer.stringify`   |
+| Set content attribute to `x`   | Parsed by `options.transformer.parse`. If the result is in `options.values`, result, otherwise previous value | As set                                       |
+| Remove attribute               | *Initial value* or first element in `options.values`                                                          | Removed                                      |
 
 ### Transformer `json()`
 
@@ -1184,13 +1177,11 @@ are applied to, so you man need to provide a type annotation.
 
 #### Behavior overview for transformer `json()`
 
-| Operation                       | Value                                                            |
-| --------------------------------| -----------------------------------------------------------------|
-| Initialization                  | Accessor initial value or `undefined`                            |
-| Set JSON-serializable value `x` | `x`                                                              |
-| Set non-JSON-serializable value | Exception                                                        |
-| Set attribute                   | `JSON.parse(attrValue)` or accessor initial value or `undefined` |
-| Remove attribute                | Accessor initial value or `undefined`                            |
+| Operation                      | IDL attribute value                                                         | Content attribute (when used with `@attr()`)      |
+| -------------------------------| ----------------------------------------------------------------------------|---------------------------------------------------|
+| Set IDL attribute value to `x` | `JSON.parse(JSON.stringify(x))`                                             | `JSON.stringify(idlValue, null, options.reviver)` |
+| Set content attribute to `x`   | Previous value if invalid JSON, otherwise `JSON.parse(x, options.receiver)` | As set                                            |
+| Remove content attribute       | *Initial value* or `undefined`                                              | Removed                                           |
 
 ### Transformer `event()`
 

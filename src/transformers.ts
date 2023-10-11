@@ -396,9 +396,14 @@ export function literal<T extends HTMLElement, V>(
   const { transform, values } = literalOptions<T, V>(options);
   return createTransformer<T, V>({
     parse(rawValue, oldValue) {
-      const parsed = transform.parse.call(this, rawValue, oldValue);
-      if (values.includes(parsed)) {
-        return parsed;
+      if (rawValue !== null) {
+        const parsed = transform.parse.call(this, rawValue, Nil);
+        if (values.includes(parsed)) {
+          return parsed;
+        }
+        if (oldValue !== Nil) {
+          return oldValue;
+        }
       }
       return fallbackValues.get(this) ?? values[0];
     },
