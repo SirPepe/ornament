@@ -35,10 +35,7 @@ function stringifyJSONAttribute(value: any, replacer: any): string {
   try {
     return JSON.stringify(value, replacer);
   } catch (cause) {
-    throw new Error(
-      "Value is not JSON-serializable, but this is required for attribute handling",
-      { cause },
-    );
+    throw new Error("Attribute value is not JSON-serializable", { cause });
   }
 }
 
@@ -134,7 +131,9 @@ function numberOptions(input: unknown): NumberOptions<number> {
   assertType(min, "min", "number");
   assertType(max, "max", "number");
   if (min >= max) {
-    throw new RangeError(`Expected "min" to be be less than "max"`);
+    throw new RangeError(
+      `Expected "min" to be be less than "max", but ${min} is larger than ${max}`,
+    );
   }
   return { min, max };
 }
@@ -164,7 +163,7 @@ export function number<T extends HTMLElement>(
       }
       const asNumber = Number(value);
       if (Number.isNaN(asNumber)) {
-        throw new Error(`Invalid number NaN`);
+        throw new Error(`Invalid number value "NaN"`);
       }
       if (asNumber < min || asNumber > max) {
         throw new RangeError(`${asNumber} is out of range [${min}, ${max}]`);
@@ -197,7 +196,9 @@ function bigintOptions(input: unknown): NumberOptions<bigint | undefined> {
   assertType(min, "min", "bigint", "undefined");
   assertType(max, "max", "bigint", "undefined");
   if (typeof min === "bigint" && typeof max === "bigint" && min >= max) {
-    throw new RangeError(`Expected "min" to be be less than "max"`);
+    throw new RangeError(
+      `Expected "min" to be be less than "max", but ${min} is larger than ${max}`,
+    );
   }
   return { min, max };
 }
@@ -439,7 +440,7 @@ function listOptions<T extends HTMLElement, V>(
   const { separator = ",", transform } = input as Record<any, any>;
   assertTransformer<T, V>(transform);
   if (typeof separator !== "string") {
-    throw new Error(`Invalid separator ${separator}`);
+    throw new Error(`Invalid separator of type ${typeof separator}`);
   }
   return { separator, transform };
 }
