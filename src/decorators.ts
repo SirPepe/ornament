@@ -456,7 +456,7 @@ export function attr<T extends HTMLElement, V>(
           attrValue !== null
             ? transformer.parse.call(this, attrValue, Nil)
             : transformer.validate.call(this, input, Nil);
-        return transformer.init.call(this, value, input, context);
+        return transformer.init.call(this, input, context);
       },
       set(input) {
         const oldValue = target.get.call(this);
@@ -504,7 +504,7 @@ export function prop<T extends HTMLElement, V>(
     return {
       init(input) {
         input = initAccessor(this, context.name, input);
-        input = transformer.init.call(this, input, input, context);
+        input = transformer.init.call(this, input, context);
         return transformer.validate.call(this, input, Nil);
       },
       set(input) {

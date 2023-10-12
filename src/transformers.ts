@@ -47,8 +47,7 @@ export function string<T extends HTMLElement>(): Transformer<T, string> {
       return String(newValue);
     },
     validate: String,
-    init(_, defaultValue) {
-      const value = defaultValue ?? "";
+    init(value = "") {
       initialValues.set(this, value);
       return value;
     },
@@ -84,12 +83,12 @@ export function href<T extends HTMLElement>(): Transformer<T, string> {
       shadow.href = String(newValue);
       return shadow.href;
     },
-    init(_, defaultValue) {
+    init(value) {
       const shadow = document.createElement("a");
       shadows.set(this, shadow);
-      if (defaultValue) {
-        defaultValues.set(this, defaultValue);
-        shadow.href = defaultValue;
+      if (value) {
+        defaultValues.set(this, value);
+        shadow.href = value;
       }
       return shadow.href;
     },
@@ -131,25 +130,26 @@ function numberOptions(input: unknown): NumberOptions<number> {
 export function number<T extends HTMLElement>(
   options: Partial<NumberOptions<number>> = EMPTY_OBJ,
 ): Transformer<T, number> {
-  const fallbackValues = new WeakMap<T, number>();
+  const initialValues = new WeakMap<T, number>();
   const { min, max } = numberOptions(options);
   return createTransformer<T, number>({
     parse(value, oldValue) {
       if (value === null) {
-        return fallbackValues.get(this) ?? 0;
+        return initialValues.get(this) ?? 0;
       }
       const asNumber = Number(value);
       if (Number.isNaN(asNumber)) {
         if (oldValue !== Nil) {
           return oldValue;
         }
-        return fallbackValues.get(this) ?? 0;
+        return initialValues.get(this) ?? 0;
       }
       return Math.min(Math.max(asNumber, min), max);
     },
     validate(value) {
+      // TODO: parse the value instead
       if (typeof value === "undefined") {
-        return fallbackValues.get(this) ?? 0;
+        return initialValues.get(this) ?? 0;
       }
       const asNumber = Number(value);
       if (Number.isNaN(asNumber)) {
@@ -160,10 +160,8 @@ export function number<T extends HTMLElement>(
       }
       return asNumber;
     },
-    init(value, defaultValue) {
-      if (typeof defaultValue === "number") {
-        fallbackValues.set(this, defaultValue);
-      }
+    init(value = 0) {
+      initialValues.set(this, value);
       return value;
     },
   });
@@ -208,7 +206,7 @@ function toBigInt(value: string | number | bigint | boolean): bigint {
 export function int<T extends HTMLElement>(
   options: Partial<NumberOptions<bigint>> = EMPTY_OBJ,
 ): Transformer<T, bigint> {
-  const fallbackValues = new WeakMap<T, bigint>();
+  const initialValues = new WeakMap<T, bigint>();
   // The type assertion below is a blatant lie, as any or both of min and max
   // may well be undefined. But in the less/greater than operations that they
   // are used in they either convert to NaN (in case of undefined), which is NOT
@@ -232,14 +230,15 @@ export function int<T extends HTMLElement>(
           if (oldValue !== Nil) {
             return oldValue;
           }
-          return fallbackValues.get(this) ?? 0n;
+          return initialValues.get(this) ?? 0n;
         }
       }
-      return fallbackValues.get(this) ?? 0n;
+      return initialValues.get(this) ?? 0n;
     },
     validate(value) {
+      // TODO: parse the value instead
       if (typeof value === "undefined") {
-        return fallbackValues.get(this) ?? 0n;
+        return initialValues.get(this) ?? 0n;
       }
       if (value === null) {
         return 0n;
@@ -250,10 +249,8 @@ export function int<T extends HTMLElement>(
       }
       return asInt;
     },
-    init(value, defaultValue) {
-      if (typeof defaultValue === "bigint") {
-        fallbackValues.set(this, defaultValue);
-      }
+    init(value = 0n) {
+      initialValues.set(this, value);
       return value;
     },
   });
@@ -267,12 +264,12 @@ type JSONOptions = {
 export function json<T extends HTMLElement>(
   options: JSONOptions = EMPTY_OBJ,
 ): Transformer<T, any> {
-  const fallbackValues = new WeakMap<T, any>();
+  const initialValues = new WeakMap<T, any>();
   return createTransformer<T, any>({
     parse(newValue, oldValue) {
       // Attribute removed
       if (!newValue && oldValue !== Nil) {
-        return fallbackValues.get(this);
+        return initialValues.get(this);
       }
       // Attribute set or init from attribute
       try {
@@ -281,7 +278,7 @@ export function json<T extends HTMLElement>(
         if (oldValue !== Nil) {
           return oldValue;
         }
-        return fallbackValues.get(this);
+        return initialValues.get(this);
       }
     },
     validate(value) {
@@ -292,10 +289,10 @@ export function json<T extends HTMLElement>(
     stringify(value) {
       return stringifyJSONAttribute(value, options.replacer);
     },
-    init(value, defaultValue) {
-      // Verify that the default stringifies
-      stringifyJSONAttribute(defaultValue, options.replacer);
-      fallbackValues.set(this, defaultValue);
+    init(value) {
+      // Verify that the initial value stringifies
+      stringifyJSONAttribute(value, options.replacer);
+      initialValues.set(this, value);
       return value;
     },
   });
@@ -308,24 +305,24 @@ type SchemaLike<V> = {
   ): { success: true; data: V } | { success: false; error: any };
 };
 
-type ZodOptions = {
+type SchemaOptions = {
   reviver?: Parameters<typeof JSON.parse>[1];
   replacer?: Parameters<typeof JSON.stringify>[1];
 };
 
 export function schema<T extends HTMLElement, V>(
   schema: SchemaLike<V>,
-  options: ZodOptions = EMPTY_OBJ,
+  options: SchemaOptions = EMPTY_OBJ,
 ): Transformer<T, V> {
   if (typeof schema !== "object") {
     throw new TypeError("First argument of the schema transformer is required");
   }
-  const fallbackValues = new WeakMap<T, V>();
+  const initialValues = new WeakMap<T, V>();
   return createTransformer<T, V>({
     parse(newValue, oldValue) {
       // Attribute removed
       if (!newValue && oldValue !== Nil) {
-        return fallbackValues.get(this) as V;
+        return initialValues.get(this) as V;
       }
       // Attribute set or init from attribute
       try {
@@ -337,12 +334,12 @@ export function schema<T extends HTMLElement, V>(
         if (oldValue !== Nil) {
           return oldValue;
         }
-        return fallbackValues.get(this) as V;
+        return initialValues.get(this) as V;
       } catch {
         if (oldValue !== Nil) {
           return oldValue;
         }
-        return fallbackValues.get(this) as V;
+        return initialValues.get(this) as V;
       }
     },
     validate(value) {
@@ -351,12 +348,14 @@ export function schema<T extends HTMLElement, V>(
       stringifyJSONAttribute(parsed, options.replacer);
       return parsed;
     },
-    stringify: (value) => stringifyJSONAttribute(value, options.replacer),
-    init(value, defaultValue) {
-      defaultValue = schema.parse(defaultValue);
+    stringify(value) {
+      return stringifyJSONAttribute(value, options.replacer);
+    },
+    init(value) {
+      value = schema.parse(value);
       // Verify that the default stringifies
-      stringifyJSONAttribute(defaultValue, options.replacer);
-      fallbackValues.set(this, defaultValue);
+      stringifyJSONAttribute(value, options.replacer);
+      initialValues.set(this, value);
       return value;
     },
   });
@@ -416,9 +415,9 @@ export function literal<T extends HTMLElement, V>(
     },
     stringify: transform.stringify,
     eql: transform.eql,
-    init(value, defaultValue) {
-      if (values.includes(defaultValue)) {
-        fallbackValues.set(this, defaultValue);
+    init(value = values[0]) {
+      if (values.includes(value)) {
+        fallbackValues.set(this, value);
       }
       return value;
     },
@@ -445,7 +444,7 @@ function listOptions<T extends HTMLElement, V>(
 export function list<T extends HTMLElement, V>(
   inputOptions: ListOptions<T, V>,
 ): Transformer<T, V[]> {
-  const fallbackValues = new WeakMap<T, V[]>();
+  const initialValues = new WeakMap<T, V[]>();
   const { transform, separator } = listOptions<T, V>(inputOptions);
   return createTransformer<T, V[]>({
     parse(rawValues) {
@@ -458,11 +457,11 @@ export function list<T extends HTMLElement, V>(
           return [];
         });
       }
-      return fallbackValues.get(this) ?? [];
+      return initialValues.get(this) ?? [];
     },
     validate(newValues) {
       if (typeof newValues === "undefined") {
-        return fallbackValues.get(this) ?? [];
+        return initialValues.get(this) ?? [];
       }
       if (isArray(newValues)) {
         return newValues.map((newValue) =>
@@ -474,7 +473,7 @@ export function list<T extends HTMLElement, V>(
     stringify(value) {
       if (value) {
         return value
-          .map((value) => (transform.stringify ?? String).call(this, value))
+          .map((value) => transform.stringify.call(this, value))
           .join(separator);
       }
       return "";
@@ -493,10 +492,8 @@ export function list<T extends HTMLElement, V>(
       }
       return true;
     },
-    init(value, defaultValue) {
-      if (isArray(defaultValue)) {
-        fallbackValues.set(this, defaultValue);
-      }
+    init(value = []) {
+      initialValues.set(this, value);
       return value;
     },
   });
@@ -545,7 +542,7 @@ export function event<
     stringify() {
       throw new Error();
     },
-    init(value, _, context) {
+    init(value, context) {
       if (context.private || typeof context.name === "symbol") {
         throw new Error("Event handler name must be a non-private non-symbol");
       }

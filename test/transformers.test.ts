@@ -79,6 +79,17 @@ describe("Transformers", () => {
       el.foo = undefined as any;
       expect(el.foo).to.equal("undefined");
     });
+
+    test("from HTML", async () => {
+      const tagName = generateTagName();
+      @define(tagName)
+      class Test extends HTMLElement {
+        @attr(string()) accessor foo = "";
+      }
+      const fixture = document.createElement("div");
+      fixture.innerHTML = `<${tagName} foo="hello"></${tagName}>`;
+      expect((fixture.children[0] as any).foo).to.equal("hello");
+    });
   });
 
   describe("href()", () => {
