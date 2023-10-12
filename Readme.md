@@ -594,9 +594,11 @@ newDocument.adoptNode(testEl);
 **Method decorator** that causes decorated class methods to subscribe to either
 [Event Targets](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget) or
 [signals](https://github.com/preactjs/signals), depending on the arguments. The
-subscriptions activate when an element's constructor completes.
+subscriptions activate when an element's constructor completes and the all
+listeners automatically unsubscribe when the subscribed element gets garbage
+collected.
 
-#### `@subscribe(targetOrTargetFactory, eventName, options?)`
+#### Subscribe to EventTargets: `@subscribe(targetOrTargetFactory, eventName, options?)`
 
 Subscribe to an EventTarget. EventTarget is an interface that objects such as
 HTMLElement, Window, Document and *many* more objects implement. You can also
@@ -673,7 +675,7 @@ class Test extends HTMLElement {
 }
 ```
 
-The Target-producing factory can be used to access targets that depend on the
+The target-producing factory can be used to access targets that depend on the
 element instance, such as the element's shadow root. The factory function gets
 called each time an element initializes, with `this` set to the instance.
 
@@ -688,10 +690,9 @@ called each time an element initializes, with `this` set to the instance.
   - **passive (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
   - **signal (AbortSignal, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
 
-#### `@subscribe(signal, options?)`
+#### Subscribe to Signals: `@subscribe(signal, options?)`
 
-Subscribe to a signal. Any signal implementation that roughly follows
-[Preact's implementation](https://github.com/preactjs/signals) should work:
+Subscribe to a signal:
 
 ```javascript
 import { define, subscribe } from "@sirpepe/ornament";
@@ -710,6 +711,17 @@ counter.value = 1;
 counter.value = 2;
 counter.value = 3;
 // logs 0, 1, 2, 3
+```
+
+Any signal object that implements the following API should work:
+
+```typescript
+type Signal<T> = {
+  // Takes an update callback and returns an unsubscribe function
+  subscribe(callback: () => void): () => void;
+  // Represents the current value
+  value: T;
+};
 ```
 
 Because signals permanently represent reactive values, subscribing itself causes
