@@ -897,8 +897,9 @@ value, so the `string()` transformer's built-in fallback value `""` gets used.
 
 ### Transformer `string()`
 
-Implements a string attribute or property. Loosely modeled after built-in string
-attributes such as `id` and `lang`.
+Implements a string attribute or property. Modeled after built-in string
+attributes such as `id` and `lang`, it will always represent a string and
+stringify any and all non-string values.
 
 ```javascript
 import { define, attr, string } from "@sirpepe/ornament";
@@ -909,18 +910,14 @@ class Test extends HTMLElement {
 }
 ```
 
-In this example, the attribute `foo` always represents a string. Any non-string
-value gets converted to strings by the accessor's setter. The attribute's value
-can be unset (to the accessor's initial value or `""`) by setting `undefined` or
-removing the content attribute.
+A content attribute's IDL attribute value can be unset (to the accessor's
+initial value or `""`) by removing the content attribute.
 
 #### Behavior overview for transformer `string()`
 
 | Operation                        | IDL attribute value      | Content attribute (when used with `@attr()`) |
 | ---------------------------------| -------------------------|----------------------------------------------|
 | Set IDL attribute to `x`         | `String(x)`              | IDL attribute value                          |
-| Set IDL attribute to `null`      | `"null"`                 | IDL attribute value                          |
-| Set IDL attribute to `undefined` | *Initial value* or `""`  | IDL attribute value                          |
 | Set content attribute            | Content attribute value  | As set (equal to IDL attribute value)        |
 | Remove content attribute         | *Initial value* or `""`  | Removed                                      |
 

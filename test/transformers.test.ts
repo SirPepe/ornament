@@ -46,6 +46,9 @@ describe("Transformers", () => {
       el.foo = false as any;
       expect(el.foo).to.equal("false");
       expect(el.getAttribute("foo")).to.equal("false");
+      el.foo = undefined as any;
+      expect(el.foo).to.equal("undefined");
+      expect(el.getAttribute("foo")).to.equal("undefined");
     });
 
     test("with initial value", async () => {
@@ -74,7 +77,7 @@ describe("Transformers", () => {
       el.foo = "Hello";
       expect(el.foo).to.equal("Hello");
       el.foo = undefined as any;
-      expect(el.foo).to.equal("");
+      expect(el.foo).to.equal("undefined");
     });
   });
 
@@ -488,6 +491,7 @@ describe("Transformers", () => {
       el.setAttribute("foo", "7");
       expect(el.foo).to.eql([7]);
       el.setAttribute("foo", "asdf");
+      // expect(el.foo).to.eql([]);
       expect(el.foo).to.eql([0]);
       el.setAttribute("foo", "   1, , ,,2   ,3     ");
       expect(el.foo).to.eql([1, 2, 3]);

@@ -42,23 +42,18 @@ function stringifyJSONAttribute(value: any, replacer: any): string {
 export function string<T extends HTMLElement>(): Transformer<T, string> {
   const initialValues = new WeakMap<T, string>();
   return createTransformer<T, string>({
-    parse(newValue, oldValue) {
-      // Content attribute got removed
-      if (!newValue && oldValue !== Nil) {
+    parse(newValue) {
+      if (!newValue) {
         return initialValues.get(this) ?? "";
       }
       return String(newValue);
     },
-    validate(value) {
-      if (typeof value === "undefined") {
-        return initialValues.get(this) ?? "";
-      }
-      return String(value);
-    },
+    validate: String,
     init(value, defaultValue) {
-      if (typeof defaultValue === "string") {
-        initialValues.set(this, defaultValue);
+      if (typeof defaultValue === "undefined") {
+        return "";
       }
+      initialValues.set(this, value);
       return value;
     },
   });
