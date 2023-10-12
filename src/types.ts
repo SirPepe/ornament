@@ -40,10 +40,6 @@ export type Transformer<T extends HTMLElement, V> = {
     defaultValue: V,
     context: ClassAccessorDecoratorContext<T, V>,
   ) => V;
-  // Optionally transforms a value before it is returned from the getter. Can
-  // also be used to run a side effect when the setter gets used. Defaults to
-  // the identity function.
-  get: (this: T, value: V, context: ClassAccessorDecoratorContext<T, V>) => V;
   // Optionally transforms a value before it is set by either the setter or a
   // content attribute update. Can also be used to run a side effect when the
   // setter gets used. Defaults to the identity function. If the raw value is

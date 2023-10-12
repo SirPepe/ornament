@@ -13,7 +13,6 @@ const baseTransformer: Omit<Transformer<any, any>, "parse" | "validate"> = {
   stringify: String,
   eql: <T>(a: T, b: T) => a === b,
   init: id,
-  get: id,
   set: id,
   updateContentAttr: () => true,
 };
@@ -39,6 +38,7 @@ function stringifyJSONAttribute(value: any, replacer: any): string {
   }
 }
 
+// Stringify everything
 export function string<T extends HTMLElement>(): Transformer<T, string> {
   const initialValues = new WeakMap<T, string>();
   return createTransformer<T, string>({
@@ -57,44 +57,43 @@ export function string<T extends HTMLElement>(): Transformer<T, string> {
   });
 }
 
+// behave like <a href> by simply being <a href>
 export function href<T extends HTMLElement>(): Transformer<T, string> {
-  const initialValues = new WeakMap<T, string>();
+  const shadows = new WeakMap<T, HTMLAnchorElement>();
+  const defaultValues = new WeakMap<T, string>();
   return createTransformer<T, string>({
-    parse(newValue, oldValue) {
-      // Content attribute got removed
-      if (!newValue && oldValue !== Nil) {
-        const result = initialValues.get(this) ?? "";
-        initialValues.delete(this); // reset like <a href>
-        return result;
+    parse(newValue) {
+      // Shadow is undefined when initializing from HTML
+      const shadow = shadows.get(this) ?? document.createElement("a");
+      if (!newValue) {
+        const defaultValue = defaultValues.get(this);
+        if (defaultValue) {
+          shadow.setAttribute("href", defaultValue);
+        } else {
+          shadow.removeAttribute("href");
+        }
+      } else {
+        shadow.setAttribute("href", String(newValue));
       }
-      return String(newValue);
+      return shadow.href;
     },
-    validate: String,
-    eql(newValue, oldValue) {
-      if (!initialValues.get(this)) {
-        return false;
-      }
-      return newValue === oldValue;
+    stringify() {
+      return shadows.get(this)?.getAttribute("href") ?? "";
     },
-    get(value) {
-      if (!initialValues.has(this)) {
-        return value;
-      }
-      const tmp = document.createElement("a");
-      tmp.href = value;
-      return tmp.href;
+    validate(newValue) {
+      // Shadow is undefined for validation of the accessors default value
+      const shadow = shadows.get(this) ?? document.createElement("a");
+      shadow.href = String(newValue);
+      return shadow.href;
     },
-    set(value, rawValue) {
-      if (!initialValues.has(this) && rawValue !== null) {
-        initialValues.set(this, value);
+    init(_, defaultValue) {
+      const shadow = document.createElement("a");
+      shadows.set(this, shadow);
+      if (defaultValue) {
+        defaultValues.set(this, defaultValue);
+        shadow.href = defaultValue;
       }
-      return value;
-    },
-    init(value, defaultValue) {
-      if (defaultValue && typeof defaultValue === "string") {
-        initialValues.set(this, defaultValue);
-      }
-      return value;
+      return shadow.href;
     },
   });
 }

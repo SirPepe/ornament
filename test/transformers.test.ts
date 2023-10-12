@@ -102,7 +102,7 @@ describe("Transformers", () => {
       expect(el.foo).to.equal("https://example.com/asdf/");
     });
 
-    test("with initial value", async () => {
+    test("with default value", async () => {
       const tagName = generateTagName();
       @define(tagName)
       class Test extends HTMLElement {

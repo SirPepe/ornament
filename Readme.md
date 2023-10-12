@@ -833,10 +833,6 @@ export type Transformer<T extends HTMLElement, V> = {
     defaultValue: V,
     context: ClassAccessorDecoratorContext<T, V>,
   ) => V;
-  // Optionally transforms a value before it is returned from the getter. Can
-  // also be used to run a side effect when the setter gets used. Defaults to
-  // the identity function.
-  get: (this: T, value: V, context: ClassAccessorDecoratorContext<T, V>) => V;
   // Optionally transforms a value before it is set by either the setter or a
   // content attribute update. Can also be used to run a side effect when the
   // setter gets used. Defaults to the identity function. If the raw value is
@@ -923,8 +919,9 @@ initial value or `""`) by removing the content attribute.
 
 ### Transformer `href()`
 
-Implements a string attribute or property that works like the `href` attribute
-on `<a>` in that it automatically turns relative URLs into absolute URLs.
+Implements a string attribute or property that works exactly like the `href`
+attribute on `<a>` in that it automatically turns relative URLs into absolute
+URLs.
 
 ```javascript
 import { define, attr, href } from "@sirpepe/ornament";
@@ -943,6 +940,9 @@ console.log(testEl.foo); // > "http://localhost/asdf"
 testEl.foo = "https://example.com/foo/bar/"
 console.log(testEl.foo); // > "https://example.com/foo/bar/"
 ```
+
+A content attribute's IDL attribute value can be unset (to the accessor's
+initial value or `""`) by removing the content attribute.
 
 #### Behavior overview for transformer `href()`
 

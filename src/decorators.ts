@@ -489,9 +489,6 @@ export function attr<T extends HTMLElement, V>(
         }
         trigger(this, "prop", { name: context.name });
       },
-      get() {
-        return transformer.get.call(this, target.get.call(this), context);
-      },
     };
   };
 }
@@ -518,9 +515,6 @@ export function prop<T extends HTMLElement, V>(
         newValue = transformer.set.call(this, newValue, Nil, context);
         target.set.call(this, newValue);
         trigger(this, "prop", { name: context.name });
-      },
-      get() {
-        return transformer.get.call(this, target.get.call(this), context);
       },
     };
   };
