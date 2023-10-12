@@ -44,15 +44,13 @@ export function string<T extends HTMLElement>(): Transformer<T, string> {
   return createTransformer<T, string>({
     parse(newValue) {
       if (!newValue) {
-        return initialValues.get(this) ?? "";
+        return initialValues.get(this)!;
       }
       return String(newValue);
     },
     validate: String,
-    init(value, defaultValue) {
-      if (typeof defaultValue === "undefined") {
-        return "";
-      }
+    init(_, defaultValue) {
+      const value = defaultValue ?? "";
       initialValues.set(this, value);
       return value;
     },
