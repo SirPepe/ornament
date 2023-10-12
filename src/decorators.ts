@@ -428,12 +428,7 @@ export function attr<T extends HTMLElement, V>(
           if (transformer.eql.call(this, newValue, oldValue)) {
             return;
           }
-          newValue = transformer.set.call(
-            this,
-            newValue,
-            evt.newValue,
-            context,
-          );
+          newValue = transformer.set.call(this, newValue, context);
           target.set.call(this, newValue);
           trigger(this, "prop", { name: context.name });
         };
@@ -455,16 +450,16 @@ export function attr<T extends HTMLElement, V>(
         const value =
           attrValue !== null
             ? transformer.parse.call(this, attrValue, Nil)
-            : transformer.validate.call(this, input, Nil);
+            : transformer.validate.call(this, input);
         return transformer.init.call(this, input, context);
       },
       set(input) {
         const oldValue = target.get.call(this);
-        let newValue = transformer.validate.call(this, input, oldValue);
+        let newValue = transformer.validate.call(this, input);
         if (transformer.eql.call(this, newValue, oldValue)) {
           return;
         }
-        newValue = transformer.set.call(this, newValue, input, context);
+        newValue = transformer.set.call(this, newValue, context);
         target.set.call(this, newValue);
         if (isReflectiveAttribute) {
           const updateAttr = transformer.updateContentAttr.call(
@@ -505,14 +500,14 @@ export function prop<T extends HTMLElement, V>(
       init(input) {
         input = initAccessor(this, context.name, input);
         input = transformer.init.call(this, input, context);
-        return transformer.validate.call(this, input, Nil);
+        return transformer.validate.call(this, input);
       },
       set(input) {
-        let newValue = transformer.validate.call(this, input, Nil);
+        let newValue = transformer.validate.call(this, input);
         if (transformer.eql.call(this, newValue, target.get.call(this))) {
           return;
         }
-        newValue = transformer.set.call(this, newValue, Nil, context);
+        newValue = transformer.set.call(this, newValue, context);
         target.set.call(this, newValue);
         trigger(this, "prop", { name: context.name });
       },

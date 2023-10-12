@@ -22,7 +22,7 @@ export type Transformer<T extends HTMLElement, V> = {
   parse: (this: T, rawValue: unknown, oldValue: V | typeof Nil) => V;
   // Validates setter inputs, which may be of absolutely any type. May throw for
   // invalid values, just like setters on built-in elements may.
-  validate: (this: T, newValue: unknown, oldValue: V | typeof Nil) => V;
+  validate: (this: T, newValue: unknown) => V;
   // Turns IDL attribute values into content attribute values (strings), thereby
   // controlling the attribute representation of an accessor together with
   // updateContentAttr(). Must never throw, defaults to the String() function
@@ -30,7 +30,7 @@ export type Transformer<T extends HTMLElement, V> = {
   // Determines whether a new attribute value is equal to the old value. If this
   // method returns true, reactive callbacks will not be triggered. Defaults to
   // simple strict equality (===).
-  eql: (this: T, newValue: V, oldValue: V) => boolean;
+  eql: (this: T, a: V, b: V) => boolean;
   // Optionally transforms a value before it is used to initialize the accessor.
   // Can also be used to run a side effect when the accessor initializes.
   // Defaults to the identity function.
@@ -40,12 +40,7 @@ export type Transformer<T extends HTMLElement, V> = {
   // setter gets used. Defaults to the identity function. If the raw value is
   // not Nil, the set operation was caused by a content attribute update and the
   // content attribute value is reflected in the raw value (string | null).
-  set: (
-    this: T,
-    value: V,
-    rawValue: unknown,
-    context: ClassAccessorDecoratorContext<T, V>,
-  ) => V;
+  set: (this: T, value: V, context: ClassAccessorDecoratorContext<T, V>) => V;
   // Decides if, based on a new value, an attribute gets updated to match the
   // new value (true/false) or removed (null). Only gets called when the
   // transformer's eql() method returns false. Defaults to a function that

@@ -401,11 +401,11 @@ export function literal<T extends HTMLElement, V>(
       }
       return fallbackValues.get(this) ?? values[0];
     },
-    validate(newValue, oldValue) {
+    validate(newValue) {
       if (typeof newValue === "undefined") {
         return fallbackValues.get(this) ?? values[0];
       }
-      const validated = transform.validate.call(this, newValue, oldValue);
+      const validated = transform.validate.call(this, newValue);
       if (values.includes(validated)) {
         return validated;
       }
@@ -465,7 +465,7 @@ export function list<T extends HTMLElement, V>(
       }
       if (isArray(newValues)) {
         return newValues.map((newValue) =>
-          transform.validate.call(this, newValue, Nil),
+          transform.validate.call(this, newValue),
         );
       }
       throw new Error(`Invalid value: ${newValues}`);
@@ -555,7 +555,7 @@ export function event<
       }
       return value;
     },
-    set(value, _, context) {
+    set(value, context) {
       // If either the new handler or the old handler are falsy, the event
       // handler must be detached and then re-attached to reflect the new firing
       // order of event handlers. If both the new and old handlers are
