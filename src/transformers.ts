@@ -7,13 +7,11 @@ import {
   assertType,
 } from "./types.js";
 
-const id = <T>(x: T) => x;
-
-const baseTransformer: Omit<Transformer<any, any>, "parse" | "validate"> = {
+const protoTransformer: Omit<Transformer<any, any>, "parse" | "validate"> = {
   stringify: String,
   eql: <T>(a: T, b: T) => a === b,
-  init: id,
-  set: id,
+  init: <T>(x: T) => x,
+  set: <T>(x: T) => x,
   updateContentAttr: () => true,
 };
 
@@ -27,7 +25,7 @@ type InputTransformer<T extends HTMLElement, V> = Optional<
 function createTransformer<T extends HTMLElement, V>(
   input: InputTransformer<T, V>,
 ): Transformer<T, V> {
-  return Object.assign(Object.create(baseTransformer), input);
+  return Object.assign(Object.create(protoTransformer), input);
 }
 
 function stringifyJSONAttribute(value: any, replacer: any): string {
