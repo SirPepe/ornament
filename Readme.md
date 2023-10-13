@@ -1253,14 +1253,14 @@ Ornament runs intra-component communication over an internal event bus. You will
 almost certainly never need to access it directly, but there is is an API just
 in case.
 
-| Event                      | Cause                                     | Payload                                                                        |
-| ---------------------------| ------------------------------------------|--------------------------------------------------------------------------------|
-| `init`                     | Constructor ran to completion             | `Event`                                                                        |
-| `connected`                | `connectedCallback()` fired               | `Event`                                                                        |
-| `disconnected`             | `disconnectedCallback()` fired            | `Event`                                                                        |
-| `adopted`                  | `adoptedCallback()` fired                 | `Event`                                                                        |
-| `prop`                     | IDL attribute change (`@prop` or `@attr`) | `Event & { name: string \| symbol }`                                           |
-| `attribute`                | Content attribute change (`@attr`)        | `Event & { name: string; oldValue: string \| null; newValue: string \| null }` |
+| Event          | Cause                                     | Payload                                                                        |
+| ---------------| ------------------------------------------|--------------------------------------------------------------------------------|
+| `init`         | Constructor ran to completion             | `Event`                                                                        |
+| `connected`    | `connectedCallback()` fired               | `Event`                                                                        |
+| `disconnected` | `disconnectedCallback()` fired            | `Event`                                                                        |
+| `adopted`      | `adoptedCallback()` fired                 | `Event`                                                                        |
+| `prop`         | IDL attribute change (`@prop` or `@attr`) | `Event & { name: string \| symbol }`                                           |
+| `attr`         | Content attribute change (`@attr`)        | `Event & { name: string; oldValue: string \| null; newValue: string \| null }` |
 
 **Note for TypeScript:** you can declare additions to the global interface
 `OrnamentEventMap` to extend this list with your own events.

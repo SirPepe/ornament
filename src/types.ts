@@ -7,7 +7,7 @@ declare global {
     disconnected: Record<string, never>;
     adopted: Record<string, never>;
     prop: { name: string | symbol };
-    attribute: {
+    attr: {
       name: string;
       oldValue: string | null;
       newValue: string | null;

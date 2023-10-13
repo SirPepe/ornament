@@ -108,7 +108,7 @@ export function define<T extends CustomElementConstructor>(
           // @ts-ignore
           super.attributeChangedCallback.call(this, name, oldValue, newValue);
         }
-        trigger(this, "attribute", { name, oldValue, newValue });
+        trigger(this, "attr", { name, oldValue, newValue });
       }
     };
   };
@@ -432,7 +432,7 @@ export function attr<T extends HTMLElement, V>(
           target.set.call(this, newValue);
           trigger(this, "prop", { name: context.name });
         };
-        listen(this, "attribute", attributeChangedCallback);
+        listen(this, "attr", attributeChangedCallback);
       });
     }
 
