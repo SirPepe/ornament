@@ -1,4 +1,4 @@
-import { EMPTY_OBJ, Nil, isArray } from "./lib.js";
+import { EMPTY_OBJ, NO_VALUE, isArray } from "./lib.js";
 import {
   type Transformer,
   type Optional,
@@ -11,7 +11,7 @@ const protoTransformer: Omit<Transformer<any, any>, "parse" | "validate"> = {
   stringify: String,
   eql: <T>(a: T, b: T) => a === b,
   init: <T>(x: T) => x,
-  set: <T>(x: T) => x,
+  beforeSet: <T>(x: T) => x,
   updateContentAttr: () => true,
 };
 
@@ -36,13 +36,13 @@ function stringifyJSONAttribute(value: any, replacer: any): string {
   }
 }
 
-// Stringify everything
+// Stringify everything, stateless and simple.
 export function string<T extends HTMLElement>(): Transformer<T, string> {
   const initialValues = new WeakMap<T, string>();
   return createTransformer<T, string>({
     parse(newValue) {
       if (!newValue) {
-        return initialValues.get(this)!;
+        return initialValues.get(this)!; // always initialized in init
       }
       return String(newValue);
     },
@@ -101,10 +101,7 @@ export function bool<T extends HTMLElement>(): Transformer<T, boolean> {
     validate: Boolean,
     stringify: () => "",
     updateContentAttr(_, newValue) {
-      if (newValue === false) {
-        return null;
-      }
-      return true;
+      return newValue === false ? null : true;
     },
   });
 }
@@ -121,7 +118,7 @@ function numberOptions(input: unknown): NumberOptions<number> {
   assertType(max, "max", "number");
   if (min >= max) {
     throw new RangeError(
-      `Expected "min" to be be less than "max", but ${min} is larger than ${max}`,
+      `Expected "min" value of ${min} to be be less than "max" value of ${max}`,
     );
   }
   return { min, max };
@@ -133,16 +130,13 @@ export function number<T extends HTMLElement>(
   const initialValues = new WeakMap<T, number>();
   const { min, max } = numberOptions(options);
   return createTransformer<T, number>({
-    parse(value, oldValue) {
+    parse(value) {
       if (value === null) {
         return initialValues.get(this) ?? 0;
       }
       const asNumber = Number(value);
       if (Number.isNaN(asNumber)) {
-        if (oldValue !== Nil) {
-          return oldValue;
-        }
-        return initialValues.get(this) ?? 0;
+        return NO_VALUE;
       }
       return Math.min(Math.max(asNumber, min), max);
     },
@@ -187,7 +181,7 @@ function bigintOptions(input: unknown): NumberOptions<bigint | undefined> {
   // undefined. No need to do extra type checks beforehand.
   if ((min as any) > (max as any)) {
     throw new RangeError(
-      `Expected "min" to be be less than "max", but ${min} is larger than ${max}`,
+      `Expected "min" value of ${min} to be be less than "max" value of ${max}`,
     );
   }
   return { min, max };
@@ -215,7 +209,7 @@ export function int<T extends HTMLElement>(
   // it.
   const { min, max } = bigintOptions(options) as { min: bigint; max: bigint };
   return createTransformer<T, bigint>({
-    parse(value, oldValue) {
+    parse(value) {
       if (isBigIntConvertible(value)) {
         try {
           const asInt = toBigInt(value);
@@ -227,10 +221,7 @@ export function int<T extends HTMLElement>(
           }
           return asInt;
         } catch {
-          if (oldValue !== Nil) {
-            return oldValue;
-          }
-          return initialValues.get(this) ?? 0n;
+          return NO_VALUE;
         }
       }
       return initialValues.get(this) ?? 0n;
@@ -266,19 +257,14 @@ export function json<T extends HTMLElement>(
 ): Transformer<T, any> {
   const initialValues = new WeakMap<T, any>();
   return createTransformer<T, any>({
-    parse(newValue, oldValue) {
-      // Attribute removed
-      if (!newValue && oldValue !== Nil) {
+    parse(newValue) {
+      if (newValue === null) {
         return initialValues.get(this);
       }
-      // Attribute set or init from attribute
       try {
-        return JSON.parse(String(newValue), options.reviver);
+        return JSON.parse(newValue, options.reviver);
       } catch {
-        if (oldValue !== Nil) {
-          return oldValue;
-        }
-        return initialValues.get(this);
+        return NO_VALUE;
       }
     },
     validate(value) {
@@ -319,27 +305,15 @@ export function schema<T extends HTMLElement, V>(
   }
   const initialValues = new WeakMap<T, V>();
   return createTransformer<T, V>({
-    parse(newValue, oldValue) {
-      // Attribute removed
-      if (!newValue && oldValue !== Nil) {
+    parse(newValue) {
+      if (newValue === null) {
         return initialValues.get(this) as V;
       }
-      // Attribute set or init from attribute
       try {
-        const raw = JSON.parse(String(newValue), options.reviver);
-        const parsed = schema.safeParse(raw);
-        if (parsed.success) {
-          return parsed.data;
-        }
-        if (oldValue !== Nil) {
-          return oldValue;
-        }
-        return initialValues.get(this) as V;
+        const raw = JSON.parse(newValue, options.reviver);
+        return schema.parse(raw);
       } catch {
-        if (oldValue !== Nil) {
-          return oldValue;
-        }
-        return initialValues.get(this) as V;
+        return NO_VALUE;
       }
     },
     validate(value) {
@@ -389,17 +363,15 @@ export function literal<T extends HTMLElement, V>(
   const fallbackValues = new WeakMap<T, V>();
   const { transform, values } = literalOptions<T, V>(options);
   return createTransformer<T, V>({
-    parse(rawValue, oldValue) {
-      if (rawValue !== null) {
-        const parsed = transform.parse.call(this, rawValue, Nil);
-        if (values.includes(parsed)) {
-          return parsed;
-        }
-        if (oldValue !== Nil) {
-          return oldValue;
-        }
+    parse(rawValue) {
+      if (rawValue === null) {
+        return fallbackValues.get(this) as any; // TODO: wtf
       }
-      return fallbackValues.get(this) ?? values[0];
+      const parsed = transform.parse.call(this, rawValue);
+      if (parsed !== NO_VALUE && values.includes(parsed)) {
+        return parsed;
+      }
+      return NO_VALUE;
     },
     validate(newValue) {
       if (typeof newValue === "undefined") {
@@ -452,7 +424,10 @@ export function list<T extends HTMLElement, V>(
         return rawValues.split(separator).flatMap((rawValue) => {
           rawValue = rawValue.trim();
           if (rawValue) {
-            return [transform.parse.call(this, rawValue, Nil)];
+            const parsed = transform.parse.call(this, rawValue);
+            if (parsed !== NO_VALUE) {
+              return [parsed];
+            }
           }
           return [];
         });
@@ -555,7 +530,7 @@ export function event<
       }
       return value;
     },
-    set(value, context) {
+    beforeSet(value, context) {
       // If either the new handler or the old handler are falsy, the event
       // handler must be detached and then re-attached to reflect the new firing
       // order of event handlers. If both the new and old handlers are

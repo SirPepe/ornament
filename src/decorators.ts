@@ -1,5 +1,5 @@
 import { listen, trigger } from "./bus.js";
-import { EMPTY_OBJ, Nil } from "./lib.js";
+import { EMPTY_OBJ, NO_VALUE } from "./lib.js";
 import {
   type ClassAccessorDecorator,
   type FunctionFieldOrMethodDecorator,
@@ -424,11 +424,11 @@ export function attr<T extends HTMLElement, V>(
             return; // skip attribute reaction caused by a setter
           }
           const oldValue = target.get.call(this);
-          let newValue = transformer.parse.call(this, evt.newValue, oldValue);
-          if (transformer.eql.call(this, newValue, oldValue)) {
+          const newValue = transformer.parse.call(this, evt.newValue);
+          if (newValue === NO_VALUE || transformer.eql(newValue, oldValue)) {
             return;
           }
-          newValue = transformer.set.call(this, newValue, context);
+          transformer.beforeSet.call(this, newValue, context);
           target.set.call(this, newValue);
           trigger(this, "prop", { name: context.name });
         };
@@ -449,24 +449,20 @@ export function attr<T extends HTMLElement, V>(
         const attrValue = this.getAttribute(contentAttrName);
         const value =
           attrValue !== null
-            ? transformer.parse.call(this, attrValue, Nil)
+            ? transformer.parse.call(this, attrValue)
             : transformer.validate.call(this, input);
         return transformer.init.call(this, input, context);
       },
       set(input) {
         const oldValue = target.get.call(this);
-        let newValue = transformer.validate.call(this, input);
-        if (transformer.eql.call(this, newValue, oldValue)) {
+        const newValue = transformer.validate.call(this, input);
+        if (transformer.eql(newValue, oldValue)) {
           return;
         }
-        newValue = transformer.set.call(this, newValue, context);
+        transformer.beforeSet.call(this, newValue, context);
         target.set.call(this, newValue);
         if (isReflectiveAttribute) {
-          const updateAttr = transformer.updateContentAttr.call(
-            this,
-            oldValue,
-            newValue,
-          );
+          const updateAttr = transformer.updateContentAttr(oldValue, newValue);
           // If an attribute update is about to happen, the next
           // attributeChangedCallback must be skipped to prevent double calls of
           // @reactive methods
@@ -498,16 +494,21 @@ export function prop<T extends HTMLElement, V>(
     assertContext(context, "prop", "accessor");
     return {
       init(input) {
-        input = initAccessor(this, context.name, input);
-        input = transformer.init.call(this, input, context);
-        return transformer.validate.call(this, input);
+        return transformer.validate.call(
+          this,
+          transformer.init.call(
+            this,
+            initAccessor(this, context.name, input),
+            context,
+          ),
+        );
       },
       set(input) {
-        let newValue = transformer.validate.call(this, input);
-        if (transformer.eql.call(this, newValue, target.get.call(this))) {
+        const newValue = transformer.validate.call(this, input);
+        if (transformer.eql(newValue, target.get.call(this))) {
           return;
         }
-        newValue = transformer.set.call(this, newValue, context);
+        transformer.beforeSet.call(this, newValue, context);
         target.set.call(this, newValue);
         trigger(this, "prop", { name: context.name });
       },

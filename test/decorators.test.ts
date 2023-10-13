@@ -208,6 +208,20 @@ describe("Decorators", () => {
       expect(el.getAttribute("y")).to.equal("C");
     });
 
+    test("late upgrade", async () => {
+      const tagName = generateTagName();
+      const el: any = document.createElement(tagName);
+      el.setAttribute("x", "B");
+      @define(tagName)
+      class Test extends HTMLElement {
+        @attr(string()) accessor x = "A";
+      }
+      window.customElements.upgrade(el);
+      expect(el.x).to.equal("B");
+      el.removeAttribute("x");
+      expect(el.x).to.equal("A");
+    });
+
     test("accessor is resistant against clobbering", async () => {
       const tagName = generateTagName();
       // Clobber x before the element has been defined

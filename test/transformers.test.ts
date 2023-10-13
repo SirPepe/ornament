@@ -502,8 +502,7 @@ describe("Transformers", () => {
       el.setAttribute("foo", "7");
       expect(el.foo).to.eql([7]);
       el.setAttribute("foo", "asdf");
-      // expect(el.foo).to.eql([]);
-      expect(el.foo).to.eql([0]);
+      expect(el.foo).to.eql([]);
       el.setAttribute("foo", "   1, , ,,2   ,3     ");
       expect(el.foo).to.eql([1, 2, 3]);
       el.setAttribute("foo", "");
