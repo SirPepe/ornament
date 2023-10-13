@@ -1,7 +1,6 @@
 import { EMPTY_OBJ, NO_VALUE, isArray } from "./lib.js";
 import {
   type Transformer,
-  type Optional,
   assertRecord,
   assertTransformer,
   assertType,
