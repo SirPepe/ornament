@@ -11,7 +11,7 @@ import {
 
 // Un-clobber an accessor if the element upgrades after a property with
 // a matching name has already been set
-function initAccessor(
+function initAccessorInitialValue(
   instance: any,
   name: string | symbol,
   defaultValue: any,
@@ -445,17 +445,16 @@ export function attr<T extends HTMLElement, V>(
             `Content attribute '${contentAttrName}' is missing its public API`,
           );
         }
-        input = initAccessor(this, contentAttrName, input);
-        const attrValue = this.getAttribute(contentAttrName);
-        const value =
-          attrValue !== null
-            ? transformer.parse.call(this, attrValue)
-            : transformer.validate.call(this, input);
-        return transformer.init.call(this, input, context);
+        return transformer.init.call(
+          this,
+          initAccessorInitialValue(this, contentAttrName, input),
+          context,
+        );
       },
       set(input) {
+        transformer.validate.call(this, input);
+        const newValue = transformer.transform.call(this, input);
         const oldValue = target.get.call(this);
-        const newValue = transformer.validate.call(this, input);
         if (transformer.eql(newValue, oldValue)) {
           return;
         }
@@ -494,17 +493,15 @@ export function prop<T extends HTMLElement, V>(
     assertContext(context, "prop", "accessor");
     return {
       init(input) {
-        return transformer.validate.call(
+        return transformer.init.call(
           this,
-          transformer.init.call(
-            this,
-            initAccessor(this, context.name, input),
-            context,
-          ),
+          initAccessorInitialValue(this, context.name, input),
+          context,
         );
       },
       set(input) {
-        const newValue = transformer.validate.call(this, input);
+        transformer.validate.call(this, input);
+        const newValue = transformer.transform.call(this, input);
         if (transformer.eql(newValue, target.get.call(this))) {
           return;
         }

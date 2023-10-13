@@ -227,7 +227,7 @@ describe("Transformers", () => {
       expect(el.foo).to.equal(0);
       el.foo = 7;
       expect(el.foo).to.equal(7);
-      el.foo = undefined as any;
+      el.foo = 0;
       expect(el.foo).to.equal(0);
     });
 
@@ -254,12 +254,10 @@ describe("Transformers", () => {
       el.foo = 1n;
       expect(el.foo).to.equal(1n);
       expect(el.getAttribute("foo")).to.equal("1");
-      el.foo = undefined as any;
+      el.foo = 0n;
       expect(el.foo).to.equal(0n);
       el.setAttribute("foo", "2");
       expect(el.foo).to.equal(2n);
-      el.foo = null as any;
-      expect(el.foo).to.equal(0n);
       el.setAttribute("foo", "5.75");
       expect(el.foo).to.equal(5n);
       el.setAttribute("foo", "sfhuehueghugeh");
@@ -310,7 +308,7 @@ describe("Transformers", () => {
       expect(el.foo).to.equal(0n);
       el.foo = 7n;
       expect(el.foo).to.equal(7n);
-      el.foo = undefined as any;
+      el.foo = 0n;
       expect(el.foo).to.equal(0n);
     });
 
@@ -427,8 +425,6 @@ describe("Transformers", () => {
       expect(el.foo).to.equal("A");
       el.foo = "B";
       expect(el.foo).to.equal("B");
-      el.foo = undefined as any;
-      expect(el.foo).to.equal("A");
     });
   });
 
@@ -509,6 +505,10 @@ describe("Transformers", () => {
       expect(el.foo).to.eql([]);
       el.removeAttribute("foo");
       expect(el.foo).to.eql([0]);
+      el.foo = [1, 2];
+      expect(el.getAttribute("foo")).to.eql("1,2");
+      el.foo = [];
+      expect(el.getAttribute("foo")).to.eql("");
     });
 
     test("list of space-separated strings as attribute", async () => {

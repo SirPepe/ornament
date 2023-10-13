@@ -7,7 +7,10 @@ import {
   assertType,
 } from "./types.js";
 
-const protoTransformer: Omit<Transformer<any, any>, "parse" | "validate"> = {
+const protoTransformer: Transformer<any, any> = {
+  parse: (x: any) => x,
+  validate: () => true,
+  transform: (x: any) => x,
   stringify: String,
   eql: <T>(a: T, b: T) => a === b,
   init: <T>(x: T) => x,
@@ -15,16 +18,9 @@ const protoTransformer: Omit<Transformer<any, any>, "parse" | "validate"> = {
   updateContentAttr: () => true,
 };
 
-/* eslint-disable */
-type InputTransformer<T extends HTMLElement, V> = Optional<
-  Transformer<T, V>,
-  Exclude<keyof Transformer<T, V>, "parse" | "validate">
->;
-/* eslint-enable */
-
-function createTransformer<T extends HTMLElement, V>(
-  input: InputTransformer<T, V>,
-): Transformer<T, V> {
+function createTransformer<T extends HTMLElement, V, IntermediateV = V>(
+  input: Partial<Transformer<T, V, IntermediateV>>,
+): Transformer<T, V, IntermediateV> {
   return Object.assign(Object.create(protoTransformer), input);
 }
 
@@ -46,7 +42,7 @@ export function string<T extends HTMLElement>(): Transformer<T, string> {
       }
       return String(newValue);
     },
-    validate: String,
+    transform: String,
     init(value = "") {
       initialValues.set(this, value);
       return value;
@@ -60,9 +56,8 @@ export function href<T extends HTMLElement>(): Transformer<T, string> {
   const defaultValues = new WeakMap<T, string>();
   return createTransformer<T, string>({
     parse(newValue) {
-      // Shadow is undefined when initializing from HTML
-      const shadow = shadows.get(this) ?? document.createElement("a");
-      if (!newValue) {
+      const shadow = shadows.get(this)!;
+      if (newValue === null) {
         const defaultValue = defaultValues.get(this);
         if (defaultValue) {
           shadow.setAttribute("href", defaultValue);
@@ -77,7 +72,7 @@ export function href<T extends HTMLElement>(): Transformer<T, string> {
     stringify() {
       return shadows.get(this)?.getAttribute("href") ?? "";
     },
-    validate(newValue) {
+    transform(newValue) {
       // Shadow is undefined for validation of the accessors default value
       const shadow = shadows.get(this) ?? document.createElement("a");
       shadow.href = String(newValue);
@@ -98,7 +93,7 @@ export function href<T extends HTMLElement>(): Transformer<T, string> {
 export function bool<T extends HTMLElement>(): Transformer<T, boolean> {
   return createTransformer<T, boolean>({
     parse: (value) => value !== null,
-    validate: Boolean,
+    transform: Boolean,
     stringify: () => "",
     updateContentAttr(_, newValue) {
       return newValue === false ? null : true;
@@ -129,6 +124,16 @@ export function number<T extends HTMLElement>(
 ): Transformer<T, number> {
   const initialValues = new WeakMap<T, number>();
   const { min, max } = numberOptions(options);
+  // Used as validation function and in init
+  function validate(value: unknown): void {
+    const asNumber = Number(value);
+    if (Number.isNaN(asNumber)) {
+      throw new Error(`Invalid number value "NaN"`);
+    }
+    if (asNumber < min || asNumber > max) {
+      throw new RangeError(`${asNumber} is out of range [${min}, ${max}]`);
+    }
+  }
   return createTransformer<T, number>({
     parse(value) {
       if (value === null) {
@@ -140,36 +145,13 @@ export function number<T extends HTMLElement>(
       }
       return Math.min(Math.max(asNumber, min), max);
     },
-    validate(value) {
-      // TODO: parse the value instead
-      if (typeof value === "undefined") {
-        return initialValues.get(this) ?? 0;
-      }
-      const asNumber = Number(value);
-      if (Number.isNaN(asNumber)) {
-        throw new Error(`Invalid number value "NaN"`);
-      }
-      if (asNumber < min || asNumber > max) {
-        throw new RangeError(`${asNumber} is out of range [${min}, ${max}]`);
-      }
-      return asNumber;
-    },
+    validate,
     init(value = 0) {
+      validate(value);
       initialValues.set(this, value);
       return value;
     },
   });
-}
-
-function isBigIntConvertible(
-  value: unknown,
-): value is string | number | bigint | boolean {
-  return (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "bigint" ||
-    typeof value === "boolean"
-  );
 }
 
 function bigintOptions(input: unknown): NumberOptions<bigint | undefined> {
@@ -187,12 +169,10 @@ function bigintOptions(input: unknown): NumberOptions<bigint | undefined> {
   return { min, max };
 }
 
-function toBigInt(value: string | number | bigint | boolean): bigint {
-  if (typeof value === "string") {
-    const match = /^(-?[0-9]+)(\.[0-9]+)/.exec(value);
-    if (match) {
-      return BigInt(match[1]);
-    }
+function parseBigInt(value: string): bigint {
+  const match = /^(-?[0-9]+)(\.[0-9]+)/.exec(value);
+  if (match) {
+    return BigInt(match[1]);
   }
   return BigInt(value);
 }
@@ -208,39 +188,35 @@ export function int<T extends HTMLElement>(
   // bigints. This is a bit code golf-y, but we are just not gonna worry about
   // it.
   const { min, max } = bigintOptions(options) as { min: bigint; max: bigint };
+  // Used as validation function and in init
+  function validate(value: unknown): void {
+    const asInt = BigInt(value as any);
+    if (asInt < min || asInt > max) {
+      throw new RangeError(`${asInt} is out of range [${min}, ${max}]`);
+    }
+  }
   return createTransformer<T, bigint>({
     parse(value) {
-      if (isBigIntConvertible(value)) {
-        try {
-          const asInt = toBigInt(value);
-          if (asInt <= min) {
-            return min;
-          }
-          if (asInt >= max) {
-            return max;
-          }
-          return asInt;
-        } catch {
-          return NO_VALUE;
-        }
-      }
-      return initialValues.get(this) ?? 0n;
-    },
-    validate(value) {
-      // TODO: parse the value instead
-      if (typeof value === "undefined") {
+      if (value === null) {
         return initialValues.get(this) ?? 0n;
       }
-      if (value === null) {
-        return 0n;
+      try {
+        const asInt = parseBigInt(value);
+        if (asInt <= min) {
+          return min;
+        }
+        if (asInt >= max) {
+          return max;
+        }
+        return asInt;
+      } catch {
+        return NO_VALUE;
       }
-      const asInt = BigInt(value as any);
-      if (asInt < min || asInt > max) {
-        throw new RangeError(`${asInt} is out of range [${min}, ${max}]`);
-      }
-      return asInt;
     },
+    validate,
+    transform: (x: any) => BigInt(x),
     init(value = 0n) {
+      validate(value);
       initialValues.set(this, value);
       return value;
     },
@@ -268,9 +244,7 @@ export function json<T extends HTMLElement>(
       }
     },
     validate(value) {
-      // Verify that the new value stringifies
       stringifyJSONAttribute(value, options.replacer);
-      return value;
     },
     stringify(value) {
       return stringifyJSONAttribute(value, options.replacer);
@@ -360,37 +334,36 @@ function literalOptions<T extends HTMLElement, V>(
 export function literal<T extends HTMLElement, V>(
   options: LiteralOptions<T, V>,
 ): Transformer<T, V> {
-  const fallbackValues = new WeakMap<T, V>();
+  const initialValues = new WeakMap<T, V>();
   const { transform, values } = literalOptions<T, V>(options);
+  // Used as validation function and in init
+  function validate(this: T, value: any): void {
+    transform.validate.call(this, value);
+    const transformed = transform.transform.call(this, value);
+    if (!values.includes(transformed)) {
+      throw new Error(
+        `Invalid value: ${transform.stringify.call(this, transformed)}`,
+      );
+    }
+  }
   return createTransformer<T, V>({
-    parse(rawValue) {
-      if (rawValue === null) {
-        return fallbackValues.get(this) as any; // TODO: wtf
+    parse(value) {
+      if (value === null) {
+        return initialValues.get(this)!;
       }
-      const parsed = transform.parse.call(this, rawValue);
+      const parsed = transform.parse.call(this, value);
       if (parsed !== NO_VALUE && values.includes(parsed)) {
         return parsed;
       }
       return NO_VALUE;
     },
-    validate(newValue) {
-      if (typeof newValue === "undefined") {
-        return fallbackValues.get(this) ?? values[0];
-      }
-      const validated = transform.validate.call(this, newValue);
-      if (values.includes(validated)) {
-        return validated;
-      }
-      throw new Error(
-        `Invalid value: ${transform.stringify.call(this, validated)}`,
-      );
-    },
-    stringify: transform.stringify,
+    validate,
     eql: transform.eql,
+    stringify: transform.stringify,
+    transform: transform.transform,
     init(value = values[0]) {
-      if (values.includes(value)) {
-        fallbackValues.set(this, value);
-      }
+      validate.call(this, value);
+      initialValues.set(this, value);
       return value;
     },
   });
@@ -415,10 +388,19 @@ function listOptions<T extends HTMLElement, V>(
 
 export function list<T extends HTMLElement, V>(
   inputOptions: ListOptions<T, V>,
-): Transformer<T, V[]> {
+): Transformer<T, V[], any[]> {
   const initialValues = new WeakMap<T, V[]>();
   const { transform, separator } = listOptions<T, V>(inputOptions);
-  return createTransformer<T, V[]>({
+  // Used as validation function and in init
+  function validate(this: T, values: unknown): void {
+    if (!isArray(values)) {
+      throw new Error(`Expected array, got ${typeof values}`);
+    }
+    for (const value of values) {
+      transform.validate.call(this, value);
+    }
+  }
+  return createTransformer<T, V[], any[]>({
     parse(rawValues) {
       if (typeof rawValues === "string") {
         return rawValues.split(separator).flatMap((rawValue) => {
@@ -434,20 +416,13 @@ export function list<T extends HTMLElement, V>(
       }
       return initialValues.get(this) ?? [];
     },
-    validate(newValues) {
-      if (typeof newValues === "undefined") {
-        return initialValues.get(this) ?? [];
-      }
-      if (isArray(newValues)) {
-        return newValues.map((newValue) =>
-          transform.validate.call(this, newValue),
-        );
-      }
-      throw new Error(`Invalid value: ${newValues}`);
+    validate,
+    transform(values) {
+      return values.map((value) => transform.transform.call(this, value));
     },
-    stringify(value) {
-      if (value) {
-        return value
+    stringify(values) {
+      if (values) {
+        return values
           .map((value) => transform.stringify.call(this, value))
           .join(separator);
       }
@@ -468,6 +443,7 @@ export function list<T extends HTMLElement, V>(
       return true;
     },
     init(value = []) {
+      validate.call(this, value);
       initialValues.set(this, value);
       return value;
     },
@@ -503,7 +479,7 @@ export function event<
       }
       return null;
     },
-    validate(value) {
+    transform(value) {
       if (typeof value === "function") {
         return value as Handler<T, E>;
       }
