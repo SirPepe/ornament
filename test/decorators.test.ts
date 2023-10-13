@@ -98,6 +98,14 @@ describe("Decorators", () => {
       expect((el as any).x).to.equal("X");
     });
 
+    test("reject invalid initial values", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(number({ min: 0 })) accessor x = -7;
+      }
+      expect(() => new Test()).to.throw(RangeError);
+    });
+
     test("reject on static", () => {
       expect(() => {
         @define(generateTagName())
@@ -253,6 +261,14 @@ describe("Decorators", () => {
       window.customElements.upgrade(el);
       expect(Object.hasOwn(el, "x")).to.equal(false);
       expect((el as any).x).to.equal("Y");
+    });
+
+    test("reject invalid initial values", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(number({ min: 0 })) accessor x = -7;
+      }
+      expect(() => new Test()).to.throw(RangeError);
     });
 
     test("reject on symbol fields without a name for a public facade", async () => {
