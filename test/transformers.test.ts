@@ -187,6 +187,42 @@ describe("Transformers", () => {
       el.foo = 3;
       el.setAttribute("foo", "asdf");
       expect(el.foo).to.equal(3);
+      expect(() => {
+        el.foo = NaN;
+      }).to.throw();
+    });
+
+    test("as attribute with NaN", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(number({ allowNaN: true })) accessor foo = 0;
+      }
+      const el = new Test();
+      expect(el.foo).to.equal(0);
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.foo = 1;
+      expect(el.foo).to.equal(1);
+      expect(el.getAttribute("foo")).to.equal("1");
+      el.setAttribute("foo", "2");
+      expect(el.foo).to.equal(2);
+      el.setAttribute("foo", "2.22");
+      expect(el.foo).to.equal(2.22);
+      el.removeAttribute("foo");
+      expect(el.foo).to.equal(0);
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.foo = 3;
+      el.setAttribute("foo", "asdf");
+      expect(Number.isNaN(el.foo)).to.equal(true);
+      el.foo = 3;
+      expect(el.foo).to.equal(3);
+      expect(el.getAttribute("foo")).to.equal("3");
+      el.foo = NaN;
+      expect(Number.isNaN(el.foo)).to.equal(true);
+      expect(el.getAttribute("foo")).to.equal("NaN");
+      el.foo = 3;
+      el.setAttribute("foo", "NaN");
+      expect(Number.isNaN(el.foo)).to.equal(true);
+      expect(el.getAttribute("foo")).to.equal("NaN");
     });
 
     test("min/max", async () => {
@@ -200,6 +236,22 @@ describe("Transformers", () => {
       }).to.throw();
       el.setAttribute("foo", "22");
       expect(el.foo).to.equal(10);
+    });
+
+    test("min/max with NaN", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(number({ min: 0, max: 10, allowNaN: true })) accessor foo = 0;
+      }
+      const el = new Test();
+      expect(() => {
+        el.foo = -1;
+      }).to.throw();
+      el.setAttribute("foo", "22");
+      expect(el.foo).to.equal(10);
+      el.foo = NaN;
+      expect(Number.isNaN(el.foo)).to.equal(true);
+      expect(el.getAttribute("foo")).to.equal("NaN");
     });
 
     test("custom fallback value", async () => {
@@ -236,6 +288,16 @@ describe("Transformers", () => {
         @define(generateTagName())
         class Test extends HTMLElement {
           @attr(number({ max: 5 })) accessor foo = 10;
+        }
+        const el = new Test();
+      }).to.throw();
+    });
+
+    test("initial value out of range non-allowed NaN", async () => {
+      expect(() => {
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @attr(number({ max: 5 })) accessor foo = NaN;
         }
         const el = new Test();
       }).to.throw();

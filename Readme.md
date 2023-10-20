@@ -1,6 +1,6 @@
 # Ornament
 
-Unopinionated, pareto-optimal micro-library (<= 3.8k) for building vanilla web
+Unopinionated, pareto-optimal micro-library (<= 3.7k) for building vanilla web
 component infrastructure:
 
 ```javascript
@@ -152,7 +152,7 @@ you will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/do
 (with the option `experimentalDecorators` turned *off*).
 
 Apart from that, Ornament is just a bunch of functions. No further setup
-required.
+required, no extra concepts to learn.
 
 ### General philosophy
 
@@ -798,7 +798,7 @@ side effects.
 | `string()`        | `string`            |                          |
 | `href()`          | `string` (URL)      |                          |
 | `bool()`          | `boolean`           |                          |
-| `number()`        | `number`            | `min`, `max`             |
+| `number()`        | `number`            | `min`, `max`, `allowNaN` |
 | `int()`           | `bigint`            | `min`, `max`             |
 | `json()`          | JSON serializable   | `reviver`, `replacer`    |
 | `list()`          | Array               | `separator`, `transform` |
@@ -979,23 +979,24 @@ class Test extends HTMLElement {
 }
 ```
 
-Non-numbers get converted to numbers, but never to `NaN` - the property setter
-and the accessor's initializer throw exceptions when their input convert to
-`NaN`.
+Non-numbers get converted to numbers. Unless the option `allowNaN` is set to
+`true`, the property setter and the accessor's initializer throw exceptions when
+their input convert to `NaN`.
 
 #### Options for transformer `number()`
 
 - **`min` (number, optional)**: Smallest possible value. Defaults to `-Infinity`. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception.
 - **`max` (number, optional)**: Largest possible value. Defaults to `Infinity`. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception.
+- **`allowNaN` (boolean, optional)**: Whether or not NaN is allowed. Defaults to `false`.
 
 #### Behavior overview for transformer `number()`
 
 | Operation                                   | IDL attribute value                                 | Content attribute (when used with `@attr()`) |
 | --------------------------------------------| ----------------------------------------------------|----------------------------------------------|
-| Set IDL attribute to value `x`              | `minmax(opts.min, opts.max, toNumberWithoutNaN(x))` | String(IDL attribute value)                  |
+| Set IDL attribute to value `x`              | `minmax(opts.min, opts.max, toNumber(x, allowNaN))` | String(IDL attribute value)                  |
 | Set IDL attribute to out-of-range value     | RangeError                                          | String(IDL attribute value)                  |
-| Set content attribute to value `x`          | `minmax(opts.min, opts.max, toNumberWithoutNaN(x))` | As set                                       |
-| Set content attribute to non-numeric value  | No change                                           | As set                                       |
+| Set content attribute to value `x`          | `minmax(opts.min, opts.max, toNumber(x, allowNaN))` | As set                                       |
+| Set content attribute to non-numeric value  | No change, or NaN if option `allowNaN` is `true`    | As set                                       |
 | Set content attribute to out-of-range value | No change                                           | As set                                       |
 | Remove content attribute                    | Initial value or `0`                                | Removed                                      |
 
