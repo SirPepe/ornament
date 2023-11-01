@@ -7,6 +7,7 @@ import {
   debounce,
   define,
   disconnected,
+  enhance,
   prop,
   reactive,
   subscribe,
@@ -17,8 +18,18 @@ import { signal } from "@preact/signals-core";
 const test = it;
 
 describe("Decorators", () => {
+  describe("@enhance", () => {
+    test("upgrade class", () => {
+      @enhance()
+      class Test extends HTMLElement {}
+      expect(
+        Boolean((Test as any).prototype.attributeChangedCallback),
+      ).to.equal(true);
+    });
+  });
+
   describe("@define", () => {
-    test("register element and create string tag", () => {
+    test("register element", () => {
       @define("register-test")
       class Test extends HTMLElement {}
       expect(window.customElements.get("register-test")).to.equal(Test);

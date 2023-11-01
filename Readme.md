@@ -319,6 +319,7 @@ properly upgraded.
 | Decorator         | Class element       | `static` | `#private` | Symbols          |
 | ------------------| --------------------|----------|------------|------------------|
 | `@define()`       | Class               | -        | -          | -                |
+| `@enhance()`      | Class               | -        | -          | -                |
 | `@attr()`         | Accessor            | ✕        | ✓[^1]      | ✓[^1]            |
 | `@prop()`         | Accessor            | ✕        | ✓          | ✓                |
 | `@reactive()`     | Method              | ✕        | ✓          | -                |
@@ -365,6 +366,29 @@ declare global {
 let test = document.createElement("my-test");
 console.log(test.foo); // only type checks with the above interface declaration
 ```
+
+### `@enhance()`
+
+**Class decorator** to set up attribute observation for use with the
+[@attr()](#attrtransformer-options) decorator, *without* registering the class
+as a custom element.
+
+```javascript
+import { enhance } from "@sirpepe/ornament";
+
+@enhance()
+class MyTest extends HTMLElement {}
+
+// MyTest can only be instantiated when it has been registered as a custom
+// element. Because we use @enhance() instead of @define() in this example, we
+// have to take care of this manually.
+window.customElements.define("my-test", MyTest);
+
+console.log(document.createElement("my-test")); // instance of MyTest
+```
+
+This decorator is only useful if you intend to handle element registration in
+some other way.
 
 ### `@prop(transformer)`
 

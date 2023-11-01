@@ -36,21 +36,17 @@ const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
 // @reactive() methods, which are not supposed to be async.
 const DEBOUNCED_METHOD_MAP = new WeakMap<Method<any, any>, Method<any, any>>();
 
-// The class decorator @define() defines a custom element and also injects a
-// mixin class that hat deals with attribute observation and reactive
-// init callback handling.
-export function define<T extends CustomElementConstructor>(
+// The class decorator @enhance() injects the mixin class that hat deals with
+// attribute observation and reactive init callback handling. You should
+// probably stick to @define(), which does the same thing, but also defines the
+// custom element. This decorator is only useful if you need to handle element
+// registration in some other way.
+export function enhance<T extends CustomElementConstructor>(
   this: unknown,
-  tagName: string,
 ): (target: T, context: ClassDecoratorContext<T>) => T {
   return function (target: T, context: ClassDecoratorContext<T>): T {
     assertContext(context, "define", "class");
     const originalObservedAttributes = (target as any).observedAttributes ?? [];
-
-    // Define the custom element after all other decorators have been applied
-    context.addInitializer(function () {
-      window.customElements.define(tagName, this);
-    });
 
     // Installs the mixin class. This kindof changes the type of the input
     // constructor T, but as TypeScript can currently not use class decorators
@@ -111,6 +107,26 @@ export function define<T extends CustomElementConstructor>(
         trigger(this, "attr", { name, oldValue, newValue });
       }
     };
+  };
+}
+
+// The class decorator @define() defines a custom element and also injects a
+// mixin class that hat deals with attribute observation and reactive
+// init callback handling.
+export function define<T extends CustomElementConstructor>(
+  this: unknown,
+  tagName: string,
+): (target: T, context: ClassDecoratorContext<T>) => T {
+  return function (target: T, context: ClassDecoratorContext<T>): T {
+    assertContext(context, "define", "class");
+
+    // Define the custom element after all other decorators have been applied
+    context.addInitializer(function () {
+      window.customElements.define(tagName, this);
+    });
+
+    // Install the mixin class via @enhance()
+    return enhance<T>()(target, context);
   };
 }
 
