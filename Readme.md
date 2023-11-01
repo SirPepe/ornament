@@ -137,8 +137,8 @@ window.customElements.define("my-greeter", MyGreeter);
 ```
 
 Ornament aims to make the most tedious bits of building vanilla web components
-(attribute handling and reactions to attribute handling) easy. This makes your
-custom architecture or framework easy to build on top of Ornament.
+(attribute handling and reactions to attribute handling) easy by adding some
+primitives that really *should* be part of the standard, but aren't.
 
 ## Guide
 
@@ -159,7 +159,8 @@ required, no extra concepts to learn.
 The native APIs for web components are verbose and imperative, but lend
 themselves to quite a bit of streamlining with
 [the upcoming syntax for ECMAScript Decorators](https://2ality.com/2022/10/javascript-decorators.html).
-And streamlining the native APIs is the *entire* goal here. Ornament is
+They are also missing a few important primitives, Ornament's goal is to provide
+the missing primitives and streamline the developer experience. Ornament is
 **not a framework** but instead aims to be:
 
 - **as stable as possible** by remaining dependency-free and keeping its own code to an absolute minimum
