@@ -449,11 +449,28 @@ export function attr<T extends HTMLElement, V>(
             `Content attribute '${contentAttrName}' is missing its public API`,
           );
         }
-        return transformer.init.call(
+        // Initialize the transformer with the default value. If the attribute
+        // is already set when the accessor initializes, we use the value from
+        // it, but the transformer needs to be initialized first.
+        const defaultValue = transformer.init.call(
           this,
           initAccessorInitialValue(this, contentAttrName, input),
           context,
         );
+        // Use the already-existing attribute value when possible. If the
+        // attribute does not exist or its value can't be parsed, fall back to
+        // the default value from the initialization step.
+        if (this.hasAttribute(contentAttrName)) {
+          const attrValue = transformer.parse.call(
+            this,
+            this.getAttribute(contentAttrName),
+          );
+          if (attrValue !== NO_VALUE) {
+            transformer.beforeSet.call(this, attrValue, context);
+            return attrValue;
+          }
+        }
+        return defaultValue;
       },
       set(input) {
         transformer.validate.call(this, input);

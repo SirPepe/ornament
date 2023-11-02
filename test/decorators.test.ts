@@ -195,6 +195,22 @@ describe("Decorators", () => {
       expect((container.children[0] as any).x).to.equal("B");
     });
 
+    test("initialize attribute value early", async () => {
+      const fn = spy();
+      const tagName = generateTagName();
+      @define(tagName)
+      class Test extends HTMLElement {
+        @attr(string()) accessor x = "A"; // this never appears
+        @reactive()
+        test() {
+          fn(this.x);
+        }
+      }
+      const container = document.createElement("div");
+      container.innerHTML = `<${tagName} x="B"></${tagName}>`;
+      expect(fn.getCalls().map(({ args }) => args)).to.eql([["B"]]);
+    });
+
     test("Non-reflective attribute", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
