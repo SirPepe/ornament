@@ -870,6 +870,22 @@ describe("Decorators", () => {
       expect(fn.getCalls()[1].args).to.eql(["B", 42]);
     });
 
+    test("on a base class", async () => {
+      const fn = spy();
+      class Base extends HTMLElement {
+        @reactive() test() {
+          fn();
+        }
+      }
+      @define(generateTagName())
+      class Test extends Base {
+        @prop(number()) accessor foo = 42;
+      }
+      const el = new Test();
+      el.foo = 23;
+      expect(fn.callCount).to.equal(2); // initial + 1 update
+    });
+
     test("reject on static methods", async () => {
       expect(() => {
         class Test extends HTMLElement {
@@ -1108,7 +1124,7 @@ describe("Decorators", () => {
   });
 
   describe("Regressions", () => {
-    test.skip("co-existence on private fields does not blow up", async () => {
+    test.skip("co-existence of @debounce() and @reactive() on private fields does not blow up", async () => {
       // This problem only manifests itself when @debounce is applied to a
       // private field and a private method is decorated with @reactive
       @define(generateTagName())

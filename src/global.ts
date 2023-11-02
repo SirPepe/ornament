@@ -1,6 +1,7 @@
 // In some bundler happens to include Ornament more than once, we need to make
 // sure that the metadata stores are globally unique.
 
+import { EMPTY_OBJ } from "./lib.js";
 import type { Method } from "./types.js";
 
 export const METADATA_KEY: unique symbol = Symbol.for("ORNAMENT_METADATA");
@@ -31,7 +32,7 @@ declare global {
 }
 
 if (!window[METADATA_KEY]) {
-  window[METADATA_KEY] = {} as any;
+  window[METADATA_KEY] = EMPTY_OBJ as any;
 }
 
 window[METADATA_KEY].targetMap ||= new WeakMap<HTMLElement, EventTarget>();
