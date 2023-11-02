@@ -1,4 +1,5 @@
 import { listen, trigger } from "./bus.js";
+import { METADATA_KEY } from "./global.js";
 import { EMPTY_OBJ, NO_VALUE } from "./lib.js";
 import {
   type ClassAccessorDecorator,
@@ -23,19 +24,6 @@ function initAccessorInitialValue(
   return defaultValue;
 }
 
-// Accessor decorators initialize *after* custom elements access their
-// observedAttributes getter. This means that, in the absence of the decorators
-// metadata feature, there is no way to associate observed attributes with
-// specific elements or constructors from inside the @attr() decorator. Instead
-// we simply track *all* attributes defined by @attr() *on any class* and decide
-// *inside the attribute changed callback* whether they are *actually* observed
-// by a given element.
-const ALL_OBSERVABLE_ATTRIBUTES = new Set<string>();
-
-// Maps debounced methods to original methods. Needed for initial calls of
-// @reactive() methods, which are not supposed to be async.
-const DEBOUNCED_METHOD_MAP = new WeakMap<Method<any, any>, Method<any, any>>();
-
 // The class decorator @enhance() injects the mixin class that hat deals with
 // attribute observation and reactive init callback handling. You should
 // probably stick to @define(), which does the same thing, but also defines the
@@ -59,7 +47,10 @@ export function enhance<T extends CustomElementConstructor>(
       }
 
       static get observedAttributes(): string[] {
-        return [...originalObservedAttributes, ...ALL_OBSERVABLE_ATTRIBUTES];
+        return [
+          ...originalObservedAttributes,
+          ...window[METADATA_KEY].observableAttributes,
+        ];
       }
 
       connectedCallback(): void {
@@ -158,7 +149,9 @@ export function reactive<T extends HTMLElement>(
         // non-debounced method if required and wraps it in predicate logic.
         if (options.initial !== false) {
           if (!options.predicate || options.predicate.call(this)) {
-            (DEBOUNCED_METHOD_MAP.get(value) ?? value).call(this);
+            (window[METADATA_KEY].debouncedMethods.get(value) ?? value).call(
+              this,
+            );
           }
         }
       });
@@ -176,10 +169,6 @@ export function reactive<T extends HTMLElement>(
     });
   };
 }
-
-const unsubscribeRegistry = new FinalizationRegistry<() => void>(
-  (unsubscribe) => unsubscribe(),
-);
 
 type SubscribePredicate<T, V> = (this: T, value: V) => boolean;
 
@@ -227,7 +216,7 @@ function createEventSubscriberInitializer<
           : targetOrTargetFactory;
       const unsubscribe = () =>
         eventTarget.removeEventListener(eventNames, callback);
-      unsubscribeRegistry.register(this, unsubscribe);
+      window[METADATA_KEY].unsubscribeRegistry.register(this, unsubscribe);
       eventTarget.addEventListener(eventNames, callback);
     });
   };
@@ -276,7 +265,7 @@ function createSignalSubscriberInitializer<
         }
       };
       const unsubscribe = target.subscribe(callback);
-      unsubscribeRegistry.register(this, unsubscribe);
+      window[METADATA_KEY].unsubscribeRegistry.register(this, unsubscribe);
     });
   };
 }
@@ -415,7 +404,7 @@ export function attr<T extends HTMLElement, V>(
     // If the attribute needs to be observed, add the name to the set of all
     // observed attributes.
     if (isReflectiveAttribute) {
-      ALL_OBSERVABLE_ATTRIBUTES.add(contentAttrName);
+      window[METADATA_KEY].observableAttributes.add(contentAttrName);
     }
 
     // If the attribute needs to be observed and the accessor initializes,
@@ -553,7 +542,7 @@ function createDebouncedMethod<T extends object, A extends unknown[]>(
       }),
     );
   }
-  DEBOUNCED_METHOD_MAP.set(debouncedMethod, originalMethod);
+  window[METADATA_KEY].debouncedMethods.set(debouncedMethod, originalMethod);
   return debouncedMethod;
 }
 
