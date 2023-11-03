@@ -11,7 +11,7 @@ import {
 } from "./types.js";
 
 // Un-clobber an accessor if the element upgrades after a property with
-// a matching name has already been set
+// a matching name has already been set.
 function initAccessorInitialValue(
   instance: any,
   name: string | symbol,
@@ -29,12 +29,15 @@ function initAccessorInitialValue(
 // probably stick to @define(), which does the same thing, but also defines the
 // custom element. This decorator is only useful if you need to handle element
 // registration in some other way.
-export function enhance<T extends CustomElementConstructor>(
-  this: unknown,
-): (target: T, context: ClassDecoratorContext<T>) => T {
+export function enhance<T extends CustomElementConstructor>(): (
+  target: T,
+  context: ClassDecoratorContext<T>,
+) => T {
   return function (target: T, context: ClassDecoratorContext<T>): T {
     assertContext(context, "define", "class");
-    const originalObservedAttributes = (target as any).observedAttributes ?? [];
+    const originalObservedAttributes = new Set<string>(
+      (target as any).observedAttributes ?? [],
+    );
 
     // Installs the mixin class. This kindof changes the type of the input
     // constructor T, but as TypeScript can currently not use class decorators
@@ -89,7 +92,7 @@ export function enhance<T extends CustomElementConstructor>(
           // eslint-disable-next-line
           // @ts-ignore
           super.attributeChangedCallback &&
-          originalObservedAttributes.includes(name)
+          originalObservedAttributes.has(name)
         ) {
           // eslint-disable-next-line
           // @ts-ignore
@@ -105,7 +108,6 @@ export function enhance<T extends CustomElementConstructor>(
 // mixin class that hat deals with attribute observation and reactive
 // init callback handling.
 export function define<T extends CustomElementConstructor>(
-  this: unknown,
   tagName: string,
 ): (target: T, context: ClassDecoratorContext<T>) => T {
   return function (target: T, context: ClassDecoratorContext<T>): T {
@@ -133,7 +135,6 @@ type ReactiveDecorator<T extends HTMLElement> = (
 ) => void;
 
 export function reactive<T extends HTMLElement>(
-  this: unknown,
   options: ReactiveOptions<T> = EMPTY_OBJ,
 ): ReactiveDecorator<T> {
   const subscribedElements = new WeakSet();
@@ -273,7 +274,6 @@ function createSignalSubscriberInitializer<
 }
 
 export function subscribe<T extends HTMLElement, S extends SignalLike<any>>(
-  this: unknown,
   target: S,
   options?: SignalSubscribeOptions<T, SignalType<S>>,
 ): SignalSubscribeDecorator<T>;
@@ -374,7 +374,6 @@ type AttrOptions = {
 };
 
 export function attr<T extends HTMLElement, V>(
-  this: unknown,
   transformer: Transformer<T, V>,
   options: AttrOptions = EMPTY_OBJ,
 ): ClassAccessorDecorator<T, V> {
@@ -452,11 +451,28 @@ export function attr<T extends HTMLElement, V>(
             `Content attribute '${contentAttrName}' is missing its public API`,
           );
         }
-        return transformer.init.call(
+        // Initialize the transformer with the default value. If the attribute
+        // is already set when the accessor initializes, we use the value from
+        // it, but the transformer needs to be initialized first.
+        const defaultValue = transformer.init.call(
           this,
           initAccessorInitialValue(this, contentAttrName, input),
           context,
         );
+        // Use the already-existing attribute value when possible. If the
+        // attribute does not exist or its value can't be parsed, fall back to
+        // the default value from the initialization step.
+        if (this.hasAttribute(contentAttrName)) {
+          const attrValue = transformer.parse.call(
+            this,
+            this.getAttribute(contentAttrName),
+          );
+          if (attrValue !== NO_VALUE) {
+            transformer.beforeSet.call(this, attrValue, context);
+            return attrValue;
+          }
+        }
+        return defaultValue;
       },
       set(input) {
         transformer.validate.call(this, input);
@@ -493,7 +509,6 @@ export function attr<T extends HTMLElement, V>(
 // Accessor decorator @prop() returns a normal accessor, but with validation and
 // reactivity added.
 export function prop<T extends HTMLElement, V>(
-  this: unknown,
   transformer: Transformer<T, V>,
 ): ClassAccessorDecorator<T, V> {
   return function (target, context): ClassAccessorDecoratorResult<T, V> {
@@ -549,7 +564,6 @@ function createDebouncedMethod<T extends object, A extends unknown[]>(
 }
 
 export function debounce<T extends HTMLElement, A extends unknown[]>(
-  this: unknown,
   options: DebounceOptions = EMPTY_OBJ,
 ): FunctionFieldOrMethodDecorator<T, A> {
   const fn = options.fn ?? debounce.raf();
