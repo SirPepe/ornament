@@ -214,10 +214,12 @@ function createEventSubscriberInitializer<
         typeof targetOrTargetFactory === "function"
           ? targetOrTargetFactory.call(this)
           : targetOrTargetFactory;
-      const unsubscribe = () =>
-        eventTarget.removeEventListener(eventNames, callback);
-      window[METADATA_KEY].unsubscribeRegistry.register(this, unsubscribe);
-      eventTarget.addEventListener(eventNames, callback);
+      for (const eventName of eventNames.trim().split(/\s+/)) {
+        const unsubscribe = () =>
+          eventTarget.removeEventListener(eventName, callback);
+        window[METADATA_KEY].unsubscribeRegistry.register(this, unsubscribe);
+        eventTarget.addEventListener(eventName, callback);
+      }
     });
   };
 }

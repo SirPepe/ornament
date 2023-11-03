@@ -870,6 +870,22 @@ describe("Decorators", () => {
       expect(fn.getCalls()[1].args).to.eql(["B", 42]);
     });
 
+    test("on a base class", async () => {
+      const fn = spy();
+      class Base extends HTMLElement {
+        @reactive() test() {
+          fn();
+        }
+      }
+      @define(generateTagName())
+      class Test extends Base {
+        @prop(number()) accessor foo = 42;
+      }
+      const el = new Test();
+      el.foo = 23;
+      expect(fn.callCount).to.equal(2); // initial + 1 update
+    });
+
     test("reject on static methods", async () => {
       expect(() => {
         class Test extends HTMLElement {
@@ -941,6 +957,29 @@ describe("Decorators", () => {
         target.dispatchEvent(event);
         expect(fn.callCount).to.equal(1);
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
+      });
+
+      test("subscribe to multiple events on an event target", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "foo bar\n  baz")
+          test(event: Event) {
+            fn(this, event, event.target);
+          }
+        }
+        const instance = new Test();
+        const event1 = new Event("foo");
+        const event2 = new Event("bar");
+        const event3 = new Event("baz");
+        target.dispatchEvent(event1);
+        target.dispatchEvent(event2);
+        target.dispatchEvent(event3);
+        expect(fn.callCount).to.equal(3);
+        expect(fn.getCalls()[0].args).to.eql([instance, event1, target]);
+        expect(fn.getCalls()[1].args).to.eql([instance, event2, target]);
+        expect(fn.getCalls()[2].args).to.eql([instance, event3, target]);
       });
 
       test("subscribe to an event target and access private fields", async () => {
@@ -1108,7 +1147,7 @@ describe("Decorators", () => {
   });
 
   describe("Regressions", () => {
-    test.skip("co-existence on private fields does not blow up", async () => {
+    test.skip("co-existence of @debounce() and @reactive() on private fields does not blow up", async () => {
       // This problem only manifests itself when @debounce is applied to a
       // private field and a private method is decorated with @reactive
       @define(generateTagName())

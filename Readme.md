@@ -1,6 +1,6 @@
 # Ornament
 
-Unopinionated, pareto-optimal micro-library (<= 3.7k) for building vanilla web
+Unopinionated, pareto-optimal micro-library (<= 3.8k) for building vanilla web
 component infrastructure:
 
 ```javascript
@@ -623,11 +623,12 @@ subscriptions activate when an element's constructor completes and the all
 listeners automatically unsubscribe when the subscribed element gets garbage
 collected.
 
-#### Subscribe to EventTargets: `@subscribe(targetOrTargetFactory, eventName, options?)`
+#### Subscribe to EventTargets: `@subscribe(targetOrTargetFactory, eventNames, options?)`
 
-Subscribe to an EventTarget. EventTarget is an interface that objects such as
-HTMLElement, Window, Document and *many* more objects implement. You can also
-create a vanilla event target by calling `new EventTarget()`...
+Subscribe to one or more events an EventTarget. `EventTarget` is an interface
+that objects such as HTMLElement, Window, Document and *many* more objects
+implement. You can also create a vanilla event target by calling
+`new EventTarget()`...
 
 ```javascript
 import { define, subscribe } from "@sirpepe/ornament";
@@ -687,6 +688,9 @@ source.value = 42;
 Both instances of `my-test` are now subscribed to `change` events on the data
 source and their shadow DOM content stays in sync.
 
+To subscribe to multiple events, pass a single string with the event names
+separated by whitespace.
+
 You can also provide a target-producing factory in place of the target itself:
 
 ```javascript
@@ -695,8 +699,8 @@ import { define, subscribe } from "@sirpepe/ornament";
 @define("my-test")
 class Test extends HTMLElement {
   // "window" is a perfectly valid event target
-  @subscribe(window, "change") #a() {} // same effect as below
-  @subscribe(() => window, "change") #b() {} // same effect as above
+  @subscribe(window, "update") #a() {} // same effect as below
+  @subscribe(() => window, "update") #b() {} // same effect as above
 }
 ```
 
@@ -707,7 +711,7 @@ called each time an element initializes, with `this` set to the instance.
 ##### Options for `@subscribe()` for EventTarget
 
 - **`targetOrTargetFactory` (EventTarget | (this: T) => EventTarget)**: The event target (or event-target-returning function) to subscribe to
-- **`eventName` (string)**: The event name to listen to
+- **`eventNames` (string)**: The event(s) to listen to. To subscribe to multiple events, pass a single string with the event names separated by whitespace
 - **`options` (object, optional)**: Event handling options, consisting of...
   - **predicate (function `(this: T, event: Event) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the event object and must return a boolean
   - **capture (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
