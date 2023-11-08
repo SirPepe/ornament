@@ -1334,6 +1334,14 @@ listen(someElement, "prop", (evt) => {
 });
 ```
 
+## Symbols
+
+### `NO_VALUE`
+
+Transformers can return a special symbol to indicate that they were unable to
+parse an input. This symbol is exported by Ornament as `NO_VALUE` or available
+under the key `"ORNAMENT_NO_VALUE"` in the global symbol registry.
+
 ## Cookbook
 
 ### Debounced reactive
