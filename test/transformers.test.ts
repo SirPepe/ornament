@@ -192,6 +192,43 @@ describe("Transformers", () => {
       }).to.throw();
     });
 
+    test("as nullable attribute", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(number({ nullable: true }))
+        accessor foo: null | undefined | number = 0;
+      }
+      const el = new Test();
+      expect(el.foo).to.equal(0);
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.foo = 1;
+      expect(el.foo).to.equal(1);
+      expect(el.getAttribute("foo")).to.equal("1");
+      el.foo = null;
+      expect(el.foo).to.equal(null);
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.setAttribute("foo", "2");
+      expect(el.foo).to.equal(2);
+      el.setAttribute("foo", "2.22");
+      expect(el.foo).to.equal(2.22);
+      el.setAttribute("foo", "0");
+      expect(el.foo).to.equal(0);
+      el.foo = undefined;
+      expect(el.foo).to.equal(null);
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.setAttribute("foo", "Infinity");
+      expect(el.foo).to.equal(Infinity);
+      el.removeAttribute("foo");
+      expect(el.foo).to.equal(null);
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.foo = 3;
+      el.setAttribute("foo", "asdf");
+      expect(el.foo).to.equal(3);
+      expect(() => {
+        el.foo = NaN;
+      }).to.throw();
+    });
+
     test("as attribute with NaN", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -229,6 +266,20 @@ describe("Transformers", () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         @attr(number({ min: 0, max: 10 })) accessor foo = 0;
+      }
+      const el = new Test();
+      expect(() => {
+        el.foo = -1;
+      }).to.throw();
+      el.setAttribute("foo", "22");
+      expect(el.foo).to.equal(10);
+    });
+
+    test("min/max when nullable", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(number({ min: 0, max: 10, nullable: true }))
+        accessor foo: number | null | undefined = 0;
       }
       const el = new Test();
       expect(() => {
@@ -283,6 +334,19 @@ describe("Transformers", () => {
       expect(el.foo).to.equal(0);
     });
 
+    test("non-initialized accessor when nullable", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(number({ nullable: true })) accessor foo: any;
+      }
+      const el = new Test();
+      expect(el.foo).to.equal(null);
+      el.foo = 7;
+      expect(el.getAttribute("foo")).to.equal("7");
+      el.removeAttribute("foo");
+      expect(el.foo).to.equal(null);
+    });
+
     test("initial value out of range", async () => {
       expect(() => {
         @define(generateTagName())
@@ -293,7 +357,7 @@ describe("Transformers", () => {
       }).to.throw();
     });
 
-    test("initial value out of range non-allowed NaN", async () => {
+    test("initial value set to out of range non-allowed NaN", async () => {
       expect(() => {
         @define(generateTagName())
         class Test extends HTMLElement {
@@ -322,6 +386,9 @@ describe("Transformers", () => {
       expect(el.foo).to.equal(2n);
       el.setAttribute("foo", "5.75");
       expect(el.foo).to.equal(5n);
+      expect(() => {
+        el.foo = 5.55 as any;
+      }).to.throw();
       el.setAttribute("foo", "sfhuehueghugeh");
       expect(el.foo).to.equal(5n);
       el.setAttribute("foo", "3");
@@ -330,6 +397,38 @@ describe("Transformers", () => {
       expect(el.foo).to.equal(1n);
       el.removeAttribute("foo");
       expect(el.foo).to.equal(0n);
+    });
+
+    test("as nullable attribute", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(int({ nullable: true }))
+        accessor foo: bigint | null | undefined = 0n;
+      }
+      const el = new Test();
+      expect(el.foo).to.equal(0n);
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.foo = 1n;
+      expect(el.foo).to.equal(1n);
+      expect(el.getAttribute("foo")).to.equal("1");
+      el.foo = null;
+      expect(el.foo).to.equal(null);
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.setAttribute("foo", "5.75");
+      expect(el.foo).to.equal(5n);
+      el.foo = undefined;
+      expect(el.foo).to.equal(null);
+      expect(el.getAttribute("foo")).to.equal(null);
+      expect(() => {
+        el.foo = 5.55 as any;
+      }).to.throw();
+      el.foo = "1" as any;
+      expect(el.foo).to.equal(1n);
+      expect(el.getAttribute("foo")).to.equal("1");
+      el.setAttribute("foo", "sfhuehueghugeh");
+      expect(el.foo).to.equal(1n);
+      el.removeAttribute("foo");
+      expect(el.foo).to.equal(null);
     });
 
     test("min/max", async () => {
@@ -343,6 +442,23 @@ describe("Transformers", () => {
       }).to.throw();
       el.setAttribute("foo", "22");
       expect(el.foo).to.equal(10n);
+    });
+
+    test("min/max when nullable", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(int({ min: 0n, max: 10n, nullable: true }))
+        accessor foo: bigint | null | undefined = 0n;
+      }
+      const el = new Test();
+      expect(() => {
+        el.foo = -1n;
+      }).to.throw();
+      el.setAttribute("foo", "22");
+      expect(el.foo).to.equal(10n);
+      el.foo = null;
+      expect(el.foo).to.equal(null);
+      expect(el.getAttribute("foo")).to.equal(null);
     });
 
     test("custom fallback value", async () => {
@@ -372,6 +488,19 @@ describe("Transformers", () => {
       expect(el.foo).to.equal(7n);
       el.foo = 0n;
       expect(el.foo).to.equal(0n);
+    });
+
+    test("non-initialized accessor when nullable", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(int({ nullable: true })) accessor foo: any;
+      }
+      const el = new Test();
+      expect(el.foo).to.equal(null);
+      el.foo = 7n;
+      expect(el.getAttribute("foo")).to.equal("7");
+      el.removeAttribute("foo");
+      expect(el.foo).to.equal(null);
     });
 
     test("initial value out of range", async () => {

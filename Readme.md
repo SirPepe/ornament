@@ -1,6 +1,6 @@
 # Ornament
 
-Unopinionated, pareto-optimal micro-library (<= 3.9k) for building vanilla web
+Unopinionated, pareto-optimal micro-library (<= 4k) for building vanilla web
 component infrastructure:
 
 ```javascript
@@ -822,17 +822,17 @@ side effects.
 
 ### Transformers overview
 
-| Transformer       | Type                | Options                  |
-| ------------------| --------------------|--------------------------|
-| `string()`        | `string`            |                          |
-| `href()`          | `string` (URL)      |                          |
-| `bool()`          | `boolean`           |                          |
-| `number()`        | `number`            | `min`, `max`, `allowNaN` |
-| `int()`           | `bigint`            | `min`, `max`             |
-| `json()`          | JSON serializable   | `reviver`, `replacer`    |
-| `list()`          | Array               | `separator`, `transform` |
-| `literal()`       | Any                 | `values`, `transform`    |
-| `event()`         | `function | null`   |                          |
+| Transformer       | Type                | Options                              |
+| ------------------| --------------------|--------------------------------------|
+| `string()`        | `string`            |                                      |
+| `href()`          | `string` (URL)      |                                      |
+| `bool()`          | `boolean`           |                                      |
+| `number()`        | `number`            | `min`, `max`, `allowNaN`, `nullable` |
+| `int()`           | `bigint`            | `min`, `max`, `nullable`             |
+| `json()`          | JSON serializable   | `reviver`, `replacer`                |
+| `list()`          | Array               | `separator`, `transform`             |
+| `literal()`       | Any                 | `values`, `transform`                |
+| `event()`         | `function | null`   |                                      |
 
 A transformers is just a bag of functions with the following type signature:
 
@@ -1008,26 +1008,30 @@ class Test extends HTMLElement {
 }
 ```
 
-Non-numbers get converted to numbers. Unless the option `allowNaN` is set to
-`true`, the property setter and the accessor's initializer throw exceptions when
-their input convert to `NaN`.
+Non-numbers get converted to numbers. The transformer allows `null` and
+`undefined` (with the latter converting to `null`) if the option `nullable` is
+set to `true`. If converting a non-number to a number results in `NaN` and the
+option `allowNaN` is not set to `true`, the property setter and the accessor's
+initializer throw exceptions.
 
 #### Options for transformer `number()`
 
 - **`min` (number, optional)**: Smallest possible value. Defaults to `-Infinity`. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception.
 - **`max` (number, optional)**: Largest possible value. Defaults to `Infinity`. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception.
-- **`allowNaN` (boolean, optional)**: Whether or not NaN is allowed. Defaults to `false`.
+- **`allowNaN` (boolean, optional)**: Whether or not `NaN` is allowed. Defaults to `false`.
+- **`nullable` (boolean, optional)**: Whether or not `null` and `undefined` (with the latter converting to `null`) are allowed. Defaults to `false`.
 
 #### Behavior overview for transformer `number()`
 
-| Operation                                   | IDL attribute value                                 | Content attribute (when used with `@attr()`) |
-| --------------------------------------------| ----------------------------------------------------|----------------------------------------------|
-| Set IDL attribute to value `x`              | `minmax(opts.min, opts.max, toNumber(x, allowNaN))` | String(IDL attribute value)                  |
-| Set IDL attribute to out-of-range value     | RangeError                                          | String(IDL attribute value)                  |
-| Set content attribute to value `x`          | `minmax(opts.min, opts.max, toNumber(x, allowNaN))` | As set                                       |
-| Set content attribute to non-numeric value  | No change, or NaN if option `allowNaN` is `true`    | As set                                       |
-| Set content attribute to out-of-range value | No change                                           | As set                                       |
-| Remove content attribute                    | Initial value or `0`                                | Removed                                      |
+| Operation                                   | IDL attribute value                                          | Content attribute (when used with `@attr()`)                         |
+| --------------------------------------------| -------------------------------------------------------------|----------------------------------------------------------------------|
+| Set IDL attribute to value `x`              | `minmax(opts.min, opts.max, toNumber(x, allowNaN))`          | String(IDL attribute value)                                          |
+| Set IDL attribute to out-of-range value     | RangeError                                                   | String(IDL attribute value)                                          |
+| Set IDL attribute to `null` or `undefined`  | `null` is `nullable` is true, otherwise `0`                  | Removed if `nullable` is true, otherwise String(IDL attribute value) |
+| Set content attribute to value `x`          | `minmax(opts.min, opts.max, toNumber(x, allowNaN))`          | As set                                                               |
+| Set content attribute to non-numeric value  | No change, or NaN if option `allowNaN` is `true`             | As set                                                               |
+| Set content attribute to out-of-range value | No change                                                    | As set                                                               |
+| Remove content attribute                    | `null` is `nullable` is true, otherwise initial value or `0` | Removed                                                              |
 
 ### Transformer `int(options?)`
 
@@ -1047,24 +1051,28 @@ class Test extends HTMLElement {
 }
 ```
 
-The IDL attribute setter throws an exception when its input cannot be converted
-to bigint.
+The transformer allows `null` and `undefined` (with the latter converting to
+`null`) if the option `nullable` is set to `true`. In all other cases, the IDL#
+attribute setter throws an exception when its input cannot be converted to
+bigint.
 
 #### Options for transformer `int()`
 
 - **`min` (bigint, optional)**: Smallest possible value. Defaults to the minimum possible bigint value. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception.
 - **`max` (bigint, optional)**: Largest possible value. Defaults to the maximum possible bigint value. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception.
+- **`nullable` (boolean, optional)**: Whether or not `null` and `undefined` (with the latter converting to `null`) are allowed. Defaults to `false`.
 
 #### Behavior overview for transformer `int()`
 
-| Operation                                       | IDL attribute value                         | Content attribute (when used with `@attr()`) |
-| ------------------------------------------------| --------------------------------------------|----------------------------------------------|
-| Set IDL attribute to value `x`                  | `minmax(ops.min, opts.max, BigInt(x))`      | String(IDL attribute value)                  |
-| Set IDL attribute to out-of-range value         | RangeError                                  | String(IDL attribute value)                  |
-| Set IDL attribute to non-int value              | `BigInt(x)`                                 | String(IDL attribute value)                  |
-| Set content attribute to value `x`              | `minmax(opts.min, opts.max, BigInt(x))`     | As set                                       |
-| Set non-int content attribute                   | Clamp to Int if float, otherwise no change  | As set                                       |
-| Remove attribute                                | Initial value or `0n`                       | Removed                                      |
+| Operation                                  | IDL attribute value                                          | Content attribute (when used with `@attr()`)                         |
+| -------------------------------------------| -------------------------------------------------------------|----------------------------------------------------------------------|
+| Set IDL attribute to value `x`             | `minmax(ops.min, opts.max, BigInt(x))`                       | String(IDL attribute value)                                          |
+| Set IDL attribute to out-of-range value    | RangeError                                                   | String(IDL attribute value)                                          |
+| Set IDL attribute to `null` or `undefined` | `null` is `nullable` is true, otherwise `0n`                 | Removed if `nullable` is true, otherwise String(IDL attribute value) |
+| Set IDL attribute to non-int value         | `BigInt(x)`                                                  | String(IDL attribute value)                                          |
+| Set content attribute to value `x`         | `minmax(opts.min, opts.max, BigInt(x))`                      | As set                                                               |
+| Set non-int content attribute              | Clamp to Int if float, otherwise no change                   | As set                                                               |
+| Remove content attribute                   | `null` is `nullable` is true, otherwise initial value or `0` | Removed                                                              |
 
 ### Transformer `bool()`
 

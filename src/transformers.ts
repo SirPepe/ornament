@@ -31,6 +31,15 @@ function stringifyJSONAttribute(value: any, replacer: any): string {
   }
 }
 
+function deleteContentAttrIfNullable(isNullable: boolean) {
+  return function (_: unknown, newValue: any): boolean | null {
+    if (isNullable && (typeof newValue === "undefined" || newValue === null)) {
+      return null;
+    }
+    return true;
+  };
+}
+
 // Stringify everything, stateless and simple.
 export function string<T extends HTMLElement>(): Transformer<T, string> {
   const initialValues = new WeakMap<T, string>();
@@ -103,6 +112,7 @@ export function bool<T extends HTMLElement>(): Transformer<T, boolean> {
 type NumericOptions<T extends number | bigint | undefined> = {
   min: T;
   max: T;
+  nullable: boolean;
 };
 
 type NumberOptions = NumericOptions<number> & {
@@ -111,7 +121,7 @@ type NumberOptions = NumericOptions<number> & {
 
 function numberOptions(input: unknown): NumberOptions {
   assertRecord(input, "options");
-  const { min = -Infinity, max = Infinity, allowNaN } = input;
+  const { min = -Infinity, max = Infinity, allowNaN, nullable } = input;
   assertType(min, "min", "number");
   assertType(max, "max", "number");
   if (min >= max) {
@@ -119,16 +129,25 @@ function numberOptions(input: unknown): NumberOptions {
       `Expected "min" value of ${min} to be be less than "max" value of ${max}`,
     );
   }
-  return { min, max, allowNaN: Boolean(allowNaN) };
+  return { min, max, allowNaN: Boolean(allowNaN), nullable: Boolean(nullable) };
 }
 
 export function number<T extends HTMLElement>(
+  options: Partial<Omit<NumberOptions, "nullable">> & { nullable: true },
+): Transformer<T, number | null | undefined>;
+export function number<T extends HTMLElement>(
+  options?: Partial<NumberOptions>,
+): Transformer<T, number>;
+export function number<T extends HTMLElement>(
   options: Partial<NumberOptions> = EMPTY_OBJ,
-): Transformer<T, number> {
+): Transformer<T, any> {
   const initialValues = new WeakMap<T, number>();
-  const { min, max, allowNaN } = numberOptions(options);
+  const { min, max, allowNaN, nullable } = numberOptions(options);
   // Used as validation function and in init
   function validate(value: unknown): void {
+    if ((typeof value === "undefined" || value === null) && nullable) {
+      return;
+    }
     const asNumber = Number(value);
     if (!allowNaN && Number.isNaN(asNumber)) {
       throw new Error(`Invalid number value "NaN"`);
@@ -137,10 +156,10 @@ export function number<T extends HTMLElement>(
       throw new RangeError(`${asNumber} is out of range [${min}, ${max}]`);
     }
   }
-  return createTransformer<T, number>({
+  return createTransformer<T, any>({
     parse(value) {
       if (value === null) {
-        return initialValues.get(this) ?? 0;
+        return nullable ? null : initialValues.get(this) ?? 0;
       }
       const asNumber = Number(value);
       if (Number.isNaN(asNumber)) {
@@ -151,18 +170,28 @@ export function number<T extends HTMLElement>(
       }
       return Math.min(Math.max(asNumber, min), max);
     },
+    transform(value: any) {
+      if (nullable && (typeof value === "undefined" || value === null)) {
+        return null;
+      }
+      return Number(value);
+    },
     validate,
-    init(value = 0) {
+    init(value) {
+      if (typeof value === "undefined") {
+        value = nullable ? null : 0;
+      }
       validate(value);
       initialValues.set(this, value);
       return value;
     },
+    updateContentAttr: deleteContentAttrIfNullable(nullable),
   });
 }
 
 function bigintOptions(input: unknown): NumericOptions<bigint | undefined> {
   assertRecord(input, "options");
-  const { min, max } = input;
+  const { min, max, nullable } = input;
   assertType(min, "min", "bigint", "undefined");
   assertType(max, "max", "bigint", "undefined");
   // The comparison below can only be true if both min and max are not
@@ -172,7 +201,7 @@ function bigintOptions(input: unknown): NumericOptions<bigint | undefined> {
       `Expected "min" value of ${min} to be be less than "max" value of ${max}`,
     );
   }
-  return { min, max };
+  return { min, max, nullable: Boolean(nullable) };
 }
 
 function parseBigInt(value: string): bigint {
@@ -183,9 +212,17 @@ function parseBigInt(value: string): bigint {
   return BigInt(value);
 }
 
+type IntOptions = NumericOptions<bigint>;
+
 export function int<T extends HTMLElement>(
-  options: Partial<NumericOptions<bigint>> = EMPTY_OBJ,
-): Transformer<T, bigint> {
+  options: Partial<Omit<IntOptions, "nullable">> & { nullable: true },
+): Transformer<T, bigint | null | undefined>;
+export function int<T extends HTMLElement>(
+  options?: Partial<IntOptions>,
+): Transformer<T, bigint>;
+export function int<T extends HTMLElement>(
+  options: Partial<IntOptions> = EMPTY_OBJ,
+): Transformer<T, any> {
   const initialValues = new WeakMap<T, bigint>();
   // The type assertion below is a blatant lie, as any or both of min and max
   // may well be undefined. But in the less/greater than operations that they
@@ -193,18 +230,25 @@ export function int<T extends HTMLElement>(
   // less or greater than anything OR they are not undefined and thus proper
   // bigints. This is a bit code golf-y, but we are just not gonna worry about
   // it.
-  const { min, max } = bigintOptions(options) as { min: bigint; max: bigint };
+  const { min, max, nullable } = bigintOptions(options) as {
+    min: bigint;
+    max: bigint;
+    nullable: boolean;
+  };
   // Used as validation function and in init
   function validate(value: unknown): void {
+    if ((typeof value === "undefined" || value === null) && nullable) {
+      return;
+    }
     const asInt = BigInt(value as any);
     if (asInt < min || asInt > max) {
       throw new RangeError(`${asInt} is out of range [${min}, ${max}]`);
     }
   }
-  return createTransformer<T, bigint>({
+  return createTransformer<T, any>({
     parse(value) {
       if (value === null) {
-        return initialValues.get(this) ?? 0n;
+        return nullable ? null : initialValues.get(this) ?? 0n;
       }
       try {
         const asInt = parseBigInt(value);
@@ -220,12 +264,21 @@ export function int<T extends HTMLElement>(
       }
     },
     validate,
-    transform: (x: any) => BigInt(x),
-    init(value = 0n) {
+    transform(value: any) {
+      if (nullable && (typeof value === "undefined" || value === null)) {
+        return null;
+      }
+      return BigInt(value);
+    },
+    init(value) {
+      if (typeof value === "undefined") {
+        value = nullable ? null : 0n;
+      }
       validate(value);
       initialValues.set(this, value);
       return value;
     },
+    updateContentAttr: deleteContentAttrIfNullable(nullable),
   });
 }
 
