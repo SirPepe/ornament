@@ -191,7 +191,7 @@ type EventSubscribeDecorator<T, E extends Event> = (
 ) => void;
 
 type EventTargetFactory<T, E extends EventTarget = EventTarget> = (
-  this: T,
+  instance: T,
 ) => E;
 
 function createEventSubscriberInitializer<
@@ -213,7 +213,7 @@ function createEventSubscriberInitializer<
       };
       const eventTarget =
         typeof targetOrTargetFactory === "function"
-          ? targetOrTargetFactory.call(this)
+          ? targetOrTargetFactory(this)
           : targetOrTargetFactory;
       for (const eventName of eventNames.trim().split(/\s+/)) {
         const unsubscribe = () =>

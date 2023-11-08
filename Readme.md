@@ -706,11 +706,12 @@ class Test extends HTMLElement {
 
 The target-producing factory can be used to access targets that depend on the
 element instance, such as the element's shadow root. The factory function gets
-called each time an element initializes, with `this` set to the instance.
+called each time an element initializes, with its first argument set to the
+instance.
 
 ##### Options for `@subscribe()` for EventTarget
 
-- **`targetOrTargetFactory` (EventTarget | (this: T) => EventTarget)**: The event target (or event-target-returning function) to subscribe to
+- **`targetOrTargetFactory` (EventTarget | (instance: T) => EventTarget)**: The event target (or event-target-returning function) to subscribe to
 - **`eventNames` (string)**: The event(s) to listen to. To subscribe to multiple events, pass a single string with the event names separated by whitespace
 - **`options` (object, optional)**: Event handling options, consisting of...
   - **predicate (function `(this: T, event: Event) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the event object and must return a boolean
@@ -1471,7 +1472,13 @@ import { define, subscribe } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
-  @subscribe(document.documentElement, "input", (evt) => evt.target.matches("input[type=number]"))
+  @subscribe(
+    document.documentElement,
+    "input",
+    {
+      predicate: (evt) => evt.target.matches("input[type-number]")
+    },
+  )
   log(evt) {
     console.log(evt); // "input" events
   }
@@ -1479,7 +1486,7 @@ class Test extends HTMLElement {
 ```
 
 If you'd rather catch event happening in the component's shadow dom, the syntax
-gets a bit gnarly at first:
+gets a bit more gnarly at first:
 
 ```javascript
 import { define, subscribe } from "@sirpepe/ornament";
@@ -1488,11 +1495,11 @@ import { define, subscribe } from "@sirpepe/ornament";
 class Test extends HTMLElement {
   root = this.attachShadow({ mode: "open" });
   @subscribe(
-    function () {
-      return this.root;
-    },
+    (instance) => this.root,
     "input",
-    { predicate: (evt) => evt.target.matches("input[type-number]") }
+    {
+      predicate: (evt) => evt.target.matches("input[type-number]")
+    },
   )
   log(evt) {
     console.log(evt); // "input" events
@@ -1511,11 +1518,11 @@ import { define, subscribe } from "@sirpepe/ornament";
 
 const handle = (eventName, selector) =>
   subscribe(
-    function () {
-      return this.root;
-    },
+    (instance) => this.root,
     eventName,
-    { predicate: (evt) => evt.target.matches(selector) }
+    {
+      predicate: (evt) => evt.target.matches(selector)
+    },
   );
 
 @define("my-test")
@@ -1543,9 +1550,7 @@ import { define, subscribe } from "@sirpepe/ornament";
 // This can now handle all events from the shadow root
 const capture = (eventName, selector) =>
   subscribe(
-    function () {
-      return this.root;
-    },
+    (instance) => this.root,
     eventName,
     {
       predicate: (evt) => evt.target.matches(selector),

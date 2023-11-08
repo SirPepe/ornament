@@ -1060,9 +1060,7 @@ describe("Decorators", () => {
             super();
             this.root.append(target);
           }
-          @subscribe(function (this: Test) {
-            return this.root;
-          }, "click")
+          @subscribe((instance: Test) => instance.root, "click")
           test(event: MouseEvent) {
             fn(this, event, event.target);
           }
@@ -1083,9 +1081,7 @@ describe("Decorators", () => {
             super();
             this.attachShadow({ mode: "open" }).append(target);
           }
-          @subscribe(function (this: Test) {
-            return this.shadowRoot as any;
-          }, "click")
+          @subscribe((instance: Test) => instance.shadowRoot as any, "click")
           test(event: MouseEvent) {
             fn(this, event, event.target);
           }
