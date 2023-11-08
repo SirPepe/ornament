@@ -6,6 +6,10 @@ import {
   assertType,
 } from "./types.js";
 
+type Optional<T> = {
+  [P in keyof T]?: T[P] | undefined | null;
+};
+
 const protoTransformer: Transformer<any, any> = {
   parse: (x: any) => x,
   validate: () => true,
@@ -121,7 +125,8 @@ type NumberOptions = NumericOptions<number> & {
 
 function numberOptions(input: unknown): NumberOptions {
   assertRecord(input, "options");
-  const { min = -Infinity, max = Infinity, allowNaN, nullable } = input;
+  const min = input.min ?? -Infinity;
+  const max = input.max ?? Infinity;
   assertType(min, "min", "number");
   assertType(max, "max", "number");
   if (min >= max) {
@@ -129,17 +134,22 @@ function numberOptions(input: unknown): NumberOptions {
       `Expected "min" value of ${min} to be be less than "max" value of ${max}`,
     );
   }
-  return { min, max, allowNaN: Boolean(allowNaN), nullable: Boolean(nullable) };
+  return {
+    min,
+    max,
+    allowNaN: Boolean(input.allowNaN),
+    nullable: Boolean(input.nullable),
+  };
 }
 
 export function number<T extends HTMLElement>(
-  options: Partial<Omit<NumberOptions, "nullable">> & { nullable: true },
+  options: Optional<Omit<NumberOptions, "nullable">> & { nullable: true },
 ): Transformer<T, number | null | undefined>;
 export function number<T extends HTMLElement>(
-  options?: Partial<NumberOptions>,
+  options?: Optional<NumberOptions>,
 ): Transformer<T, number>;
 export function number<T extends HTMLElement>(
-  options: Partial<NumberOptions> = EMPTY_OBJ,
+  options: Optional<NumberOptions> = EMPTY_OBJ,
 ): Transformer<T, any> {
   const initialValues = new WeakMap<T, number>();
   const { min, max, allowNaN, nullable } = numberOptions(options);
@@ -191,7 +201,8 @@ export function number<T extends HTMLElement>(
 
 function bigintOptions(input: unknown): NumericOptions<bigint | undefined> {
   assertRecord(input, "options");
-  const { min, max, nullable } = input;
+  const min = input.min ?? void 0;
+  const max = input.max ?? void 0;
   assertType(min, "min", "bigint", "undefined");
   assertType(max, "max", "bigint", "undefined");
   // The comparison below can only be true if both min and max are not
@@ -201,7 +212,7 @@ function bigintOptions(input: unknown): NumericOptions<bigint | undefined> {
       `Expected "min" value of ${min} to be be less than "max" value of ${max}`,
     );
   }
-  return { min, max, nullable: Boolean(nullable) };
+  return { min, max, nullable: Boolean(input.nullable) };
 }
 
 function parseBigInt(value: string): bigint {
@@ -215,13 +226,13 @@ function parseBigInt(value: string): bigint {
 type IntOptions = NumericOptions<bigint>;
 
 export function int<T extends HTMLElement>(
-  options: Partial<Omit<IntOptions, "nullable">> & { nullable: true },
+  options: Optional<Omit<IntOptions, "nullable">> & { nullable: true },
 ): Transformer<T, bigint | null | undefined>;
 export function int<T extends HTMLElement>(
-  options?: Partial<IntOptions>,
+  options?: Optional<IntOptions>,
 ): Transformer<T, bigint>;
 export function int<T extends HTMLElement>(
-  options: Partial<IntOptions> = EMPTY_OBJ,
+  options: Optional<IntOptions> = EMPTY_OBJ,
 ): Transformer<T, any> {
   const initialValues = new WeakMap<T, bigint>();
   // The type assertion below is a blatant lie, as any or both of min and max

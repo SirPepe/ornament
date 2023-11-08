@@ -275,6 +275,16 @@ describe("Transformers", () => {
       expect(el.foo).to.equal(10);
     });
 
+    test("min/max set to nullish values", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(number({ min: null, max: void 0 })) accessor foo = 0;
+      }
+      const el = new Test();
+      el.foo = Infinity;
+      el.foo = -Infinity;
+    });
+
     test("min/max when nullable", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -442,6 +452,16 @@ describe("Transformers", () => {
       }).to.throw();
       el.setAttribute("foo", "22");
       expect(el.foo).to.equal(10n);
+    });
+
+    test("min/max set to nullish values", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(int({ min: null, max: void 0 })) accessor foo = 0n;
+      }
+      const el = new Test();
+      el.foo = 10000000000000000000000000n;
+      el.foo = -10000000000000000000000000n;
     });
 
     test("min/max when nullable", async () => {

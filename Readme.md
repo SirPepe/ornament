@@ -1017,8 +1017,8 @@ initializer throw exceptions.
 
 #### Options for transformer `number()`
 
-- **`min` (number, optional)**: Smallest possible value. Defaults to `-Infinity`. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception.
-- **`max` (number, optional)**: Largest possible value. Defaults to `Infinity`. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception.
+- **`min` (number, optional)**: Smallest possible value. Defaults to `-Infinity`. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception. Can be omitted or set to `null` or `undefined` to signify no minimum value.
+- **`max` (number, optional)**: Largest possible value. Defaults to `Infinity`. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception. Can be omitted or set to `null` or `undefined` to signify no maximum value.
 - **`allowNaN` (boolean, optional)**: Whether or not `NaN` is allowed. Defaults to `false`.
 - **`nullable` (boolean, optional)**: Whether or not `null` and `undefined` (with the latter converting to `null`) are allowed. Defaults to `false`.
 
@@ -1059,8 +1059,8 @@ bigint.
 
 #### Options for transformer `int()`
 
-- **`min` (bigint, optional)**: Smallest possible value. Defaults to the minimum possible bigint value. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception.
-- **`max` (bigint, optional)**: Largest possible value. Defaults to the maximum possible bigint value. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception.
+- **`min` (bigint, optional)**: Smallest possible value. Defaults to the minimum possible bigint value. Content attribute values less than `min` get clamped, IDL attribute values get validated and (if too small) rejected with an exception. Can be omitted or set to `null` or `undefined` to signify no minimum value.
+- **`max` (bigint, optional)**: Largest possible value. Defaults to the maximum possible bigint value. Content attribute values greater than `max` get clamped, IDL attribute values get validated and (if too large) rejected with an exception. Can be omitted or set to `null` or `undefined` to signify no maximum value.
 - **`nullable` (boolean, optional)**: Whether or not `null` and `undefined` (with the latter converting to `null`) are allowed. Defaults to `false`.
 
 #### Behavior overview for transformer `int()`
