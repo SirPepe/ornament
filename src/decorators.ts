@@ -366,7 +366,7 @@ function createLifecycleDecorator<K extends keyof OrnamentEventMap>(
     };
 }
 
-// Bulk-create all basic lifecycle decrorators
+// Bulk-create all basic lifecycle decorators
 export const connected = createLifecycleDecorator("connected");
 export const disconnected = createLifecycleDecorator("disconnected");
 export const adopted = createLifecycleDecorator("adopted");
