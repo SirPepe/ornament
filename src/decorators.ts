@@ -559,10 +559,7 @@ function createDebouncedMethod<T extends object, A extends unknown[]>(
 ): Method<T, A> {
   const cancelFns = new WeakMap<T, undefined | (() => void)>();
   function debouncedMethod(this: T, ...args: A): any {
-    const cancelFn = cancelFns.get(this);
-    if (cancelFn) {
-      cancelFn();
-    }
+    cancelFns.get(this)?.(); // call cancel function, if it exists
     cancelFns.set(
       this,
       wait(() => {

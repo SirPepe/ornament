@@ -101,50 +101,30 @@ export function assertRecord(
   input: unknown,
   name: string,
 ): asserts input is Record<any, any> {
-  if (typeof input !== "object") {
+  if (input === null || typeof input !== "object") {
     throw new TypeError(
-      `Expected "${name}" to be an object, got ${typeof input}`,
+      `Expected "${name}" to be an object, got ${
+        input === null ? null : typeof input
+      }`,
     );
   }
-  if (input === null) {
-    throw new TypeError(`Expected "${name}" to be an object, got ${null}`);
-  }
 }
-
-function is<K extends keyof Types>(
-  value: unknown,
-  ...types: K[]
-): value is Types[K] {
-  return types.some(
-    (type) =>
-      (value === null && type === "null") ||
-      (value !== null && typeof value === type),
-  );
-}
-
 export function assertType<K extends keyof Types>(
   value: unknown,
   name: string,
   ...types: K[]
 ): asserts value is Types[K] {
-  if (is(value, ...types)) {
+  if (
+    types.some(
+      (type) =>
+        (value === null && type === "null") ||
+        (value !== null && typeof value === type),
+    )
+  ) {
     return;
   }
   throw new TypeError(
-    `Expected "${name}" to "${types.join("/")}" but got ${typeof value}`,
-  );
-}
-
-export function assertPropType<K extends keyof Types>(
-  obj: any,
-  prop: string,
-  ...types: K[]
-): void {
-  if (is(obj[prop], ...types)) {
-    return;
-  }
-  throw new TypeError(
-    `Expected "${prop}" to be "${types.join("/")}" but got ${typeof obj[prop]}`,
+    `Expected "${name}" to be "${types.join("/")}" but got ${typeof value}`,
   );
 }
 
@@ -152,14 +132,14 @@ export function assertTransformer<T extends HTMLElement, V>(
   input: unknown,
 ): asserts input is Transformer<T, V> {
   assertRecord(input, "transformer");
-  assertPropType(input, "init", "function");
-  assertPropType(input, "parse", "function");
-  assertPropType(input, "validate", "function");
-  assertPropType(input, "transform", "function");
-  assertPropType(input, "stringify", "function");
-  assertPropType(input, "eql", "function");
-  assertPropType(input, "beforeSet", "function");
-  assertPropType(input, "updateContentAttr", "function");
+  assertType(input.init, "init", "function");
+  assertType(input.parse, "parse", "function");
+  assertType(input.validate, "validate", "function");
+  assertType(input.transform, "transform", "function");
+  assertType(input.stringify, "stringify", "function");
+  assertType(input.eql, "eql", "function");
+  assertType(input.beforeSet, "beforeSet", "function");
+  assertType(input.updateContentAttr, "updateContentAttr", "function");
 }
 
 type AcceptOptions = {

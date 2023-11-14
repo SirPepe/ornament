@@ -58,9 +58,11 @@ function assertInRange<T extends number | bigint>(
 }
 
 function clamp<T extends number | bigint>(value: T, min?: T, max?: T): T {
+  // Can only be true when min is not undefined
   if (value <= (min as any)) {
     return min as any;
   }
+  // Can only be true when max is not undefined
   if (value >= (max as any)) {
     return max as any;
   }
@@ -250,24 +252,13 @@ export function int<T extends HTMLElement>(
   options: Optional<IntOptions> = EMPTY_OBJ,
 ): Transformer<T, any> {
   const initialValues = new WeakMap<T, bigint>();
-  // The type assertion below is a blatant lie, as any or both of min and max
-  // may well be undefined. But in the less/greater than operations that they
-  // are used in they either convert to NaN (in case of undefined), which is NOT
-  // less or greater than anything OR they are not undefined and thus proper
-  // bigints. This is a bit code golf-y, but we are just not gonna worry about
-  // it.
-  const { min, max, nullable } = bigintOptions(options) as {
-    min: bigint;
-    max: bigint;
-    nullable: boolean;
-  };
+  const { min, max, nullable } = bigintOptions(options);
   // Used as validation function and in init
   function validate(value: unknown): void {
     if ((typeof value === "undefined" || value === null) && nullable) {
       return;
     }
-    const asInt = BigInt(value as any);
-    assertInRange(asInt, min, max);
+    assertInRange(BigInt(value as any), min, max);
   }
   return createTransformer<T, any>({
     parse(value) {
