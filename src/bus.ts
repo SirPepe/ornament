@@ -1,6 +1,6 @@
 import { METADATA_KEY } from "./global";
 
-class OrnamentEvent<K extends keyof OrnamentEventMap> extends Event {
+export class OrnamentEvent<K extends keyof OrnamentEventMap> extends Event {
   readonly args: OrnamentEventMap[K];
   constructor(name: K, args: OrnamentEventMap[K]) {
     super(name);

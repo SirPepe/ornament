@@ -1420,14 +1420,18 @@ Ornament runs intra-component communication over an internal event bus. You will
 almost certainly never need to access it directly, but there is is an API just
 in case.
 
-| Event          | Cause                                     | Payload                                                                        |
-| ---------------| ------------------------------------------|--------------------------------------------------------------------------------|
-| `init`         | Constructor ran to completion             | `Event`                                                                        |
-| `connected`    | `connectedCallback()` fired               | `Event`                                                                        |
-| `disconnected` | `disconnectedCallback()` fired            | `Event`                                                                        |
-| `adopted`      | `adoptedCallback()` fired                 | `Event`                                                                        |
-| `prop`         | IDL attribute change (`@prop` or `@attr`) | `Event & { name: string \| symbol }`                                           |
-| `attr`         | Content attribute change (`@attr`)        | `Event & { name: string; oldValue: string \| null; newValue: string \| null }` |
+| Event              | Cause                                     | Event type                        | Payload (`args` property on the event object)                        |
+| ------------------ | ------------------------------------------|---------------------------------- |----------------------------------------------------------------------|
+| `init`             | Constructor ran to completion             | OrnamentEvent<"init">             | `[]`                                                                 |
+| `connected`        | `connectedCallback()` fired               | OrnamentEvent<"connected">        | `[]`                                                                 |
+| `disconnected`     | `disconnectedCallback()` fired            | OrnamentEvent<"disconnected">     | `[]`                                                                 |
+| `adopted`          | `adoptedCallback()` fired                 | OrnamentEvent<"adopted">          | `[]`                                                                 |
+| `prop`             | IDL attribute change (`@prop` or `@attr`) | OrnamentEvent<"prop">             | `[Name: string \| symbol]`                                           |
+| `attr`             | Content attribute change (`@attr`)        | OrnamentEvent<"attr">             | `[Name: string, OldValue: string \| null, NewValue: string \| null]` |
+| `formAssociated`   | `formAssociatedCallback()` fired          | OrnamentEvent<"formAssociated">   | `[Owner: HTMLFormElement \| null]                                    |
+| `formReset`        | `formResetCallback()` fired               | OrnamentEvent<"formReset">        | `[]`                                                                 |
+| `formDisabled`     | `formDisabledCallback()` fired            | OrnamentEvent<"formDisabled">     | `[Disabled: boolean]`                                                |
+| `formStateRestore` | `formStateRestoreCallback()` fired        | OrnamentEvent<"formStateRestore"> | `[Reason: "autocomplete" \| "restore"]`                              |
 
 **Note for TypeScript:** you can declare additions to the global interface
 `OrnamentEventMap` to extend this list with your own events.
@@ -1461,6 +1465,11 @@ listen(someElement, "prop", (evt) => {
   window.alert(`IDL attribute ${evt.name} was changed!`);
 });
 ```
+
+### class `OrnamentEvent<K extends keyof OrnamentEventMap>`
+
+Event type used on the internal event bus. Only really useful if you want to
+create your own events while using TypeScript.
 
 ## Symbols
 
