@@ -15,6 +15,10 @@ declare global {
   }
 }
 
+export type Optional<T> = {
+  [P in keyof T]?: T[P] | undefined | null;
+};
+
 export type Transformer<
   T extends HTMLElement,
   Value,
@@ -149,13 +153,13 @@ type AcceptOptions = {
 export function assertContext(
   ctx: any,
   name: string,
-  kind: DecoratorContext["kind"] | DecoratorContext["kind"][],
+  kinds: DecoratorContext["kind"] | DecoratorContext["kind"][],
   accept: Partial<AcceptOptions> = EMPTY_OBJ,
 ): void {
-  const kinds = isArray(kind) ? kind : [kind];
+  kinds = isArray(kinds) ? kinds : [kinds];
   if (!kinds.includes(ctx.kind)) {
     const expected = kinds
-      .map((k) => k.slice(0, 1).toUpperCase() + k.slice(1))
+      .map((kind) => kind[0].toUpperCase() + kind.slice(1))
       .join("/");
     throw new TypeError(`${expected} decorator @${name} used on ${ctx.kind}`);
   }

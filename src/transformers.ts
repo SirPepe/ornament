@@ -4,6 +4,7 @@ import {
   assertType,
   assertTransformer,
   type Transformer,
+  type Optional,
 } from "./types.js";
 
 export const protoTransformer: Transformer<any, any> = {
@@ -15,10 +16,6 @@ export const protoTransformer: Transformer<any, any> = {
   init: <T>(x: T) => x,
   beforeSet: <T>(x: T) => x,
   updateContentAttr: () => true,
-};
-
-type Optional<T> = {
-  [P in keyof T]?: T[P] | undefined | null;
 };
 
 function createTransformer<T extends HTMLElement, V, IntermediateV = V>(
@@ -490,12 +487,9 @@ export function list<T extends HTMLElement, V>(
       return values.map((value) => transform.transform.call(this, value));
     },
     stringify(values) {
-      if (values) {
-        return values
-          .map((value) => transform.stringify.call(this, value))
-          .join(separator);
-      }
-      return "";
+      return values
+        .map((value) => transform.stringify.call(this, value))
+        .join(separator);
     },
     eql(a, b) {
       if (a.length !== b.length) {
@@ -504,12 +498,7 @@ export function list<T extends HTMLElement, V>(
       if (!transform.eql) {
         return a === b;
       }
-      for (let i = 0; i < a.length; i++) {
-        if (!transform.eql.call(this, a[i], b[i])) {
-          return false;
-        }
-      }
-      return true;
+      return a.every((aVal, i) => transform.eql.call(this, aVal, b[i]));
     },
     init(value = []) {
       validate.call(this, value);
@@ -534,11 +523,9 @@ export function event<
   const functions = new WeakMap<T, Handler<T, E>>();
   function handler(this: T, evt: E) {
     const func = functions.get(this);
-    if (func) {
-      const doDefault = func.call(this, evt);
-      if (doDefault === false) {
-        evt.preventDefault();
-      }
+    // The function may return false to cause preventDefault()
+    if (func?.call(this, evt) === false) {
+      evt.preventDefault();
     }
   }
   return createTransformer<T, Handler<T, E>>({
@@ -563,11 +550,14 @@ export function event<
       throw new Error();
     },
     init(value, context) {
-      if (context.private || typeof context.name === "symbol") {
-        throw new Error("Event handler name must be a non-private non-symbol");
-      }
-      if (!context.name.startsWith("on")) {
-        throw new Error("Event handler name must start with 'on'");
+      if (
+        context.private ||
+        typeof context.name === "symbol" ||
+        !context.name.startsWith("on")
+      ) {
+        throw new Error(
+          "Event handler names must be a non-private strings starting with 'on'",
+        );
       }
       if (value) {
         functions.set(this, value);
