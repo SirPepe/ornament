@@ -53,7 +53,7 @@
     "@rollup/plugin-node-resolve": "^15.1.0",
     "@rollup/plugin-terser": "^0.4.3",
     "@types/mocha": "^10.0.3",
-    "@types/sinon": "^10.0.16",
+    "@types/sinon": "^17.0.0",
     "@typescript-eslint/eslint-plugin": "^6.3.0",
     "@typescript-eslint/parser": "^6.3.0",
     "@web/dev-server-rollup": "^0.6.0",
@@ -64,11 +64,10 @@
     "eslint-plugin-prettier": "^5.0.0",
     "install": "^0.13.0",
     "prettier": "^3.0.0",
-    "release-it": "^16.0.0",
+    "release-it": "^17.0.0",
     "rollup": "^4.2.0",
-    "sinon": "^17.0.1",
+    "sinon": "^17.0.0",
     "typescript": "^5.0.4",
-    "uhtml": "^3.2.2",
-    "zod": "^3.21.4"
+    "uhtml": "^4.0.0"
   }
 }

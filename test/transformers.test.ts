@@ -1,8 +1,8 @@
 import { expect } from "@esm-bundle/chai";
 import { spy } from "sinon";
-import { z } from "zod";
-import { attr, define } from "../src/decorators.js";
 import {
+  attr,
+  define,
   bool,
   event,
   href,
@@ -11,9 +11,8 @@ import {
   number,
   json,
   string,
-  schema,
   list,
-} from "../src/transformers.js";
+} from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 const test = it;
 
@@ -153,7 +152,7 @@ describe("Transformers", () => {
       expect(
         () =>
           class extends HTMLElement {
-            @attr(number({ min: 1, max: 1 })) accessor foo = 1;
+            @attr(number({ min: 1, max: -1 })) accessor foo = 1;
           },
       ).to.throw();
       // Invalid initial value
@@ -738,50 +737,6 @@ describe("Transformers", () => {
       }).to.throw();
       (el as any).foo = [1, 2, 3];
       expect(el.foo).to.eql(["1", "2", "3"]);
-    });
-  });
-
-  describe("schema()", () => {
-    test("object schema as attribute", async () => {
-      const userSchema = z.object({
-        user: z.string().nonempty(),
-        email: z.string().nonempty().email(),
-      });
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        @attr(schema(userSchema))
-        accessor foo = { user: "a", email: "a@b.com" };
-      }
-      const el = new Test();
-      expect(el.foo).to.eql({ user: "a", email: "a@b.com" });
-      expect(el.getAttribute("foo")).to.equal(null);
-      el.foo = { user: "b", email: "b@c.org" };
-      expect(el.foo).to.eql({ user: "b", email: "b@c.org" });
-      expect(el.getAttribute("foo")).to.equal(`{"user":"b","email":"b@c.org"}`);
-      // Object does not match the schema
-      expect(() => {
-        el.foo = { asdf: 42 } as any;
-      }).to.throw(Error);
-      el.setAttribute("foo", "whatever"); // noop
-      expect(el.foo).to.eql({ user: "b", email: "b@c.org" });
-      expect(el.getAttribute("foo")).to.equal("whatever");
-      el.removeAttribute("foo");
-      expect(el.foo).to.eql({ user: "a", email: "a@b.com" });
-      expect(el.getAttribute("foo")).to.equal(null);
-      el.setAttribute("foo", `{ "foo": 42 }`);
-      expect(el.foo).to.eql({ user: "a", email: "a@b.com" });
-      expect(el.getAttribute("foo")).to.equal(`{ "foo": 42 }`);
-    });
-
-    test("invalid initial value", async () => {
-      const userSchema = z.number();
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        // @ts-expect-error value does not match schema
-        @attr(schema(userSchema))
-        accessor foo = "asdf";
-      }
-      expect(() => new Test()).to.throw(Error);
     });
   });
 

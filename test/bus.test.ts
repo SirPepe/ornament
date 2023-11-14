@@ -1,7 +1,6 @@
 import { expect } from "@esm-bundle/chai";
 import { spy } from "sinon";
-import { listen, trigger } from "../src/bus.js";
-import { define } from "../src/decorators.js";
+import { listen, trigger, define } from "../src/index.js";
 import { generateTagName } from "./helpers.js";
 const test = it;
 
@@ -26,7 +25,7 @@ describe("Event bus", () => {
     class Test extends HTMLElement {}
     const instance = new Test();
     listen(instance, "connected", connectFn);
-    trigger(instance, "connected", {});
+    trigger(instance, "connected");
     expect(connectFn.callCount).to.equal(1);
   });
 });

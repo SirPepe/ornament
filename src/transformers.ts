@@ -1,16 +1,12 @@
 import { EMPTY_OBJ, NO_VALUE, isArray } from "./lib.js";
 import {
-  type Transformer,
   assertRecord,
-  assertTransformer,
   assertType,
+  assertTransformer,
+  type Transformer,
 } from "./types.js";
 
-type Optional<T> = {
-  [P in keyof T]?: T[P] | undefined | null;
-};
-
-const protoTransformer: Transformer<any, any> = {
+export const protoTransformer: Transformer<any, any> = {
   parse: (x: any) => x,
   validate: () => true,
   transform: (x: any) => x,
@@ -19,6 +15,10 @@ const protoTransformer: Transformer<any, any> = {
   init: <T>(x: T) => x,
   beforeSet: <T>(x: T) => x,
   updateContentAttr: () => true,
+};
+
+type Optional<T> = {
+  [P in keyof T]?: T[P] | undefined | null;
 };
 
 function createTransformer<T extends HTMLElement, V, IntermediateV = V>(
@@ -42,6 +42,29 @@ function deleteContentAttrIfNullable(isNullable: boolean) {
     }
     return true;
   };
+}
+
+function assertInRange<T extends number | bigint>(
+  value: T,
+  min?: T,
+  max?: T,
+): void {
+  if (value < (min as any)) {
+    throw new RangeError(`${value} is less than minimum value ${min}`);
+  }
+  if (value > (max as any)) {
+    throw new RangeError(`${value} is larger than maximum value ${max}`);
+  }
+}
+
+function clamp<T extends number | bigint>(value: T, min?: T, max?: T): T {
+  if (value <= (min as any)) {
+    return min as any;
+  }
+  if (value >= (max as any)) {
+    return max as any;
+  }
+  return value;
 }
 
 // Stringify everything, stateless and simple.
@@ -129,16 +152,14 @@ function numberOptions(input: unknown): NumberOptions {
   const max = input.max ?? Infinity;
   assertType(min, "min", "number");
   assertType(max, "max", "number");
-  if (min >= max) {
-    throw new RangeError(
-      `Expected "min" value of ${min} to be be less than "max" value of ${max}`,
-    );
+  if (max < min) {
+    throw new RangeError(`${max} is less than minimum value ${min}`);
   }
   return {
     min,
     max,
-    allowNaN: Boolean(input.allowNaN),
-    nullable: Boolean(input.nullable),
+    allowNaN: !!input.allowNaN,
+    nullable: !!input.nullable,
   };
 }
 
@@ -162,9 +183,7 @@ export function number<T extends HTMLElement>(
     if (!allowNaN && Number.isNaN(asNumber)) {
       throw new Error(`Invalid number value "NaN"`);
     }
-    if (asNumber < min || asNumber > max) {
-      throw new RangeError(`${asNumber} is out of range [${min}, ${max}]`);
-    }
+    assertInRange(asNumber, min, max);
   }
   return createTransformer<T, any>({
     parse(value) {
@@ -178,7 +197,7 @@ export function number<T extends HTMLElement>(
         }
         return NO_VALUE;
       }
-      return Math.min(Math.max(asNumber, min), max);
+      return clamp(asNumber, min, max);
     },
     transform(value: any) {
       if (nullable && (typeof value === "undefined" || value === null)) {
@@ -207,20 +226,16 @@ function bigintOptions(input: unknown): NumericOptions<bigint | undefined> {
   assertType(max, "max", "bigint", "undefined");
   // The comparison below can only be true if both min and max are not
   // undefined. No need to do extra type checks beforehand.
-  if ((min as any) > (max as any)) {
-    throw new RangeError(
-      `Expected "min" value of ${min} to be be less than "max" value of ${max}`,
-    );
+  if ((max as any) < (min as any)) {
+    throw new RangeError(`${max} is less than minimum value ${min}`);
   }
-  return { min, max, nullable: Boolean(input.nullable) };
+  return { min, max, nullable: !!input.nullable };
 }
 
+// Parses the integer part out of a string containing a "float", falls back to
+// shoving the entire string into BigInt() if the RegExp does not match.
 function parseBigInt(value: string): bigint {
-  const match = /^(-?[0-9]+)(\.[0-9]+)/.exec(value);
-  if (match) {
-    return BigInt(match[1]);
-  }
-  return BigInt(value);
+  return BigInt(/^(-?[0-9]+)(\.[0-9]+)/.exec(value)?.[1] ?? value);
 }
 
 type IntOptions = NumericOptions<bigint>;
@@ -252,9 +267,7 @@ export function int<T extends HTMLElement>(
       return;
     }
     const asInt = BigInt(value as any);
-    if (asInt < min || asInt > max) {
-      throw new RangeError(`${asInt} is out of range [${min}, ${max}]`);
-    }
+    assertInRange(asInt, min, max);
   }
   return createTransformer<T, any>({
     parse(value) {
@@ -262,14 +275,7 @@ export function int<T extends HTMLElement>(
         return nullable ? null : initialValues.get(this) ?? 0n;
       }
       try {
-        const asInt = parseBigInt(value);
-        if (asInt <= min) {
-          return min;
-        }
-        if (asInt >= max) {
-          return max;
-        }
-        return asInt;
+        return clamp(parseBigInt(value), min, max);
       } catch {
         return NO_VALUE;
       }
@@ -328,6 +334,7 @@ export function json<T extends HTMLElement>(
   });
 }
 
+/*
 type SchemaLike<V> = {
   parse(data: unknown): V;
   safeParse(
@@ -378,6 +385,7 @@ export function schema<T extends HTMLElement, V>(
     },
   });
 }
+*/
 
 type LiteralOptions<T extends HTMLElement, V> = {
   values: V[];

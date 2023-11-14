@@ -36,6 +36,8 @@ if (!window[METADATA_KEY]) {
 }
 
 window[METADATA_KEY].targetMap ||= new WeakMap<HTMLElement, EventTarget>();
-window[METADATA_KEY].observableAttributes = new Set();
-window[METADATA_KEY].debouncedMethods = new WeakMap();
-window[METADATA_KEY].unsubscribeRegistry = new FinalizationRegistry((f) => f());
+window[METADATA_KEY].observableAttributes ||= new Set();
+window[METADATA_KEY].debouncedMethods ||= new WeakMap();
+window[METADATA_KEY].unsubscribeRegistry ||= new FinalizationRegistry((f) =>
+  f(),
+);

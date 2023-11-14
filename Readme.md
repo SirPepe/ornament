@@ -36,6 +36,7 @@ The code above
 - a `greet()` method that...
   - automatically gets called when any of the attributes decorated with `@attr` change
   - automatically gets called when the element instance initializes
+- does not add any abstractions to any native API at all
 
 This translates to the following boilerplate monstrosity when written by hand:
 
@@ -137,8 +138,8 @@ window.customElements.define("my-greeter", MyGreeter);
 ```
 
 Ornament aims to make the most tedious bits of building vanilla web components
-(attribute handling and reactions to attribute handling) easy by adding some
-primitives that really *should* be part of the standard, but aren't.
+(attribute handling and lifecycle reactions) easy by adding some primitives that
+really *should* be part of the standard, but aren't.
 
 ## Guide
 
@@ -159,9 +160,9 @@ required, no extra concepts to learn.
 The native APIs for web components are verbose and imperative, but lend
 themselves to quite a bit of streamlining with
 [the upcoming syntax for ECMAScript Decorators](https://2ality.com/2022/10/javascript-decorators.html).
-They are also missing a few important primitives, Ornament's goal is to provide
-the missing primitives and streamline the developer experience. Ornament is
-**not a framework** but instead aims to be:
+The native APIs are also missing a few important primitives. Ornament's goal is
+to provide the missing primitives and to streamline the developer experience.
+Ornament is **not a framework** but instead aims to be:
 
 - **as stable as possible** by remaining dependency-free and keeping its own code to an absolute minimum
 - **fast and lean** by being nothing more than just a bag of relatively small and simple functions
@@ -169,9 +170,10 @@ the missing primitives and streamline the developer experience. Ornament is
 - **universal** by adhering to (the spirit of) web standards, thereby staying compatible with vanilla web component code as well as all sorts of web frameworks
 - equipped with useful type definitions (and work within the constraints of TypeScript)
 
-Ornament is *infrastructure for web components* and not a framework. It makes
-dealing with the native APIs bearable and leaves building something actually
-sophisticated up to you. Ornament does not come with *any* of the following:
+Ornament is *infrastructure for web components* and not a framework itself. It
+makes dealing with the native APIs bearable and leaves building something
+actually sophisticated up to you. Ornament does not come with *any* of the
+following:
 
 - state management (even though it is simple to connect components to signals or event targets)
 - rendering (but it works well with [uhtml](https://github.com/WebReflection/uhtml) and similar libraries)
@@ -198,10 +200,13 @@ away:
 - If you want to replace Ornament with hand-written logic, you can
   **replace all attribute and update handling piecemeal.** Ornament's decorators
   co-exist with native `attributeChangedCallback()` and friends just fine.
+  Ornament *extends* what you can do with custom elements, it does not abstract
+  anything away.
 - Much of your migration will depend on **how you build on top of Ornament.**
   You should keep reusable components and app-specific state containers
   separate, just as you would do in e.g. React. This will make maintenance and
-  eventual migration much easier.
+  eventual migration much easier, but this is really outside of Ornament's area
+  of responsibility.
 
 In general, migrating away should not be too problematic. The components that
 you will build with Ornament will naturally tend to be self-contained and
@@ -218,6 +223,81 @@ import { define } from "@sirpepe/ornament";
 
 @define("my-test")
 class MyTest extends HTMLElement {}
+```
+
+### Safe upgrades
+
+HTML tags can be used even if the browser does not (yet) know about them, and
+this also works with web components - the browser can upgrade custom elements
+event after the parser has processed them as unknown elements.
+[But this can lead to unexpected behavior](https://codepen.io/SirPepe/pen/poqLege?editors=0010)
+when properties are set on elements that have not yet been properly defined,
+shadowing relevant accessors on the prototype:
+
+```javascript
+const x = document.createElement("hello-world");
+// "x" = unknown element = object with "HTMLElement.prototype" as prototype
+
+x.data = 42;
+// "x" now has an _own_ property data=42
+
+// Implements an accessor for hello-world. The getters and
+// setters end up as properties on the prototype
+class HelloWorld extends HTMLElement {
+  accessor data = 23;
+}
+
+window.customElements.define("hello-world", HelloWorld);
+// It is now clear that "x" should have had "HelloWorld.prototype" as its
+// prototype all along
+
+window.customElements.upgrade(x);
+// "x" now gets "HelloWorld.prototype" as its prototype (with the accessor)
+
+console.log(x.data);
+// logs 42, bypassing the getter - "x" itself has an own property "data", the
+// accessor on the prototype is shadowed
+```
+
+Ornament ensures safe upgrades, always making sure that no prototype accessors
+for attributes are ever shadowed by properties defined before an element was
+properly upgraded.
+
+### Lifecycle callbacks
+
+By centralizing event handling to lifecycle callbacks, native web component APIs
+force you to scatter function calls across multiple methods:
+
+```javascript
+class MyComponent extends HTMLElement {
+  thisNeedsToRunWhenTheElementConnectsOrDisconnects() {
+    console.log(this.isConnected);
+  }
+
+  connectedCallback() {
+    this.thisNeedsToRunWhenTheElementConnectsOrDisconnects();
+  }
+
+  disconnectedCallback() {
+    this.thisNeedsToRunWhenTheElementConnectsOrDisconnects();
+  }
+}
+```
+
+Ornaments lifecycle decorators enable you to declare what events a method should
+react to on the method itself:
+
+```javascript
+import { define, connected, disconnected } from "@sirpepe/ornament";
+
+@define("my-test")
+class MyComponent extends HTMLElement {
+  @connected()
+  @disconnected()
+  thisNeedsToRunWhenTheElementConnectsOrDisconnects() {
+    console.log(this.isConnected);
+  }
+}
 ```
 
 ### Attribute handling
@@ -269,76 +349,42 @@ attribute named `value`, which...
 - Automatically updates the content attribute with the stringified value of the IDL attribute when the IDL attribute is updated
 - Automatically updates the IDL attribute when the content attribute is updated (it parses the attribute value into a number and clamps it to the specified range)
 - Implements getters and setters for the IDL attributes, with the getter always returning a number and the setter rejecting invalid values (non-numbers or numbers outside the specified range of `[-100, 100]`)
-- Causes the method marked @reactive() to run on update
+- Causes the method marked `@reactive()` to run on update
 
 You can use `@prop()` for standalone IDL attribute (that is, DOM properties
 without an associated content attributes), swap out the `number()` transformer
 for something else, or combine any of the above with hand-written logic.
 
-### Safe upgrades
-
-HTML tags can be used even if the browser does not (yet) know about them, and
-this also works with web components - the browser can upgrade custom elements
-event after the parser has processed them as unknown elements.
-[But this can lead to unexpected behavior](https://codepen.io/SirPepe/pen/poqLege?editors=0010)
-when properties are set on elements that have not yet been properly defined,
-shadowing relevant accessors on the prototype:
-
-```javascript
-const x = document.createElement("hello-world");
-// "x" = unknown element = object with "HTMLElement.prototype" as prototype
-
-x.data = 42;
-// "x" now has an _own_ property data=42
-
-// Implements an accessor for hello-world. The getters and
-// setters end up as properties on the prototype
-class HelloWorld extends HTMLElement {
-  accessor data = 23;
-}
-
-window.customElements.define("hello-world", HelloWorld);
-// It is now clear that "x" should have had "HelloWorld.prototype" as its
-// prototype all along
-
-window.customElements.upgrade(x);
-// "x" now gets "HelloWorld.prototype" as its prototype (with the accessor)
-
-console.log(x.data);
-// logs 42, bypassing the getter - "x" itself has an own property "data", the
-// accessor on the prototype is shadowed
-```
-
-Ornament ensures safe upgrades, always making sure that no prototype accessors
-for attributes are ever shadowed by properties defined before an element was
-properly upgraded.
-
 ## Decorators
 
 ### API overview
 
-| Decorator         | Class element       | `static` | `#private` | Symbols          |
-| ------------------| --------------------|----------|------------|------------------|
-| `@define()`       | Class               | -        | -          | -                |
-| `@enhance()`      | Class               | -        | -          | -                |
-| `@attr()`         | Accessor            | ✕        | ✓[^1]      | ✓[^1]            |
-| `@prop()`         | Accessor            | ✕        | ✓          | ✓                |
-| `@reactive()`     | Method              | ✕        | ✓          | -                |
-| `@connected()`    | Method              | ✕        | ✓          | -                |
-| `@disconnected()` | Method              | ✕        | ✓          | -                |
-| `@adopted()`      | Method              | ✕        | ✓          | -                |
-| `@subscribe()`    | Method              | ✕        | ✓          | -                |
-| `@debounce()`     | Method, Class Field | ✕        | ✓          | ✓ (Class fields) |
+| Decorator             | Class element       | `static` | `#private` | Symbols          |
+| --------------------- | ------------------- | -------- | ---------- | ---------------- |
+| `@define()`           | Class               | -        | -          | -                |
+| `@enhance()`          | Class               | -        | -          | -                |
+| `@attr()`             | Accessor            | ✕        | ✓[^1]      | ✓[^1]            |
+| `@prop()`             | Accessor            | ✕        | ✓          | ✓                |
+| `@reactive()`         | Method              | ✕        | ✓          | -                |
+| `@connected()`        | Method              | ✕        | ✓          | -                |
+| `@disconnected()`     | Method              | ✕        | ✓          | -                |
+| `@adopted()`          | Method              | ✕        | ✓          | -                |
+| `@formAssociated()`   | Method              | ✕        | ✓          | -                |
+| `@formReset()`        | Method              | ✕        | ✓          | -                |
+| `@formDisabled()`     | Method              | ✕        | ✓          | -                |
+| `@formStateRestore()` | Method              | ✕        | ✓          | -                |
+| `@subscribe()`        | Method              | ✕        | ✓          | -                |
+| `@debounce()`         | Method, Class Field | ✕        | ✓          | ✓ (Class fields) |
 
 [^1]: Can be `#private` or a symbol *if* a non-private non-symbol getter/setter
       pair for the attribute name exists and a content attribute name has been
       set using the `as` option.
 
-### `@define(tagName: string)`
+### `@define(tagName: string, options: ElementDefinitionOptions = {})`
 
 **Class decorator** to register a class as a custom element. This also sets up
 attribute observation for use with the [@attr()](#attrtransformer-options)
-decorator.
+decorator and prepares the hooks for lifecycle decorators like `@connected()`.
 
 ```javascript
 import { define } from "@sirpepe/ornament";
@@ -370,9 +416,8 @@ console.log(test.foo); // only type checks with the above interface declaration
 
 ### `@enhance()`
 
-**Class decorator** to set up attribute observation for use with the
-[@attr()](#attrtransformer-options) decorator, *without* registering the class
-as a custom element.
+**Class decorator** to set up attribute observation and lifecycle hooks
+*without* registering the class as a custom element.
 
 ```javascript
 import { enhance } from "@sirpepe/ornament";
@@ -388,10 +433,10 @@ window.customElements.define("my-test", MyTest);
 console.log(document.createElement("my-test")); // instance of MyTest
 ```
 
-This decorator is only useful if you intend to handle element registration in
-some other way.
+This decorator is only really useful if you need to handle element registration
+in some other way that what `@define()` provides.
 
-### `@prop(transformer)`
+### `@prop(transformer: Transformer)`
 
 **Accessor decorator** to define an IDL property on the custom element class
 *without* an associated content attribute. Such a property is more or less a
@@ -433,7 +478,7 @@ Note that you can still define your own accessors, getters, setters etc. as you
 would usually do. They will still work as expected, but they will not cause
 `@reactive()` methods to run.
 
-### `@attr(transformer, options?)`
+### `@attr(transformer: Transformer, options: AttrOptions = {})`
 
 **Accessor decorator** to define an IDL attribute with a matching content
 attribute on the custom element class. This results in something very similar to
@@ -499,7 +544,7 @@ attributes will not cause `@reactive()` methods to run.
 - **`as` (string, optional)**: Sets an attribute name different from the accessor's name, similar to how the `class` content attribute works for the `className` IDL attribute on built-in elements. If `as` is not set, the content attribute's name will be equal to the accessor's name. `as` is required when the decorator is applied to a symbol or private property.
 - **`reflective` (boolean, optional)**: If `false`, prevents the content attribute from updating when the IDL attribute is updated, similar to how `value` works on `input` elements. Defaults to true.
 
-### `@reactive(options?)`
+### `@reactive(options: ReactiveOptions = {})`
 
 **Method decorator** that causes class methods to run when accessors decorated
 with `@prop()` or `@attr()` change their values:
@@ -613,6 +658,89 @@ const newDocument = new Document();
 newDocument.adoptNode(testEl);
 // testEl.log logs "Adopted!"
 ```
+
+### `@formAssociated()`
+
+**Method decorator** that causes decorated class methods to run when a
+form-associated component's form owner changes and its `formAssociatedCallback()`
+fires:
+
+```javascript
+import { define, formAssociated } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  static formAssociated = true;
+  @formAssociated() log(newOwner) {
+    console.log(newOwner); // null or HTMLFormElement
+  }
+}
+
+let testEl = document.createElement("my-test");
+let form = document.createElement("form");
+form.append(testEl);
+// testEl.log logs "form"
+```
+
+### `@formReset()`
+
+**Method decorator** that causes decorated class methods to run when a
+form-associated component's form owner resets and its `formResetCallback()`
+fires:
+
+```javascript
+import { define, formReset } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  static formAssociated = true;
+  @formReset() log() {
+    console.log("Reset!");
+  }
+}
+
+let testEl = document.createElement("my-test");
+let form = document.createElement("form");
+form.append(testEl);
+form.reset();
+// ... some time passes...
+// testEl.log logs "Reset!"
+```
+
+Not that form reset events are observably asynchronous, unlike all other
+lifecycle events. This is due to the form reset algorithm itself being async.
+
+### `@formDisabled()`
+
+**Method decorator** that causes decorated class methods to run when a
+form-associated component's fieldset gets disabled and its
+`formDisabledCallback()` fires:
+
+```javascript
+import { define, formDisabled } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  static formAssociated = true;
+  @formDisabled() log(state) {
+    console.log("Disabled via fieldset:", state); // true or false
+  }
+}
+
+let testEl = document.createElement("my-test");
+let fieldset = document.createElement("fieldset");
+let form = document.createElement("form");
+form.append(fieldset);
+fieldset.append(testEl);
+fieldset.disabled = true;
+// testEl.log logs "Disabled via fieldset: true"
+```
+
+### `@formStateRestore()`
+
+**Method decorator** that causes decorated class methods to run when a
+form-associated component's `formStateRestoreCallback()` fires. This is not
+supported in Chrome-based browsers as of November 2023.
 
 ### `@subscribe(...args)`
 

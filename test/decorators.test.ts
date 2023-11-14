@@ -8,11 +8,17 @@ import {
   define,
   disconnected,
   enhance,
+  formAssociated,
+  formDisabled,
+  formReset,
   prop,
   reactive,
   subscribe,
-} from "../src/decorators.js";
-import { href, json, number, string } from "../src/transformers.js";
+  href,
+  json,
+  number,
+  string,
+} from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 import { signal } from "@preact/signals-core";
 const test = it;
@@ -573,6 +579,78 @@ describe("Decorators", () => {
       expect(fn2.getCalls()[0].args).to.eql([instance]);
     });
   });
+
+  describe("@formAssociated", () => {
+    test("fire on form association", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        static formAssociated = true;
+        @formAssociated() associated(owner: HTMLFormElement | null) {
+          fn(this, owner);
+        }
+      }
+      const instance = new Test();
+      const form = document.createElement("form");
+      new Document().append(form);
+      form.append(instance);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([instance, form]);
+      instance.remove();
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[1].args).to.eql([instance, null]);
+    });
+  });
+
+  // Note: not supported in Chrome as of Nov 13 2023
+  describe.skip("@formReset", () => {
+    test("fire on form reset", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        static formAssociated = true;
+        @formReset() reset() {
+          fn(this);
+        }
+      }
+      const instance = new Test();
+      const form = document.createElement("form");
+      new Document().append(form);
+      form.append(instance);
+      form.reset();
+      await wait(); // The disable algorithm is async
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([instance]);
+    });
+  });
+
+  describe("@formDisabled", () => {
+    test("fire on fieldset disable", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        static formAssociated = true;
+        @formDisabled() disable(state: boolean) {
+          fn(this, state);
+        }
+      }
+      const instance = new Test();
+      const form = document.createElement("form");
+      const fieldset = document.createElement("fieldset");
+      new Document().append(form);
+      form.append(fieldset);
+      fieldset.append(instance);
+      expect(fn.callCount).to.equal(0);
+      fieldset.disabled = true;
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([instance, true]);
+      fieldset.disabled = false;
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[1].args).to.eql([instance, false]);
+    });
+  });
+
+  describe.skip("@formStateRestore", () => undefined);
 
   describe("@reactive", () => {
     test("initial call with reactive property", async () => {

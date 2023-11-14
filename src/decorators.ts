@@ -2,11 +2,11 @@ import { listen, trigger } from "./bus.js";
 import { METADATA_KEY } from "./global.js";
 import { EMPTY_OBJ, NO_VALUE } from "./lib.js";
 import {
+  type Transformer,
   type ClassAccessorDecorator,
   type FunctionFieldOrMethodDecorator,
   type FunctionFieldOrMethodContext,
   type Method,
-  type Transformer,
   assertContext,
 } from "./types.js";
 
@@ -46,7 +46,7 @@ export function enhance<T extends CustomElementConstructor>(): (
     return class extends target {
       constructor(...args: any[]) {
         super(...args);
-        trigger(this, "init", EMPTY_OBJ);
+        trigger(this, "init");
       }
 
       static get observedAttributes(): string[] {
@@ -61,25 +61,25 @@ export function enhance<T extends CustomElementConstructor>(): (
         // type CustomElementConstructor does not reflect that. TS won't allow
         // us to access the property speculatively, so we need to tell it to
         // shut up... and then tell ESLint to shut up about us telling TS to
-        // shut up. The same happens for the other lifecycle callbacks.
+        // shut up. The same happens for all the other lifecycle callbacks.
         // eslint-disable-next-line
         // @ts-ignore
         super.connectedCallback?.call(this);
-        trigger(this, "connected", EMPTY_OBJ);
+        trigger(this, "connected");
       }
 
       disconnectedCallback(): void {
         // eslint-disable-next-line
         // @ts-ignore
         super.disconnectedCallback?.call(this);
-        trigger(this, "disconnected", EMPTY_OBJ);
+        trigger(this, "disconnected");
       }
 
       adoptedCallback(): void {
         // eslint-disable-next-line
         // @ts-ignore
         super.adoptedCallback?.call(this);
-        trigger(this, "adopted", EMPTY_OBJ);
+        trigger(this, "adopted");
       }
 
       attributeChangedCallback(
@@ -88,17 +88,41 @@ export function enhance<T extends CustomElementConstructor>(): (
         oldValue: string | null,
         newValue: string | null,
       ): void {
-        if (
+        if (originalObservedAttributes.has(name)) {
           // eslint-disable-next-line
           // @ts-ignore
-          super.attributeChangedCallback &&
-          originalObservedAttributes.has(name)
-        ) {
-          // eslint-disable-next-line
-          // @ts-ignore
-          super.attributeChangedCallback.call(this, name, oldValue, newValue);
+          super.attributeChangedCallback?.call(this, name, oldValue, newValue);
         }
-        trigger(this, "attr", { name, oldValue, newValue });
+        trigger(this, "attr", name, oldValue, newValue);
+      }
+
+      formAssociatedCallback(owner: HTMLFormElement | null): void {
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.formAssociatedCallback?.call(this);
+        trigger(this, "formAssociated", owner);
+      }
+
+      // Note: not supported in Chrome as of Nov 13 2023
+      formResetCallback(): void {
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.formResetCallback?.call(this);
+        trigger(this, "formReset");
+      }
+
+      formDisabledCallback(disabled: boolean): void {
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.formStateRestoreCallback?.call(this);
+        trigger(this, "formDisabled", disabled);
+      }
+
+      formStateRestoreCallback(reason: "autocomplete" | "restore"): void {
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.formStateRestoreCallback?.call(this);
+        trigger(this, "formStateRestore", reason);
       }
     };
   };
@@ -109,13 +133,14 @@ export function enhance<T extends CustomElementConstructor>(): (
 // init callback handling.
 export function define<T extends CustomElementConstructor>(
   tagName: string,
+  options: ElementDefinitionOptions = {},
 ): (target: T, context: ClassDecoratorContext<T>) => T {
   return function (target: T, context: ClassDecoratorContext<T>): T {
     assertContext(context, "define", "class");
 
     // Define the custom element after all other decorators have been applied
     context.addInitializer(function () {
-      window.customElements.define(tagName, this);
+      window.customElements.define(tagName, this, options);
     });
 
     // Install the mixin class via @enhance()
@@ -148,17 +173,18 @@ export function reactive<T extends HTMLElement>(
         subscribedElements.add(this);
         // Register the callback that performs the initial method call. Uses the
         // non-debounced method if required and wraps it in predicate logic.
-        if (options.initial !== false) {
-          if (!options.predicate || options.predicate.call(this)) {
-            (window[METADATA_KEY].debouncedMethods.get(value) ?? value).call(
-              this,
-            );
-          }
+        if (
+          options.initial !== false &&
+          (!options.predicate || options.predicate.call(this))
+        ) {
+          (window[METADATA_KEY].debouncedMethods.get(value) ?? value).call(
+            this,
+          );
         }
       });
       // Start listening for reactivity events if, after the init event, the
       // element is subscribed.
-      listen(this, "prop", ({ name }) => {
+      listen(this, "prop", (name) => {
         if (
           subscribedElements.has(this) &&
           (!options.predicate || options.predicate.call(this)) &&
@@ -204,10 +230,9 @@ function createEventSubscriberInitializer<
   options: EventSubscribeOptions<T, E> = EMPTY_OBJ,
 ): (this: T) => void {
   return function (this: T) {
-    const predicate = options.predicate ?? (() => true);
     listen(this, "init", () => {
       const callback = (evt: any) => {
-        if (predicate.call(this, evt)) {
+        if (!options.predicate || options.predicate.call(this, evt)) {
           context.access.get(this).call(this, evt);
         }
       };
@@ -259,15 +284,13 @@ function createSignalSubscriberInitializer<
   options: SignalSubscribeOptions<T, V> = EMPTY_OBJ,
 ): (this: T) => void {
   return function (this: T) {
-    const predicate = options.predicate ?? (() => true);
     listen(this, "init", () => {
       const value = context.access.get(this);
-      const callback = () => {
-        if (predicate.call(this, target.value)) {
+      const unsubscribe = target.subscribe(() => {
+        if (!options.predicate || options.predicate.call(this, target.value)) {
           value.call(this, target);
         }
-      };
-      const unsubscribe = target.subscribe(callback);
+      });
       window[METADATA_KEY].unsubscribeRegistry.register(this, unsubscribe);
     });
   };
@@ -323,46 +346,34 @@ export function subscribe<T extends HTMLElement>(
   };
 }
 
-type LifecycleDecorator<T extends HTMLElement> = (
-  _: Method<T, []>,
+type LifecycleDecorator<T extends HTMLElement, Arguments extends any[]> = (
+  _: Method<T, Arguments>,
   context: ClassMethodDecoratorContext<T, (this: T, ...args: any) => any>,
 ) => void;
 
-export function connected<T extends HTMLElement>(): LifecycleDecorator<T> {
-  return function (
-    _: Method<T, []>,
-    context: ClassMethodDecoratorContext<T>,
-  ): void {
-    assertContext(context, "connected", "method");
-    context.addInitializer(function () {
-      listen(this, "connected", context.access.get(this));
-    });
-  };
+function createLifecycleDecorator<K extends keyof OrnamentEventMap>(
+  name: K,
+): <T extends HTMLElement>() => LifecycleDecorator<T, OrnamentEventMap[K]> {
+  return <T extends HTMLElement>() =>
+    function (
+      _: Method<T, OrnamentEventMap[K]>,
+      context: ClassMethodDecoratorContext<T>,
+    ): void {
+      assertContext(context, name, "method");
+      context.addInitializer(function () {
+        listen(this, name, context.access.get(this));
+      });
+    };
 }
 
-export function disconnected<T extends HTMLElement>(): LifecycleDecorator<T> {
-  return function (
-    _: Method<T, []>,
-    context: ClassMethodDecoratorContext<T>,
-  ): void {
-    assertContext(context, "disconnected", "method");
-    context.addInitializer(function () {
-      listen(this, "disconnected", context.access.get(this));
-    });
-  };
-}
-
-export function adopted<T extends HTMLElement>(): LifecycleDecorator<T> {
-  return function (
-    _: Method<T, []>,
-    context: ClassMethodDecoratorContext<T>,
-  ): void {
-    assertContext(context, "adopted", "method");
-    context.addInitializer(function () {
-      listen(this, "adopted", context.access.get(this));
-    });
-  };
-}
+// Bulk-create all basic lifecycle decrorators
+export const connected = createLifecycleDecorator("connected");
+export const disconnected = createLifecycleDecorator("disconnected");
+export const adopted = createLifecycleDecorator("adopted");
+export const formAssociated = createLifecycleDecorator("formAssociated");
+export const formReset = createLifecycleDecorator("formReset");
+export const formDisabled = createLifecycleDecorator("formDisabled");
+export const formStateRestore = createLifecycleDecorator("formStateRestore");
 
 // Accessor decorator @attr() defines a DOM attribute backed by an accessor.
 // Because attributes are public by definition, it can't be applied to private
@@ -416,27 +427,28 @@ export function attr<T extends HTMLElement, V>(
         skipNextReaction.set(this, false);
         const attributeChangedCallback = function (
           this: T,
-          evt: {
-            name: string;
-            oldValue: string | null;
-            newValue: string | null;
-          },
+          name: string,
+          oldValue: string | null,
+          newValue: string | null,
         ): void {
-          if (evt.name !== contentAttrName || evt.newValue === evt.oldValue) {
+          if (name !== contentAttrName || newValue === oldValue) {
             return; // skip irrelevant invocations
           }
           if (skipNextReaction.get(this) === true) {
             skipNextReaction.set(this, false);
             return; // skip attribute reaction caused by a setter
           }
-          const oldValue = target.get.call(this);
-          const newValue = transformer.parse.call(this, evt.newValue);
-          if (newValue === NO_VALUE || transformer.eql(newValue, oldValue)) {
+          const currentOldValue = target.get.call(this);
+          const currentNewValue = transformer.parse.call(this, newValue);
+          if (
+            currentNewValue === NO_VALUE ||
+            transformer.eql(currentNewValue, currentOldValue)
+          ) {
             return;
           }
-          transformer.beforeSet.call(this, newValue, context);
-          target.set.call(this, newValue);
-          trigger(this, "prop", { name: context.name });
+          transformer.beforeSet.call(this, currentNewValue, context);
+          target.set.call(this, currentNewValue);
+          trigger(this, "prop", context.name);
         };
         listen(this, "attr", attributeChangedCallback);
       });
@@ -500,7 +512,7 @@ export function attr<T extends HTMLElement, V>(
             );
           }
         }
-        trigger(this, "prop", { name: context.name });
+        trigger(this, "prop", context.name);
       },
     };
   };
@@ -529,7 +541,7 @@ export function prop<T extends HTMLElement, V>(
         }
         transformer.beforeSet.call(this, newValue, context);
         target.set.call(this, newValue);
-        trigger(this, "prop", { name: context.name });
+        trigger(this, "prop", context.name);
       },
     };
   };

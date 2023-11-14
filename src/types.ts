@@ -2,16 +2,16 @@ import { EMPTY_OBJ, NO_VALUE, isArray } from "./lib.js";
 
 declare global {
   interface OrnamentEventMap {
-    init: Record<string, never>;
-    connected: Record<string, never>;
-    disconnected: Record<string, never>;
-    adopted: Record<string, never>;
-    prop: { name: string | symbol };
-    attr: {
-      name: string;
-      oldValue: string | null;
-      newValue: string | null;
-    };
+    init: [];
+    connected: [];
+    disconnected: [];
+    adopted: [];
+    prop: [name: string | symbol];
+    attr: [name: string, oldValue: string | null, newValue: string | null];
+    formAssociated: [owner: HTMLFormElement | null];
+    formReset: [];
+    formDisabled: [disabled: boolean];
+    formStateRestore: [reason: "autocomplete" | "restore"];
   }
 }
 
@@ -65,10 +65,6 @@ export type Transformer<
     newValue: Value | null,
   ) => boolean | null;
 };
-
-export type Optional<Source, Keys extends keyof Source> = {
-  [Key in Keys]?: Source[Key];
-} & Pick<Source, Exclude<keyof Source, Keys>>;
 
 /* eslint-disable */
 export type ClassAccessorDecorator<T extends HTMLElement, V, R extends ClassAccessorDecoratorResult<unknown, unknown> | void = ClassAccessorDecoratorResult<T, V>>
@@ -156,12 +152,14 @@ export function assertTransformer<T extends HTMLElement, V>(
   input: unknown,
 ): asserts input is Transformer<T, V> {
   assertRecord(input, "transformer");
+  assertPropType(input, "init", "function");
   assertPropType(input, "parse", "function");
   assertPropType(input, "validate", "function");
-  assertPropType(input, "validate", "function");
-  assertPropType(input, "updateAttrPredicate", "function", "undefined");
-  assertPropType(input, "beforeInitCallback", "function", "undefined");
-  assertPropType(input, "beforeSetCallback", "function", "undefined");
+  assertPropType(input, "transform", "function");
+  assertPropType(input, "stringify", "function");
+  assertPropType(input, "eql", "function");
+  assertPropType(input, "beforeSet", "function");
+  assertPropType(input, "updateContentAttr", "function");
 }
 
 type AcceptOptions = {
