@@ -1,5 +1,10 @@
 # Ornament
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/logo_dark.png">
+  <img alt="" src="./assets/logo.png">
+</picture>
+
 Unopinionated, pareto-optimal micro-library (<= 4k) for building vanilla web
 component infrastructure:
 
