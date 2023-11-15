@@ -38,6 +38,8 @@ export default [
             passes: 3,
             unsafe_arrows: true,
             booleans_as_integers: true,
+            unsafe_comps: true,
+            unsafe_undefined: true,
           },
         }),
       ],
