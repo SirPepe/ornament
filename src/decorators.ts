@@ -377,22 +377,18 @@ export const formReset = createLifecycleDecorator("formReset");
 export const formDisabled = createLifecycleDecorator("formDisabled");
 export const formStateRestore = createLifecycleDecorator("formStateRestore");
 
-// Accessor decorator @attr() defines a DOM attribute backed by an accessor.
-// Because attributes are public by definition, it can't be applied to private
-// accessors or symbol accessors.
-
 type AttrOptions = {
   as?: string; // defaults to the attribute name
   reflective?: boolean; // defaults to true
 };
 
+// The accessor decorator @attr() defines a DOM attribute backed by an accessor.
 export function attr<T extends HTMLElement, V>(
   transformer: Transformer<T, V>,
   options: AttrOptions = EMPTY_OBJ,
 ): ClassAccessorDecorator<T, V> {
-  const isReflectiveAttribute = options.reflective !== false;
   // Enables early exits from the attributeChangedCallback for content attribute
-  // updates that were caused by invoking IDL setters
+  // updates that were caused by invoking IDL setters.
   const skipNextReaction = new WeakMap<HTMLElement, boolean>();
   return function (target, context): ClassAccessorDecoratorResult<T, V> {
     assertContext(context, "attr", "accessor");
@@ -417,42 +413,43 @@ export function attr<T extends HTMLElement, V>(
 
     // If the attribute needs to be observed, add the name to the set of all
     // observed attributes.
-    if (isReflectiveAttribute) {
+    if (options.reflective !== false) {
       window[METADATA_KEY].observableAttributes.add(contentAttrName);
     }
 
     // If the attribute needs to be observed and the accessor initializes,
     // register the attribute handler callback with the current element
     // instance - this initializer is earliest we have access to the instance.
-    if (isReflectiveAttribute) {
+    if (options.reflective !== false) {
       context.addInitializer(function () {
-        skipNextReaction.set(this, false);
-        const attributeChangedCallback = function (
-          this: T,
-          name: string,
-          oldValue: string | null,
-          newValue: string | null,
-        ): void {
-          if (name !== contentAttrName || newValue === oldValue) {
-            return; // skip irrelevant invocations
-          }
-          if (skipNextReaction.get(this) === true) {
-            skipNextReaction.set(this, false);
-            return; // skip attribute reaction caused by a setter
-          }
-          const currentOldValue = target.get.call(this);
-          const currentNewValue = transformer.parse.call(this, newValue);
-          if (
-            currentNewValue === NO_VALUE ||
-            transformer.eql(currentNewValue, currentOldValue)
-          ) {
-            return;
-          }
-          transformer.beforeSet.call(this, currentNewValue, context);
-          target.set.call(this, currentNewValue);
-          trigger(this, "prop", context.name);
-        };
-        listen(this, "attr", attributeChangedCallback);
+        listen(
+          this,
+          "attr",
+          function (
+            this: T,
+            name: string,
+            oldValue: string | null,
+            newValue: string | null,
+          ): void {
+            if (name !== contentAttrName || newValue === oldValue) {
+              return; // skip irrelevant invocations
+            }
+            if (skipNextReaction.get(this)) {
+              skipNextReaction.set(this, false);
+              return; // skip attribute reaction caused by a setter
+            }
+            const currentNewValue = transformer.parse.call(this, newValue);
+            if (
+              currentNewValue === NO_VALUE ||
+              transformer.eql(currentNewValue, target.get.call(this))
+            ) {
+              return; // skip no-ops
+            }
+            transformer.beforeSet.call(this, currentNewValue, context);
+            target.set.call(this, currentNewValue);
+            trigger(this, "prop", context.name);
+          },
+        );
       });
     }
 
@@ -497,7 +494,7 @@ export function attr<T extends HTMLElement, V>(
         }
         transformer.beforeSet.call(this, newValue, context);
         target.set.call(this, newValue);
-        if (isReflectiveAttribute) {
+        if (options.reflective !== false) {
           const updateAttr = transformer.updateContentAttr(oldValue, newValue);
           // If an attribute update is about to happen, the next
           // attributeChangedCallback must be skipped to prevent double calls of
@@ -520,8 +517,8 @@ export function attr<T extends HTMLElement, V>(
   };
 }
 
-// Accessor decorator @prop() returns a normal accessor, but with validation and
-// reactivity added.
+// The accessor decorator @prop() returns a normal accessor, but with validation
+// and reactivity added.
 export function prop<T extends HTMLElement, V>(
   transformer: Transformer<T, V>,
 ): ClassAccessorDecorator<T, V> {
@@ -539,7 +536,7 @@ export function prop<T extends HTMLElement, V>(
         transformer.validate.call(this, input);
         const newValue = transformer.transform.call(this, input);
         if (transformer.eql(newValue, target.get.call(this))) {
-          return;
+          return; // skip no-ops
         }
         transformer.beforeSet.call(this, newValue, context);
         target.set.call(this, newValue);
@@ -548,8 +545,6 @@ export function prop<T extends HTMLElement, V>(
     };
   };
 }
-
-// Class field/method decorator @debounce() debounces functions.
 
 type DebounceOptions = {
   fn?: (cb: () => void) => () => void;
@@ -574,6 +569,7 @@ function createDebouncedMethod<T extends object, A extends unknown[]>(
   return debouncedMethod;
 }
 
+// The class field/method decorator @debounce() debounces functions.
 export function debounce<T extends HTMLElement, A extends unknown[]>(
   options: DebounceOptions = EMPTY_OBJ,
 ): FunctionFieldOrMethodDecorator<T, A> {
