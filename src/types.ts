@@ -31,6 +31,7 @@ export type Transformer<
     this: T,
     value: Value,
     context: ClassAccessorDecoratorContext<T, Value>,
+    isContentAttribute: boolean,
   ) => Value;
   // Turns content attribute values into IDL attribute values. Must never throw
   // exceptions, and instead always just deal with its input. Must not cause any
@@ -41,7 +42,11 @@ export type Transformer<
   // Decides if setter inputs, which may be of absolutely any type, should be
   // accepted or rejected. Should throw for invalid values, just like setters on
   // built-in elements may. Must not cause any observable side effects.
-  validate: (this: T, value: unknown) => asserts value is IntermediateValue;
+  validate: (
+    this: T,
+    value: unknown,
+    isContentAttribute: boolean,
+  ) => asserts value is IntermediateValue;
   // Transforms values that were accepted by validate() into the proper type by
   // eg. clamping numbers, normalizing strings etc.
   transform: (this: T, value: IntermediateValue) => Value;

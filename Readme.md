@@ -956,17 +956,17 @@ side effects.
 
 ### Transformers overview
 
-| Transformer       | Type                | Options                              |
-| ------------------| --------------------|--------------------------------------|
-| `string()`        | `string`            |                                      |
-| `href()`          | `string` (URL)      |                                      |
-| `bool()`          | `boolean`           |                                      |
-| `number()`        | `number`            | `min`, `max`, `allowNaN`, `nullable` |
-| `int()`           | `bigint`            | `min`, `max`, `nullable`             |
-| `json()`          | JSON serializable   | `reviver`, `replacer`                |
-| `list()`          | Array               | `separator`, `transform`             |
-| `literal()`       | Any                 | `values`, `transform`                |
-| `event()`         | `function | null`   |                                      |
+| Transformer       | Type                                           | Options                              |
+| ------------------| -----------------------------------------------|--------------------------------------|
+| `string()`        | `string`                                       |                                      |
+| `href()`          | `string` (URL)                                 |                                      |
+| `bool()`          | `boolean`                                      |                                      |
+| `number()`        | `number`                                       | `min`, `max`, `allowNaN`, `nullable` |
+| `int()`           | `bigint`                                       | `min`, `max`, `nullable`             |
+| `json()`          | Any (JSON serializable for use with `@attr()`) | `reviver`, `replacer`                |
+| `list()`          | Array                                          | `separator`, `transform`             |
+| `literal()`       | Any                                            | `values`, `transform`                |
+| `event()`         | `function | null`                              |                                      |
 
 A transformers is just a bag of functions with the following type signature:
 
@@ -983,6 +983,7 @@ export type Transformer<
     this: T,
     value: Value,
     context: ClassAccessorDecoratorContext<T, Value>,
+    isContentAttribute: boolean,
   ) => Value;
   // Turns content attribute values into IDL attribute values. Must never throw
   // exceptions, and instead always just deal with its input. Must not cause any
@@ -993,7 +994,11 @@ export type Transformer<
   // Decides if setter inputs, which may be of absolutely any type, should be
   // accepted or rejected. Should throw for invalid values, just like setters on
   // built-in elements may. Must not cause any observable side effects.
-  validate: (this: T, value: unknown) => asserts value is IntermediateValue;
+  validate: (
+    this: T,
+    value: unknown,
+    isContentAttribute: boolean,
+  ) => asserts value is IntermediateValue;
   // Transforms values that were accepted by validate() into the proper type by
   // eg. clamping numbers, normalizing strings etc.
   transform: (this: T, value: IntermediateValue) => Value;
@@ -1337,25 +1342,28 @@ the accessor has no initial value, the first element in `values`.
 
 ### Transformer `json()`
 
-Implements an attribute that can take any valid JSON value and gets reflected as
-a JSON-encoded content attribute when used with `@attr()`. Such attributes do
-not exist in standard HTML, but may be useful nevertheless:
+Implements an attribute that can take any value. When used with `@attr()`, the
+value must be serializable with JSON in order to be reflected as a content
+attribute. When used with `@prop()`, no restrictions apply.
 
 ```javascript
-import { define, attr, json } from "@sirpepe/ornament";
+import { define, attr, prop, json } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
+  // Must be valid JSON when used with @attr()
   @attr(json()) accessor foo = { user: "", email: "" };
+  // When used with prop, any value can be used
+  @prop(json()) accessor foo = { value: 42n };
 }
 ```
 
-Content attribute values are parsed with `JSON.parse()`. Invalid JSON is
-represented with the data used to initialize the accessor. Using the IDL
-attribute's setter with inputs than can't be serialized with JSON.`stringify()`
-throws errors. This transformer is really just a wrapper around `JSON.parse()`
-and `JSON.stringify()` without any object validation. Two values are considered
-equal when their JSON representations are equal.
+Content attributes, defined with `@attr()`, are parsed with `JSON.parse()`. In
+this case, any invalid JSON is represented with the data used to initialize the
+accessor. Using the IDL attribute's setter with inputs than can't be serialized
+with JSON.`stringify()` throws errors. This transformer is really just a wrapper
+around `JSON.parse()` and `JSON.stringify()` without any object validation.
+Equality is checked with `===`.
 
 **Note for TypeScript:** Even though the transformer will accept literally any
 value at runtime, TS may infer a more restrictive type from the accessor's
@@ -1364,16 +1372,22 @@ are applied to, so you man need to provide a type annotation.
 
 #### Options for `json(options?)`
 
-- **`reviver` (function, optional)**: The `reviver` argument to use with `JSON.parse()`, if any
-- **`replacer` (function, optional)**: The `replacer` argument to use with `JSON.stringify()`, if any
+- **`reviver` (function, optional)**: The `reviver` argument to use with `JSON.parse()`, if any. Only of use when used with `@attr()`
+- **`replacer` (function, optional)**: The `replacer` argument to use with `JSON.stringify()`, if any. Only of use when used with `@attr()`
 
-#### Behavior overview for transformer `json()`
+#### Behavior overview for transformer `json()` (when used with `@attr()`)
 
-| Operation                      | IDL attribute value                                                    | Content attribute (when used with `@attr()`)      |
+| Operation                      | IDL attribute value                                                    | Content attribute                                 |
 | -------------------------------| -----------------------------------------------------------------------|---------------------------------------------------|
 | Set IDL attribute value to `x` | `JSON.parse(JSON.stringify(x))`                                        | `JSON.stringify(idlValue, null, options.reviver)` |
 | Set content attribute to `x`   | No change if invalid JSON, otherwise `JSON.parse(x, options.receiver)` | As set                                            |
 | Remove content attribute       | Initial value or `undefined`                                           | Removed                                           |
+
+#### Behavior overview for transformer `json()` (when used with `@prop()`)
+
+| Operation                      | IDL attribute value | Content attribute |
+| -------------------------------| --------------------|-------------------|
+| Set IDL attribute value to `x` | `x`                 | -                 |
 
 ### Transformer `event()`
 

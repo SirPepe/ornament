@@ -474,6 +474,7 @@ export function attr<T extends HTMLElement, V>(
           this,
           initAccessorInitialValue(this, contentAttrName, input),
           context,
+          true,
         );
         // Use the already-existing attribute value when possible. If the
         // attribute does not exist or its value can't be parsed, fall back to
@@ -491,7 +492,7 @@ export function attr<T extends HTMLElement, V>(
         return defaultValue;
       },
       set(input) {
-        transformer.validate.call(this, input);
+        transformer.validate.call(this, input, true);
         const newValue = transformer.transform.call(this, input);
         const oldValue = target.get.call(this);
         if (transformer.eql.call(this, newValue, oldValue)) {
@@ -537,10 +538,11 @@ export function prop<T extends HTMLElement, V>(
           this,
           initAccessorInitialValue(this, context.name, input),
           context,
+          false,
         );
       },
       set(input) {
-        transformer.validate.call(this, input);
+        transformer.validate.call(this, input, false);
         const newValue = transformer.transform.call(this, input);
         if (transformer.eql.call(this, newValue, target.get.call(this))) {
           return; // skip no-ops

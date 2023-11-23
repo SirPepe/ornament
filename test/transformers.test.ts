@@ -2,6 +2,7 @@ import { expect } from "@esm-bundle/chai";
 import { spy } from "sinon";
 import {
   attr,
+  prop,
   define,
   bool,
   event,
@@ -681,6 +682,33 @@ describe("Transformers", () => {
       expect(el.getAttribute("foo")).to.equal('{"a":1}');
       el.foo = undefined;
       expect(el.getAttribute("foo")).to.equal("undefined");
+    });
+
+    test("content attribute throws for invalid json", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(json())
+        accessor foo: any = null;
+      }
+      const el = new Test();
+      expect(el.foo).to.equal(null);
+      expect(() => {
+        el.foo = {
+          test: 1n,
+        } as any;
+      }).to.throw(Error);
+    });
+
+    test("IDL attribute accepts invalid json", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(json())
+        accessor foo: any = null;
+      }
+      const el = new Test();
+      expect(el.foo).to.equal(null);
+      el.foo = { test: 1n };
+      expect(el.foo).to.eql({ test: 1n });
     });
   });
 

@@ -300,7 +300,10 @@ export function json<T extends HTMLElement>(
         return NO_VALUE;
       }
     },
-    validate(value) {
+    validate(value, isContentAttribute) {
+      if (!isContentAttribute) {
+        return true;
+      }
       stringifyJSONAttribute(value, options.replacer);
     },
     stringify(value) {
@@ -348,11 +351,13 @@ export function schema<T extends HTMLElement, V>(
         return NO_VALUE;
       }
     },
-    validate(value) {
+    validate(value, isContentAttribute) {
       const parsed = schema.parse(value);
-      // Verify that the parsed value stringifies
+      if (!isContentAttribute) {
+        return true;
+      }
+      // Verify that the parsed value stringifies for attribute use
       stringifyJSONAttribute(parsed, options.replacer);
-      return parsed;
     },
     stringify(value) {
       return stringifyJSONAttribute(value, options.replacer);
@@ -396,8 +401,8 @@ export function literal<T extends HTMLElement, V>(
   const initialValues = new WeakMap<T, V>();
   const { transform, values } = literalOptions<T, V>(options);
   // Used as validation function and in init
-  function validate(this: T, value: any): void {
-    transform.validate.call(this, value);
+  function validate(this: T, value: any, isContentAttribute: boolean): void {
+    transform.validate.call(this, value, isContentAttribute);
     const transformed = transform.transform.call(this, value);
     if (!values.includes(transformed)) {
       throw new Error(
@@ -420,8 +425,8 @@ export function literal<T extends HTMLElement, V>(
     eql: transform.eql,
     stringify: transform.stringify,
     transform: transform.transform,
-    init(value = values[0]) {
-      validate.call(this, value);
+    init(value = values[0], _, isContentAttribute) {
+      validate.call(this, value, isContentAttribute);
       initialValues.set(this, value);
       return value;
     },
@@ -451,12 +456,16 @@ export function list<T extends HTMLElement, V>(
   const initialValues = new WeakMap<T, V[]>();
   const { transform, separator } = listOptions<T, V>(inputOptions);
   // Used as validation function and in init
-  function validate(this: T, values: unknown): void {
+  function validate(
+    this: T,
+    values: unknown,
+    isContentAttribute: boolean,
+  ): void {
     if (!isArray(values)) {
       throw new Error(`Expected array, got ${typeof values}`);
     }
     for (const value of values) {
-      transform.validate.call(this, value);
+      transform.validate.call(this, value, isContentAttribute);
     }
   }
   return createTransformer<T, V[], any[]>({
@@ -493,8 +502,8 @@ export function list<T extends HTMLElement, V>(
       }
       return a.every((aVal, i) => transform.eql.call(this, aVal, b[i]));
     },
-    init(value = []) {
-      validate.call(this, value);
+    init(value = [], _, isContentAttribute) {
+      validate.call(this, value, isContentAttribute);
       initialValues.set(this, value);
       return value;
     },
