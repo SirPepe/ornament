@@ -140,15 +140,19 @@ export function assertTransformer<T extends HTMLElement, V>(
   input: unknown,
 ): asserts input is Transformer<T, V> {
   assertRecord(input, "transformer");
-  assertType(input.init, "init", "function");
-  assertType(input.parse, "parse", "function");
-  assertType(input.validate, "validate", "function");
-  assertType(input.transform, "transform", "function");
-  assertType(input.stringify, "stringify", "function");
-  assertType(input.eql, "eql", "function");
-  assertType(input.beforeSet, "beforeSet", "function");
-  assertType(input.transformGet, "transformGet", "function");
-  assertType(input.updateContentAttr, "updateContentAttr", "function");
+  for (const method of [
+    "init",
+    "parse",
+    "validate",
+    "transform",
+    "stringify",
+    "eql",
+    "beforeSet",
+    "transformGet",
+    "updateContentAttr",
+  ]) {
+    assertType(input[method], method, "function");
+  }
 }
 
 export function assertContext(
