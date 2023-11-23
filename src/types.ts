@@ -147,6 +147,7 @@ export function assertTransformer<T extends HTMLElement, V>(
   assertType(input.stringify, "stringify", "function");
   assertType(input.eql, "eql", "function");
   assertType(input.beforeSet, "beforeSet", "function");
+  assertType(input.transformGet, "transformGet", "function");
   assertType(input.updateContentAttr, "updateContentAttr", "function");
 }
 
