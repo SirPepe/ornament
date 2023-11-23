@@ -10,7 +10,7 @@ import {
   assertContext,
 } from "./types.js";
 
-// Un-clobber an accessor if the element upgrades after a property with
+// Un-clobber an accessor's name if the element upgrades after a property with
 // a matching name has already been set.
 function initAccessorInitialValue(
   instance: any,
@@ -41,7 +41,8 @@ export function enhance<T extends CustomElementConstructor>(): (
 
     // Installs the mixin class. This kindof changes the type of the input
     // constructor T, but as TypeScript can currently not use class decorators
-    // to change the type, we don't bother. The changes are really small, too.
+    // to change the type, we don't bother. The changes are really small and
+    // only affects lifecycle callbacks, which are not really "public" anyway.
     // See https://github.com/microsoft/TypeScript/issues/51347
     return class extends target {
       constructor(...args: any[]) {
@@ -151,6 +152,7 @@ export function define<T extends CustomElementConstructor>(
 type ReactiveOptions<T> = {
   initial?: boolean;
   keys?: (string | symbol)[];
+  excludeKeys?: (string | symbol)[];
   predicate?: (this: T) => boolean;
 };
 
@@ -162,17 +164,15 @@ type ReactiveDecorator<T extends HTMLElement> = (
 export function reactive<T extends HTMLElement>(
   options: ReactiveOptions<T> = EMPTY_OBJ,
 ): ReactiveDecorator<T> {
-  const subscribedElements = new WeakSet();
   return function (_, context): void {
     assertContext(context, "reactive", "method");
     context.addInitializer(function () {
       const value = context.access.get(this);
+      // Register the callback that performs the initial method call and sets up
+      // listeners for subsequent methods calls.
       listen(this, "init", () => {
-        // Active only once elements have initialized. This prevents prop set-up
-        // in the constructor from triggering reactive methods.
-        subscribedElements.add(this);
-        // Register the callback that performs the initial method call. Uses the
-        // non-debounced method if required and wraps it in predicate logic.
+        // Initial method call, if applicable. Uses the non-debounced method if
+        // required and wraps it in predicate logic.
         if (
           options.initial !== false &&
           (!options.predicate || options.predicate.call(this))
@@ -181,17 +181,19 @@ export function reactive<T extends HTMLElement>(
             this,
           );
         }
-      });
-      // Start listening for reactivity events if, after the init event, the
-      // element is subscribed.
-      listen(this, "prop", (name) => {
-        if (
-          subscribedElements.has(this) &&
-          (!options.predicate || options.predicate.call(this)) &&
-          (!options.keys || options.keys?.includes(name))
-        ) {
-          value.call(this);
-        }
+        // Start listening only once the element's constructor has run to
+        // completion. This prevents prop set-up in the constructor from
+        // triggering reactive methods.
+        listen(this, "prop", (name) => {
+          if (
+            (!options.predicate || options.predicate.call(this)) &&
+            (!options.keys || options.keys?.includes(name)) &&
+            (!options.excludeKeys ||
+              options.excludeKeys?.includes(name) === false)
+          ) {
+            value.call(this);
+          }
+        });
       });
     });
   };
