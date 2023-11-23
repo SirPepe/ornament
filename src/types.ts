@@ -150,15 +150,11 @@ export function assertTransformer<T extends HTMLElement, V>(
   assertType(input.updateContentAttr, "updateContentAttr", "function");
 }
 
-type AcceptOptions = {
-  static?: boolean;
-};
-
 export function assertContext(
   ctx: any,
   name: string,
   kinds: DecoratorContext["kind"] | DecoratorContext["kind"][],
-  accept: Partial<AcceptOptions> = EMPTY_OBJ,
+  acceptStatic: boolean = false,
 ): void {
   kinds = isArray(kinds) ? kinds : [kinds];
   if (!kinds.includes(ctx.kind)) {
@@ -167,7 +163,7 @@ export function assertContext(
       .join("/");
     throw new TypeError(`${expected} decorator @${name} used on ${ctx.kind}`);
   }
-  if (ctx.static && !accept.static) {
+  if (ctx.static && !acceptStatic) {
     throw new TypeError(`Decorator @${name} can't be used on static members`);
   }
 }

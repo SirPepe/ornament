@@ -504,9 +504,8 @@ export function attr<T extends HTMLElement, V>(
           // If an attribute update is about to happen, the next
           // attributeChangedCallback must be skipped to prevent double calls of
           // @reactive methods
-          if (updateAttr !== false) {
-            skipNextReaction.set(this, true);
-          }
+          skipNextReaction.set(this, updateAttr !== false);
+          // Perform content attribute updates
           if (updateAttr === null) {
             this.removeAttribute(contentAttrName);
           } else if (updateAttr) {
@@ -597,7 +596,7 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
     value: Method<T, A> | undefined,
     context: FunctionFieldOrMethodContext<T, A>,
   ): Method<T, A> | ((init: Method<unknown, A>) => Method<unknown, A>) {
-    assertContext(context, "debounce", ["field", "method"], { static: true });
+    assertContext(context, "debounce", ["field", "method"], true);
     if (context.kind === "field") {
       // Field decorator (bound methods)
       return function init(
