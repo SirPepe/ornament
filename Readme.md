@@ -1004,14 +1004,18 @@ export type Transformer<
   // Determines whether a new attribute value is equal to the old value. If this
   // method returns true, reactive callbacks will not be triggered. Defaults to
   // simple strict equality (===).
-  eql: (a: Value, b: Value) => boolean;
+  eql: (this: T, a: Value, b: Value) => boolean;
   // Optionally run a side effect immediately before the accessor's setter is
-  // invoked.
+  // invoked. Required by the event transformer.
   beforeSet: (
     this: T,
     value: Value,
     context: ClassAccessorDecoratorContext<T, Value>,
+    attributeRemoved: boolean,
   ) => void;
+  // Optionally transform the getter's response. Required by the href
+  // transformer.
+  transformGet: (this: T, value: Value) => Value;
   // Decides if, based on a new value, an attribute gets updated to match the
   // new value (true/false) or removed (null). Only gets called when the
   // transformer's eql() method returns false. Defaults to a function that
