@@ -441,11 +441,16 @@ export function attr<T extends HTMLElement, V>(
             const currentNewValue = transformer.parse.call(this, newValue);
             if (
               currentNewValue === NO_VALUE ||
-              transformer.eql(currentNewValue, target.get.call(this))
+              transformer.eql.call(this, currentNewValue, target.get.call(this))
             ) {
               return; // skip no-ops
             }
-            transformer.beforeSet.call(this, currentNewValue, context);
+            transformer.beforeSet.call(
+              this,
+              currentNewValue,
+              context,
+              newValue === null,
+            );
             target.set.call(this, currentNewValue);
             trigger(this, "prop", context.name);
           },
@@ -479,7 +484,7 @@ export function attr<T extends HTMLElement, V>(
             this.getAttribute(contentAttrName),
           );
           if (attrValue !== NO_VALUE) {
-            transformer.beforeSet.call(this, attrValue, context);
+            transformer.beforeSet.call(this, attrValue, context, false);
             return attrValue;
           }
         }
@@ -489,10 +494,10 @@ export function attr<T extends HTMLElement, V>(
         transformer.validate.call(this, input);
         const newValue = transformer.transform.call(this, input);
         const oldValue = target.get.call(this);
-        if (transformer.eql(newValue, oldValue)) {
+        if (transformer.eql.call(this, newValue, oldValue)) {
           return;
         }
-        transformer.beforeSet.call(this, newValue, context);
+        transformer.beforeSet.call(this, newValue, context, false);
         target.set.call(this, newValue);
         if (options.reflective !== false) {
           const updateAttr = transformer.updateContentAttr(oldValue, newValue);
@@ -512,6 +517,9 @@ export function attr<T extends HTMLElement, V>(
           }
         }
         trigger(this, "prop", context.name);
+      },
+      get() {
+        return transformer.transformGet.call(this, target.get.call(this));
       },
     };
   };
@@ -535,12 +543,15 @@ export function prop<T extends HTMLElement, V>(
       set(input) {
         transformer.validate.call(this, input);
         const newValue = transformer.transform.call(this, input);
-        if (transformer.eql(newValue, target.get.call(this))) {
+        if (transformer.eql.call(this, newValue, target.get.call(this))) {
           return; // skip no-ops
         }
-        transformer.beforeSet.call(this, newValue, context);
+        transformer.beforeSet.call(this, newValue, context, false);
         target.set.call(this, newValue);
         trigger(this, "prop", context.name);
+      },
+      get() {
+        return transformer.transformGet.call(this, target.get.call(this));
       },
     };
   };

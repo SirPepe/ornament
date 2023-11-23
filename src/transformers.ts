@@ -15,6 +15,7 @@ export const protoTransformer: Transformer<any, any> = {
   eql: <T>(a: T, b: T) => a === b,
   init: <T>(x: T) => x,
   beforeSet: <T>(x: T) => x,
+  transformGet: <T>(x: T) => x,
   updateContentAttr: () => true,
 };
 
@@ -71,10 +72,7 @@ export function string<T extends HTMLElement>(): Transformer<T, string> {
   const initialValues = new WeakMap<T, string>();
   return createTransformer<T, string>({
     parse(newValue) {
-      if (!newValue) {
-        return initialValues.get(this)!; // always initialized in init
-      }
-      return String(newValue);
+      return newValue ?? initialValues.get(this)!; // always set in init
     },
     transform: String,
     init(value = "") {
@@ -84,42 +82,37 @@ export function string<T extends HTMLElement>(): Transformer<T, string> {
   });
 }
 
-// behave like <a href> by simply being <a href>
+// behaves like href on <a>
 export function href<T extends HTMLElement>(): Transformer<T, string> {
-  const shadows = new WeakMap<T, HTMLAnchorElement>();
+  const currentValues = new WeakMap<T, string | null>();
   const defaultValues = new WeakMap<T, string>();
   return createTransformer<T, string>({
     parse(newValue) {
-      const shadow = shadows.get(this)!;
+      currentValues.set(this, newValue);
       if (newValue === null) {
-        const defaultValue = defaultValues.get(this);
-        if (defaultValue) {
-          shadow.setAttribute("href", defaultValue);
-        } else {
-          shadow.removeAttribute("href");
-        }
-      } else {
-        shadow.setAttribute("href", String(newValue));
+        return defaultValues.get(this)!;
       }
-      return shadow.href;
+      return newValue;
     },
-    stringify() {
-      return shadows.get(this)?.getAttribute("href") ?? "";
-    },
-    transform(newValue) {
-      // Shadow is undefined for validation of the accessors default value
-      const shadow = shadows.get(this) ?? document.createElement("a");
-      shadow.href = String(newValue);
-      return shadow.href;
-    },
-    init(value) {
-      const shadow = document.createElement("a");
-      shadows.set(this, shadow);
-      if (value) {
-        defaultValues.set(this, value);
-        shadow.href = value;
+    eql(a, b) {
+      if (currentValues.get(this) === null) {
+        return false;
       }
-      return shadow.href;
+      return a === b;
+    },
+    beforeSet(value, _, attributeRemoved) {
+      currentValues.set(this, attributeRemoved ? null : value);
+    },
+    transformGet(value) {
+      if (currentValues.get(this) === null) {
+        return defaultValues.get(this)!;
+      }
+      return new URL(value, window.location.toString()).toString();
+    },
+    init(value = "") {
+      currentValues.set(this, null);
+      defaultValues.set(this, value);
+      return value;
     },
   });
 }
