@@ -88,7 +88,6 @@ export function href<T extends HTMLElement>(): Transformer<T, string> {
   const defaultValues = new WeakMap<T, string>();
   return createTransformer<T, string>({
     parse(newValue) {
-      currentValues.set(this, newValue);
       if (newValue === null) {
         return defaultValues.get(this)!;
       }
