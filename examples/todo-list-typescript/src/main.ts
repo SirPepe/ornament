@@ -58,16 +58,10 @@ const capture = <T extends object, U extends HTMLElement, E extends Event>(
   eventName: string,
   selector = "*",
 ) =>
-  subscribe<T, U, E>(
-    function (this: U) {
-      return shadowRoots.get(this) ?? fail();
-    },
-    eventName,
-    {
-      predicate: (evt) =>
-        evt.target instanceof HTMLElement && evt.target.matches(selector),
-    },
-  );
+  subscribe<T, U, E>((el: U) => shadowRoots.get(el) ?? fail(), eventName, {
+    predicate: (evt: Event) =>
+      evt.target instanceof HTMLElement && evt.target.matches(selector),
+  });
 
 // We need a whole lot of new events for this application, and they will all
 // have to bubble and be composed. So...

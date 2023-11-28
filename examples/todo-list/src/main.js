@@ -48,15 +48,11 @@ class BaseComponent extends HTMLElement {
 // event delegation in shadow roots. To make this palatable, the following
 // simple decorator is built around @subscribe().
 const handle = (eventName, selector = "*") =>
-  subscribe(
-    function () {
-      // this works because all shadow roots in this project are open, see base
-      // class.
-      return this.shadowRoot;
-    },
-    eventName,
-    { predicate: (evt) => evt.target.matches(selector) },
-  );
+  // this works because all shadow roots in this project are open, see base
+  // class.
+  subscribe((el) => el.shadowRoot, eventName, {
+    predicate: (evt) => evt.target.matches(selector),
+  });
 
 // We need a whole lot of events for this application, so we better build a
 // small factory to save on boilerplate!
