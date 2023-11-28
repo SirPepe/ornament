@@ -153,7 +153,7 @@ type ReactiveOptions<T> = {
   initial?: boolean;
   keys?: (string | symbol)[];
   excludeKeys?: (string | symbol)[];
-  predicate?: (this: T) => boolean;
+  predicate?: (instance: T) => boolean;
 };
 
 type ReactiveDecorator<T extends HTMLElement> = (
@@ -175,7 +175,7 @@ export function reactive<T extends HTMLElement>(
         // required and wraps it in predicate logic.
         if (
           options.initial !== false &&
-          (!options.predicate || options.predicate.call(this))
+          (!options.predicate || options.predicate(this))
         ) {
           (window[METADATA_KEY].debouncedMethods.get(value) ?? value).call(
             this,
@@ -186,7 +186,7 @@ export function reactive<T extends HTMLElement>(
         // triggering reactive methods.
         listen(this, "prop", (name) => {
           if (
-            (!options.predicate || options.predicate.call(this)) &&
+            (!options.predicate || options.predicate(this)) &&
             (!options.keys || options.keys?.includes(name)) &&
             (!options.excludeKeys ||
               options.excludeKeys?.includes(name) === false)
@@ -199,7 +199,7 @@ export function reactive<T extends HTMLElement>(
   };
 }
 
-type SubscribePredicate<T, V> = (this: T, value: V) => boolean;
+type SubscribePredicate<T, V> = (instance: T, value: V) => boolean;
 
 type EventSubscribeOptions<T, V> = AddEventListenerOptions & {
   predicate?: SubscribePredicate<T, V>;
@@ -234,7 +234,7 @@ function createEventSubscriberInitializer<
   return function (this: T) {
     listen(this, "init", () => {
       const callback = (evt: any) => {
-        if (!options.predicate || options.predicate.call(this, evt)) {
+        if (!options.predicate || options.predicate(this, evt)) {
           context.access.get(this).call(this, evt);
         }
       };
@@ -289,7 +289,7 @@ function createSignalSubscriberInitializer<
     listen(this, "init", () => {
       const value = context.access.get(this);
       const unsubscribe = target.subscribe(() => {
-        if (!options.predicate || options.predicate.call(this, target.value)) {
+        if (!options.predicate || options.predicate(this, target.value)) {
           value.call(this, target);
         }
       });

@@ -799,9 +799,7 @@ describe("Decorators", () => {
         @prop(number()) accessor value = 0;
         @reactive({
           initial: false,
-          predicate() {
-            return this.value % 2 === 0;
-          },
+          predicate: (instance) => instance.value % 2 === 0,
         })
         test() {
           fn(this.value);
@@ -817,6 +815,40 @@ describe("Decorators", () => {
       expect(fn.callCount).to.equal(1);
       expect(fn.getCalls()[0].args).to.eql([2]);
       el.value++;
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[0].args).to.eql([2]);
+      expect(fn.getCalls()[1].args).to.eql([4]);
+    });
+
+    test("static class member as a predicate (for accessing a private field)", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(number()) accessor #value = 0;
+        static triggerReactive(instance: Test): boolean {
+          return instance.#value % 2 === 0;
+        }
+        @reactive({
+          initial: false,
+          predicate: (instance) => Test.triggerReactive(instance),
+        })
+        test() {
+          fn(this.#value);
+        }
+        update() {
+          this.#value++;
+        }
+      }
+      const el = new Test();
+      el.update();
+      expect(fn.callCount).to.equal(0);
+      el.update();
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([2]);
+      el.update();
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([2]);
+      el.update();
       expect(fn.callCount).to.equal(2);
       expect(fn.getCalls()[0].args).to.eql([2]);
       expect(fn.getCalls()[1].args).to.eql([4]);
@@ -931,9 +963,9 @@ describe("Decorators", () => {
         value = false;
         @prop(string()) accessor x = "A";
         @reactive({
-          predicate() {
-            const result = this.value;
-            this.value = true;
+          predicate(instance) {
+            const result = instance.value;
+            instance.value = true;
             return result;
           },
         })
@@ -1020,7 +1052,7 @@ describe("Decorators", () => {
         const counter = signal(0);
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(counter, { predicate: (v) => v % 2 === 0 })
+          @subscribe(counter, { predicate: (_, v) => v % 2 === 0 })
           test() {
             fn(this, counter.value);
           }
@@ -1183,7 +1215,7 @@ describe("Decorators", () => {
         }
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(target, "test", { predicate: (evt) => evt.value })
+          @subscribe(target, "test", { predicate: (_, evt) => evt.value })
           test(event: TestEvent) {
             fn(this, event.value);
           }

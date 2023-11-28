@@ -591,14 +591,17 @@ true:
 
 1. `options.keys` must either have been omitted or must contain the IDL or
    content attribute name that changed
-2. `options.predicate` must either have been omitted or must return true when
+2. `options.excludeKeys` must either have been omitted or must not contain the
+   IDL or content attribute name that changed
+3. `options.predicate` must either have been omitted or must return true when
    called immediately before the function is scheduled to run
 
 #### Options for `@reactive()`
 
 - **`initial` (boolean, optional)**: Whether or not to run the function when the element's constructor finishes, before any actual changes to any decorated accessor. Defaults to `true`
 - **`keys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) to monitor. Can include private names and symbols. Defaults to monitoring all content and IDL attributes defined by `@prop()` or `@attr()`.
-- **`predicate` (Function `(this: T) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change
+- **`excludeKeys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) not to monitor. Can include private names and symbols. Defaults to an empty array.
+- **`predicate` (Function `(instance: T) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change
 
 ### `@connected()`
 
@@ -847,7 +850,7 @@ instance.
 - **`targetOrTargetFactory` (EventTarget | (instance: T) => EventTarget)**: The event target (or event-target-returning function) to subscribe to
 - **`eventNames` (string)**: The event(s) to listen to. To subscribe to multiple events, pass a single string with the event names separated by whitespace
 - **`options` (object, optional)**: Event handling options, consisting of...
-  - **predicate (function `(this: T, event: Event) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the event object and must return a boolean
+  - **predicate (function `(instance: T, event: Event) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the element instance and the event object, and must return a boolean
   - **capture (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
   - **once (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
   - **passive (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
@@ -896,7 +899,7 @@ to throw events around.
 
 - **`signal` (Signal)**: The signal to subscribe to
 - **`options` (object, optional)**: Update handling options, consisting of...
-  - **predicate (function `(this: T, value) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given signal update. Gets passed the signal's value and must return a boolean
+  - **predicate (function `(instance: T, value) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given signal update. Gets passed the element instance and the signal's value, and must return a boolean
 
 ### `@debounce(options?)`
 

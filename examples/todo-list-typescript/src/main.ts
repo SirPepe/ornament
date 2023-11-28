@@ -59,7 +59,7 @@ const capture = <T extends object, U extends HTMLElement, E extends Event>(
   selector = "*",
 ) =>
   subscribe<T, U, E>((el: U) => shadowRoots.get(el) ?? fail(), eventName, {
-    predicate: (evt: Event) =>
+    predicate: (_: unknown, evt: Event) =>
       evt.target instanceof HTMLElement && evt.target.matches(selector),
   });
 

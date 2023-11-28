@@ -51,7 +51,7 @@ const handle = (eventName, selector = "*") =>
   // this works because all shadow roots in this project are open, see base
   // class.
   subscribe((el) => el.shadowRoot, eventName, {
-    predicate: (evt) => evt.target.matches(selector),
+    predicate: (_, evt) => evt.target.matches(selector),
   });
 
 // We need a whole lot of events for this application, so we better build a
