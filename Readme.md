@@ -1449,7 +1449,7 @@ in case.
 | `connected`        | `connectedCallback()` fired               | OrnamentEvent<"connected">        | `[]`                                                                 |
 | `disconnected`     | `disconnectedCallback()` fired            | OrnamentEvent<"disconnected">     | `[]`                                                                 |
 | `adopted`          | `adoptedCallback()` fired                 | OrnamentEvent<"adopted">          | `[]`                                                                 |
-| `prop`             | IDL attribute change (`@prop` or `@attr`) | OrnamentEvent<"prop">             | `[Name: string \| symbol]`                                           |
+| `prop`             | IDL attribute change (`@prop` or `@attr`) | OrnamentEvent<"prop">             | `[Name: string \| symbol, NewValue: any]`                            |
 | `attr`             | Content attribute change (`@attr`)        | OrnamentEvent<"attr">             | `[Name: string, OldValue: string \| null, NewValue: string \| null]` |
 | `formAssociated`   | `formAssociatedCallback()` fired          | OrnamentEvent<"formAssociated">   | `[Owner: HTMLFormElement \| null]                                    |
 | `formReset`        | `formResetCallback()` fired               | OrnamentEvent<"formReset">        | `[]`                                                                 |
@@ -1459,18 +1459,23 @@ in case.
 **Note for TypeScript:** you can declare additions to the global interface
 `OrnamentEventMap` to extend this list with your own events.
 
-### `trigger(instance, name, payload)`
+### `trigger(instance, name, ...payload)`
 
-Dispatches an event on the event bus for the component `instance`. `payload`
-must be a record with all the data that must be attached to the event before its
-fired (eg. `{ name: string | symbol }` for `prop`).
+Dispatches an event on the event bus for the component `instance`. The arguments
+`payload` must be all the for the `args` property on the event object on the
+event object (eg. a single boolean for for `formDisabled`).
 
 ```javascript
 import { trigger } from "@sirpepe/ornament";
 
 // Dispatches an "connected" event. This will run all methods on "someElement"
 // that were decorated with @connect().
-trigger(someElement, "connected", {});
+trigger(someElement, "connected"); // note no args
+
+// Dispatches an "prop" event. This will run all methods on "someElement"
+// that were decorated with @reactive(), provided the "foo" key is not excluded
+// in the setup of the @reactive decorator
+trigger(someElement, "prop", "foo", 42); // note args for prop name and value
 ```
 
 ### `listen(instance, name, callback, options?)`
@@ -1485,7 +1490,8 @@ import { listen } from "@sirpepe/ornament";
 
 // Listen for "prop" event on the event bus for "someElement"
 listen(someElement, "prop", (evt) => {
-  window.alert(`IDL attribute ${evt.name} was changed!`);
+  const [ name, value ] = event.args;
+  window.alert(`IDL attribute ${name} was changed to ${value}!`);
 });
 ```
 
@@ -1535,6 +1541,7 @@ The order of the decorators im important here: `@reactive()` *must* be applied
 to a method decorated with `@debounce()` for everything to work properly. The
 initial method call of a `reactive()` method is not debounced and will keep
 happening once the element's constructor runs to completion.
+</details>
 
 ### Rendering shadow DOM
 
@@ -1550,7 +1557,9 @@ import { define, prop, reactive, debounce int } from "@sirpepe/ornament";
 export class CounterElement extends HTMLElement {
   @prop(int()) accessor value = 0;
 
-  @reactive() @debounce() #render() {
+  @reactive()
+  @debounce()
+  #render() {
     render(
       this.shadowRoot ?? this.attachShadow({ mode: "open" }),
       html`
@@ -1618,6 +1627,7 @@ class Test extends HTMLElement {
     console.log("Custom logic!");
     return this.#secret; // accesses the getter decorated with @attr()
   }
+
   set foo(value) {
     console.log("Custom logic!");
     this.#secret = value; // accesses the setter decorated with @attr()
@@ -1676,8 +1686,8 @@ class Test extends HTMLElement {
 ```
 
 Decorators like `@subscribe` run when the class definition initializes, and at
-that point, no class instances (and therefore no shadow DOM to subscribe to)
-exist. We must therefore provide a function that can return the event target on
+that point, no class instances (and no shadow DOM to subscribe to) exist. We
+must therefore provide a function that can return the event target on
 initialization. To make this less of an eyesore, it makes sense to create a
 custom decorator for event delegation based on `@subscribe`:
 
@@ -1705,9 +1715,9 @@ class Test extends HTMLElement {
 ```
 
 Note that the function that `@subscribe` takes to access event targets can *not*
-access a classes private fields. The shadow root has therefore to be publicly
-accessible (unless you want to mess around with WeakMaps storing ShadowRoots
-indexed by element instances or something similar).
+access a classes private fields. The shadow root has to be publicly accessible
+(unless you want to mess around with WeakMaps storing ShadowRoots indexed by
+element instances or something similar).
 
 Also note that not all events bubble, so you might want to use event capturing
 instead:
@@ -1820,3 +1830,30 @@ class Test extends HTMLElement {
   accessor foo = "Hello";
 }
 ```
+
+### Catching initial attribute reactions using the event bus
+
+If you try to catch initial attribute updates in your element's constructor,
+you will be disappointed:
+
+```javascript
+import { define, attr, string, listen } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @attr(string()) accessor foo = "a";
+  constructor() {
+    super();
+    // This looks like it should work, but the callback function will never fire
+    listen(this, "prop", () => console.log(this.foo), { once: true });
+  }
+}
+```
+
+This happens because the *initial* attribute reactions are not actually
+dispatched via the event bus. Reactive callbacks are instead listening for the
+`init` event, which in turn is dispatched once the classes' constructors have
+run to completion. This enables you to set up your elements state in the
+constructor without worrying about causing reactive callbacks to run. The
+downside is the minor inconsistency that not *all* attribute reactions can be
+caught with the `prop` event. You can use the `init` event instead.

@@ -402,7 +402,7 @@ export function attr<T extends HTMLElement, V>(
     if (typeof context.name === "symbol" || context.private) {
       if (typeof options.as === "undefined") {
         throw new TypeError(
-          "Attribute names for @attr() must not be symbols. Provide the `as` option and a public facade for your accessor or use a regular property name.",
+          "Content attribute names must not be symbols or private fields. Provide the `as` option and a public facade for your accessor or use a regular property name.",
         );
       }
       contentAttrName = idlAttrName = options.as;
@@ -411,52 +411,55 @@ export function attr<T extends HTMLElement, V>(
       idlAttrName = context.name;
     }
 
-    // If the attribute needs to be observed, add the name to the set of all
-    // observed attributes.
-    if (options.reflective !== false) {
-      window[METADATA_KEY].observableAttributes.add(contentAttrName);
-    }
+    // Add the name to the set of all observed attributes, even if "reflective"
+    // if false. The content attribute must in all cases be observed to enable
+    // the message bus to emit events.
+    window[METADATA_KEY].observableAttributes.add(contentAttrName);
 
     // If the attribute needs to be observed and the accessor initializes,
     // register the attribute handler callback with the current element
     // instance - this initializer is earliest we have access to the instance.
-    if (options.reflective !== false) {
-      context.addInitializer(function () {
-        listen(
-          this,
-          "attr",
-          function (
-            this: T,
-            name: string,
-            oldValue: string | null,
-            newValue: string | null,
-          ): void {
-            if (name !== contentAttrName || newValue === oldValue) {
-              return; // skip irrelevant invocations
-            }
-            if (skipNextReaction.get(this)) {
-              skipNextReaction.set(this, false);
-              return; // skip attribute reaction caused by a setter
-            }
-            const currentNewValue = transformer.parse.call(this, newValue);
-            if (
-              currentNewValue === NO_VALUE ||
-              transformer.eql.call(this, currentNewValue, target.get.call(this))
-            ) {
-              return; // skip no-ops
-            }
-            transformer.beforeSet.call(
-              this,
-              currentNewValue,
-              context,
-              newValue === null,
-            );
-            target.set.call(this, currentNewValue);
-            trigger(this, "prop", context.name);
-          },
-        );
-      });
-    }
+    context.addInitializer(function () {
+      listen(
+        this,
+        "attr",
+        function (
+          this: T,
+          name: string,
+          oldValue: string | null,
+          newValue: string | null,
+        ): void {
+          // Skip obviously irrelevant invocations
+          if (name !== contentAttrName || oldValue === newValue) {
+            return;
+          }
+          // Skip attribute reactions caused by setter invocations.
+          if (skipNextReaction.get(this)) {
+            skipNextReaction.set(this, false);
+            return;
+          }
+          // Actually parse the input value
+          const currentNewValue = transformer.parse.call(this, newValue);
+          // Skip no-ops and updates by non-reflective attributes
+          if (
+            options.reflective === false ||
+            currentNewValue === NO_VALUE ||
+            transformer.eql.call(this, currentNewValue, target.get.call(this))
+          ) {
+            return;
+          }
+          // Actually perform the update
+          transformer.beforeSet.call(
+            this,
+            currentNewValue,
+            context,
+            newValue === null,
+          );
+          target.set.call(this, currentNewValue);
+          trigger(this, "prop", context.name, currentNewValue);
+        },
+      );
+    });
 
     return {
       init(input) {
@@ -480,6 +483,7 @@ export function attr<T extends HTMLElement, V>(
         // attribute does not exist or its value can't be parsed, fall back to
         // the default value from the initialization step.
         if (this.hasAttribute(contentAttrName)) {
+          // Having a content attribute
           const attrValue = transformer.parse.call(
             this,
             this.getAttribute(contentAttrName),
@@ -516,7 +520,7 @@ export function attr<T extends HTMLElement, V>(
             );
           }
         }
-        trigger(this, "prop", context.name);
+        trigger(this, "prop", context.name, newValue);
       },
       get() {
         return transformer.transformGet.call(this, target.get.call(this));
@@ -544,12 +548,14 @@ export function prop<T extends HTMLElement, V>(
       set(input) {
         transformer.validate.call(this, input, false);
         const newValue = transformer.transform.call(this, input);
+        // skip no-ops
         if (transformer.eql.call(this, newValue, target.get.call(this))) {
-          return; // skip no-ops
+          return;
         }
+        // actually set the value
         transformer.beforeSet.call(this, newValue, context, false);
         target.set.call(this, newValue);
-        trigger(this, "prop", context.name);
+        trigger(this, "prop", context.name, newValue);
       },
       get() {
         return transformer.transformGet.call(this, target.get.call(this));

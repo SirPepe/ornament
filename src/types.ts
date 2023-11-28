@@ -6,7 +6,7 @@ declare global {
     connected: [];
     disconnected: [];
     adopted: [];
-    prop: [name: string | symbol];
+    prop: [name: string | symbol, newValue: any];
     attr: [name: string, oldValue: string | null, newValue: string | null];
     formAssociated: [owner: HTMLFormElement | null];
     formReset: [];
