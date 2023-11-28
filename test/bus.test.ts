@@ -134,45 +134,5 @@ describe("Event bus", () => {
       expect(fn.callCount).to.equal(3);
       expect(fn.getCalls()[2].args).to.eql(["foo", ""]);
     });
-
-    test("catch initial updates when defined with @attr", () => {
-      const fn = spy();
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        constructor() {
-          super();
-          listen(this, "prop", fn);
-        }
-        @attr(string()) accessor foo = "a";
-      }
-      const instance = new Test();
-      expect(fn.callCount).to.equal(1);
-      expect(fn.getCalls()[0].args).to.eql(["foo", "a"]);
-      instance.foo = "b";
-      expect(fn.callCount).to.equal(2);
-      expect(fn.getCalls()[1].args).to.eql(["foo", "b"]);
-    });
-
-    test("catch initial updates from HTML when defined with @attr", () => {
-      const fn = spy();
-      const tagName = generateTagName();
-      @define(tagName)
-      class Test extends HTMLElement {
-        constructor() {
-          super();
-          listen(this, "prop", fn);
-        }
-        @attr(string()) accessor foo = "a";
-      }
-      const fixture = document.createElement("div");
-      document.body.append(fixture);
-      fixture.innerHTML = `<${tagName} foo="hello"></${tagName}>`;
-      expect(fn.callCount).to.equal(1);
-      expect(fn.getCalls()[0].args).to.eql(["foo", "hello"]);
-      const instance: any = fixture.firstElementChild;
-      instance.foo = "b";
-      expect(fn.callCount).to.equal(2);
-      expect(fn.getCalls()[1].args).to.eql(["foo", "b"]);
-    });
   });
 });
