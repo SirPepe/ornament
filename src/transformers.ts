@@ -308,9 +308,12 @@ export function json<T extends HTMLElement>(
     stringify(value) {
       return stringifyJSONAttribute(value, options.replacer);
     },
-    init(value) {
-      // Verify that the initial value stringifies
-      stringifyJSONAttribute(value, options.replacer);
+    init(value, _, isContentAttribute) {
+      // Verify that the initial value stringifies, if stringification may
+      // become important
+      if (isContentAttribute) {
+        stringifyJSONAttribute(value, options.replacer);
+      }
       initialValues.set(this, value);
       return value;
     },

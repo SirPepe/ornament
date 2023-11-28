@@ -699,6 +699,15 @@ describe("Transformers", () => {
       }).to.throw(Error);
     });
 
+    test("content attribute throws for invalid initial json", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(json())
+        accessor foo = { test: 1n };
+      }
+      expect(() => new Test()).to.throw(Error);
+    });
+
     test("IDL attribute accepts invalid json", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -709,6 +718,15 @@ describe("Transformers", () => {
       expect(el.foo).to.equal(null);
       el.foo = { test: 1n };
       expect(el.foo).to.eql({ test: 1n });
+    });
+
+    test("IDL attribute accepts invalid initial json", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(json())
+        accessor foo = { test: 1n };
+      }
+      new Test();
     });
   });
 
