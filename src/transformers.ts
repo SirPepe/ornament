@@ -300,10 +300,12 @@ export function json<T extends HTMLElement>(
       }
     },
     validate(value, isContentAttribute) {
-      if (!isContentAttribute) {
-        return true;
+      // Verify that the initial value stringifies, if stringification may
+      // become important
+      if (isContentAttribute) {
+        stringifyJSONAttribute(value, options.replacer);
       }
-      stringifyJSONAttribute(value, options.replacer);
+      return true;
     },
     stringify(value) {
       return stringifyJSONAttribute(value, options.replacer);
@@ -319,61 +321,6 @@ export function json<T extends HTMLElement>(
     },
   });
 }
-
-/*
-type SchemaLike<V> = {
-  parse(data: unknown): V;
-  safeParse(
-    data: unknown,
-  ): { success: true; data: V } | { success: false; error: any };
-};
-
-type SchemaOptions = {
-  reviver?: Parameters<typeof JSON.parse>[1];
-  replacer?: Parameters<typeof JSON.stringify>[1];
-};
-
-export function schema<T extends HTMLElement, V>(
-  schema: SchemaLike<V>,
-  options: SchemaOptions = EMPTY_OBJ,
-): Transformer<T, V> {
-  if (typeof schema !== "object") {
-    throw new TypeError("First argument of the schema transformer is required");
-  }
-  const initialValues = new WeakMap<T, V>();
-  return createTransformer<T, V>({
-    parse(newValue) {
-      if (newValue === null) {
-        return initialValues.get(this) as V;
-      }
-      try {
-        const raw = JSON.parse(newValue, options.reviver);
-        return schema.parse(raw);
-      } catch {
-        return NO_VALUE;
-      }
-    },
-    validate(value, isContentAttribute) {
-      const parsed = schema.parse(value);
-      if (!isContentAttribute) {
-        return true;
-      }
-      // Verify that the parsed value stringifies for attribute use
-      stringifyJSONAttribute(parsed, options.replacer);
-    },
-    stringify(value) {
-      return stringifyJSONAttribute(value, options.replacer);
-    },
-    init(value) {
-      value = schema.parse(value);
-      // Verify that the default stringifies
-      stringifyJSONAttribute(value, options.replacer);
-      initialValues.set(this, value);
-      return value;
-    },
-  });
-}
-*/
 
 type LiteralOptions<T extends HTMLElement, V> = {
   values: V[];
