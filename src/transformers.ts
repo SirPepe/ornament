@@ -495,11 +495,6 @@ export function event<
       }
       return null;
     },
-    // This function should never be called, as updating event handler IDL
-    // attributes does not change the content attribute value
-    stringify() {
-      throw new Error();
-    },
     init(value, context) {
       if (
         context.private ||
@@ -529,6 +524,9 @@ export function event<
       functions.set(this, value); // change the actual event handler
       return value;
     },
+    // stringify() will never be called, as updating event handler IDL
+    // attributes does not change the content attribute value... so we just
+    // don't define it
     updateContentAttr: () => false,
   });
 }

@@ -324,7 +324,7 @@ export function subscribe<T extends HTMLElement>(
       (typeof target === "function" || target instanceof EventTarget) &&
       typeof eventsOrOptions === "string"
     ) {
-      context.addInitializer(
+      return context.addInitializer(
         createEventSubscriberInitializer(
           context,
           target,
@@ -332,17 +332,15 @@ export function subscribe<T extends HTMLElement>(
           options,
         ),
       );
-      return;
     }
     if (
       isSignalLike(target) &&
       (typeof eventsOrOptions === "object" ||
         typeof eventsOrOptions === "undefined")
     ) {
-      context.addInitializer(
+      return context.addInitializer(
         createSignalSubscriberInitializer(context, target, eventsOrOptions),
       );
-      return;
     }
     throw new Error("Invalid arguments to @subscribe");
   };
@@ -387,6 +385,7 @@ export function attr<T extends HTMLElement, V>(
   transformer: Transformer<T, V>,
   options: AttrOptions = EMPTY_OBJ,
 ): ClassAccessorDecorator<T, V> {
+  const reflective = options.reflective ?? true;
   // Enables early exits from the attributeChangedCallback for content attribute
   // updates that were caused by invoking IDL setters.
   const skipNextReaction = new WeakMap<HTMLElement, boolean>();
@@ -426,23 +425,22 @@ export function attr<T extends HTMLElement, V>(
         function (
           this: T,
           name: string,
-          oldValue: string | null,
+          _: string | null,
           newValue: string | null,
-        ): void {
+        ): unknown {
           // Skip obviously irrelevant invocations
-          if (name !== contentAttrName || oldValue === newValue) {
+          if (name !== contentAttrName) {
             return;
           }
           // Skip attribute reactions caused by setter invocations.
           if (skipNextReaction.get(this)) {
-            skipNextReaction.set(this, false);
-            return;
+            return skipNextReaction.set(this, false);
           }
           // Actually parse the input value
           const currentNewValue = transformer.parse.call(this, newValue);
           // Skip no-ops and updates by non-reflective attributes
           if (
-            options.reflective === false ||
+            !reflective ||
             currentNewValue === NO_VALUE ||
             transformer.eql.call(this, currentNewValue, target.get.call(this))
           ) {
@@ -504,7 +502,7 @@ export function attr<T extends HTMLElement, V>(
         }
         transformer.beforeSet.call(this, newValue, context, false);
         target.set.call(this, newValue);
-        if (options.reflective !== false) {
+        if (reflective) {
           const updateAttr = transformer.updateContentAttr(oldValue, newValue);
           // If an attribute update is about to happen, the next
           // attributeChangedCallback must be skipped to prevent double calls of
