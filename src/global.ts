@@ -1,5 +1,5 @@
-// In some bundler happens to include Ornament more than once, we need to make
-// sure that the metadata stores are globally unique.
+// If some bundler or HMR process happens to include Ornament more than once, we
+// need to make sure that the metadata stores are globally unique.
 
 import { EMPTY_OBJ } from "./lib.js";
 import type { Method } from "./types.js";
@@ -18,7 +18,7 @@ type OrnamentMetadata = {
   // are actually observed by a given element.
   observableAttributes: Set<string>;
   // Maps debounced methods to original methods. Needed for initial calls of
-  // @reactive() methods, which are not supposed to be async.
+  // @reactive() methods, as the initial calls are not supposed to be async.
   debouncedMethods: WeakMap<Method<any, any>, Method<any, any>>;
   // Unsubscribe from event targets or symbols when a method that @subscribe was
   // applied to gets GC's
