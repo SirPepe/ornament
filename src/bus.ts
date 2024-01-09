@@ -1,4 +1,8 @@
-import { METADATA_KEY } from "./global";
+// Trigger and listener functions simply slap event targets onto the instances
+// as needed, because some event bus functionality is required even before the
+// instances have initialized completely.
+
+import { BUS_TARGET } from "./lib";
 
 export class OrnamentEvent<K extends keyof OrnamentEventMap> extends Event {
   readonly args: OrnamentEventMap[K];
@@ -12,10 +16,7 @@ export function trigger<
   T extends HTMLElement,
   K extends keyof OrnamentEventMap,
 >(instance: T, name: K, ...args: OrnamentEventMap[K]): void {
-  let target = window[METADATA_KEY].targetMap.get(instance);
-  if (!target) {
-    window[METADATA_KEY].targetMap.set(instance, (target = new EventTarget()));
-  }
+  const target = ((instance as any)[BUS_TARGET] ??= new EventTarget());
   target.dispatchEvent(new OrnamentEvent(name, args));
 }
 
@@ -25,10 +26,7 @@ export function listen<T extends HTMLElement, K extends keyof OrnamentEventMap>(
   callback: (this: T, ...args: OrnamentEventMap[K]) => void,
   options?: AddEventListenerOptions,
 ): void {
-  let target = window[METADATA_KEY].targetMap.get(instance);
-  if (!target) {
-    window[METADATA_KEY].targetMap.set(instance, (target = new EventTarget()));
-  }
+  const target = ((instance as any)[BUS_TARGET] ??= new EventTarget());
   target.addEventListener(
     name,
     (evt: any): void => callback.call(instance, ...evt.args),

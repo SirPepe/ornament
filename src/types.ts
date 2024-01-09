@@ -128,17 +128,16 @@ export function assertType<K extends keyof Types>(
   ...types: K[]
 ): asserts value is Types[K] {
   if (
-    types.some(
+    !types.some(
       (type) =>
         (value === null && type === "null") ||
         (value !== null && typeof value === type),
     )
   ) {
-    return;
+    throw new TypeError(
+      `Expected "${name}" to be "${types.join("/")}" but got ${typeof value}`,
+    );
   }
-  throw new TypeError(
-    `Expected "${name}" to be "${types.join("/")}" but got ${typeof value}`,
-  );
 }
 
 export function assertTransformer<T extends HTMLElement, V>(

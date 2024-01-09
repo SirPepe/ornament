@@ -1,5 +1,4 @@
 import { listen, trigger } from "./bus.js";
-import { METADATA_KEY } from "./global.js";
 import { EMPTY_OBJ, NO_VALUE } from "./lib.js";
 import {
   type Transformer,
@@ -9,6 +8,35 @@ import {
   type Method,
   assertContext,
 } from "./types.js";
+
+// If some bundler or HMR process happens to include Ornament more than once, we
+// need to make sure that the metadata stores are globally unique.
+const OBSERVABLE_ATTRS: unique symbol = Symbol.for("OBSERVABLE_ATTRS");
+const DEBOUNCED_METHODS: unique symbol = Symbol.for("DEBOUNCED_METHODS");
+const UNSUBSCRIBE_REGISTRY: unique symbol = Symbol.for("UNSUBSCRIBE_REGISTRY");
+
+declare global {
+  interface Window {
+    // Accessor decorators initialize *after* custom elements access their
+    // observedAttributes getter. This means that, in the absence of the
+    // decorators metadata feature, there is no way to associate observed
+    // attributes with specific elements or constructors from inside the @attr()
+    // decorator. Instead we simply track *all* attributes defined by @attr() on
+    // any class and decide inside the attribute changed callback* whether they
+    // are actually observed by a given element.
+    [OBSERVABLE_ATTRS]: Set<string>;
+    // Maps debounced methods to original methods. Needed for initial calls of
+    // @reactive() methods, as the initial calls are not supposed to be async.
+    [DEBOUNCED_METHODS]: WeakMap<Method<any, any>, Method<any, any>>;
+    // Unsubscribe from event targets or signals when a method that @subscribe
+    // was applied to gets GC'd
+    [UNSUBSCRIBE_REGISTRY]: FinalizationRegistry<() => void>;
+  }
+}
+
+window[OBSERVABLE_ATTRS] ??= new Set();
+window[DEBOUNCED_METHODS] ??= new WeakMap();
+window[UNSUBSCRIBE_REGISTRY] ??= new FinalizationRegistry((f) => f());
 
 // Un-clobber an accessor's name if the element upgrades after a property with
 // a matching name has already been set.
@@ -45,16 +73,21 @@ export function enhance<T extends CustomElementConstructor>(): (
     // only affects lifecycle callbacks, which are not really "public" anyway.
     // See https://github.com/microsoft/TypeScript/issues/51347
     return class extends target {
+      // Instances will end up with an field [BUS_TARGET] containing the event
+      // target for the event bus. But because these targets may be needed
+      // before the instances finish initializing (or they may be never needed),
+      // the event bus function just slap them on instances if an when they
+      // become important. And because TypeScript can't do anything with the
+      // mixin class type, there is no real reason to have anything related to
+      // the event targets here... apart from this comment.
+
       constructor(...args: any[]) {
         super(...args);
         trigger(this, "init");
       }
 
       static get observedAttributes(): string[] {
-        return [
-          ...originalObservedAttributes,
-          ...window[METADATA_KEY].observableAttributes,
-        ];
+        return [...originalObservedAttributes, ...window[OBSERVABLE_ATTRS]];
       }
 
       connectedCallback(): void {
@@ -177,9 +210,7 @@ export function reactive<T extends HTMLElement>(
           options.initial !== false &&
           (!options.predicate || options.predicate(this))
         ) {
-          (window[METADATA_KEY].debouncedMethods.get(value) ?? value).call(
-            this,
-          );
+          (window[DEBOUNCED_METHODS].get(value) ?? value).call(this);
         }
         // Start listening only once the element's constructor has run to
         // completion. This prevents prop set-up in the constructor from
@@ -243,9 +274,9 @@ function createEventSubscriberInitializer<
           ? targetOrTargetFactory(this)
           : targetOrTargetFactory;
       for (const eventName of eventNames.trim().split(/\s+/)) {
-        const unsubscribe = () =>
-          eventTarget.removeEventListener(eventName, callback);
-        window[METADATA_KEY].unsubscribeRegistry.register(this, unsubscribe);
+        window[UNSUBSCRIBE_REGISTRY].register(this, () =>
+          eventTarget.removeEventListener(eventName, callback),
+        );
         eventTarget.addEventListener(eventName, callback);
       }
     });
@@ -293,7 +324,7 @@ function createSignalSubscriberInitializer<
           value.call(this, target);
         }
       });
-      window[METADATA_KEY].unsubscribeRegistry.register(this, unsubscribe);
+      window[UNSUBSCRIBE_REGISTRY].register(this, unsubscribe);
     });
   };
 }
@@ -413,7 +444,7 @@ export function attr<T extends HTMLElement, V>(
     // Add the name to the set of all observed attributes, even if "reflective"
     // if false. The content attribute must in all cases be observed to enable
     // the message bus to emit events.
-    window[METADATA_KEY].observableAttributes.add(contentAttrName);
+    window[OBSERVABLE_ATTRS].add(contentAttrName);
 
     // If the attribute needs to be observed and the accessor initializes,
     // register the attribute handler callback with the current element
@@ -581,7 +612,7 @@ function createDebouncedMethod<T extends object, A extends unknown[]>(
       }),
     );
   }
-  window[METADATA_KEY].debouncedMethods.set(debouncedMethod, originalMethod);
+  window[DEBOUNCED_METHODS].set(debouncedMethod, originalMethod);
   return debouncedMethod;
 }
 
