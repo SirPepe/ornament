@@ -626,12 +626,16 @@ describe("Decorators", () => {
 
   describe("@formDisabled", () => {
     test("fire on fieldset disable", async () => {
-      const fn = spy();
+      const fnDecorated = spy();
+      const fnLifecycleCallback = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         static formAssociated = true;
-        @formDisabled() disable(state: boolean) {
-          fn(this, state);
+        formDisabledCallback(state: boolean): void {
+          fnLifecycleCallback(this, state);
+        }
+        @formDisabled() disable(state: boolean): void {
+          fnDecorated(this, state);
         }
       }
       const instance = new Test();
@@ -640,13 +644,18 @@ describe("Decorators", () => {
       new Document().append(form);
       form.append(fieldset);
       fieldset.append(instance);
-      expect(fn.callCount).to.equal(0);
+      expect(fnDecorated.callCount).to.equal(0);
       fieldset.disabled = true;
-      expect(fn.callCount).to.equal(1);
-      expect(fn.getCalls()[0].args).to.eql([instance, true]);
+      expect(fnDecorated.callCount).to.equal(1);
+      expect(fnDecorated.getCalls()[0].args).to.eql([instance, true]);
       fieldset.disabled = false;
-      expect(fn.callCount).to.equal(2);
-      expect(fn.getCalls()[1].args).to.eql([instance, false]);
+      expect(fnDecorated.callCount).to.equal(2);
+      expect(fnDecorated.getCalls()[1].args).to.eql([instance, false]);
+      // Ensure the base lifecycle callback gets called properly
+      expect(fnDecorated.callCount).to.equal(fnLifecycleCallback.callCount);
+      expect(fnDecorated.getCalls().map(({ args }) => args)).to.eql(
+        fnLifecycleCallback.getCalls().map(({ args }) => args),
+      );
     });
   });
 

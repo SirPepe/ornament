@@ -148,7 +148,7 @@ export function enhance<T extends CustomElementConstructor>(): (
       formDisabledCallback(disabled: boolean): void {
         // eslint-disable-next-line
         // @ts-ignore
-        super.formStateRestoreCallback?.call(this);
+        super.formDisabledCallback?.call(this, disabled);
         trigger(this, "formDisabled", disabled);
       }
 
