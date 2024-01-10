@@ -615,8 +615,7 @@ describe("Decorators", () => {
     });
   });
 
-  // Note: not supported in Chrome as of Nov 13 2023
-  describe.skip("@formReset", () => {
+  describe("@formReset", () => {
     test("fire on form reset", async () => {
       const fn = spy();
       @define(generateTagName())
@@ -628,12 +627,13 @@ describe("Decorators", () => {
       }
       const instance = new Test();
       const form = document.createElement("form");
-      new Document().append(form);
+      document.body.append(form);
       form.append(instance);
       form.reset();
-      await wait(); // The disable algorithm is async
+      await wait(); // The reset algorithm is async
       expect(fn.callCount).to.equal(1);
       expect(fn.getCalls()[0].args).to.eql([instance]);
+      document.body.removeChild(form);
     });
   });
 

@@ -137,7 +137,6 @@ export function enhance<T extends CustomElementConstructor>(): (
         trigger(this, "formAssociated", owner);
       }
 
-      // Note: not supported in Chrome as of Nov 13 2023
       formResetCallback(): void {
         // eslint-disable-next-line
         // @ts-ignore
