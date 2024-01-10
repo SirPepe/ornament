@@ -158,7 +158,7 @@ export function enhance<T extends CustomElementConstructor>(): (
       ): void {
         // eslint-disable-next-line
         // @ts-ignore
-        super.formStateRestoreCallback?.call(this);
+        super.formStateRestoreCallback?.call(this, state, reason);
         trigger(this, "formStateRestore", state, reason);
       }
     };
