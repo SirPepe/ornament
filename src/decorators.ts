@@ -152,11 +152,14 @@ export function enhance<T extends CustomElementConstructor>(): (
         trigger(this, "formDisabled", disabled);
       }
 
-      formStateRestoreCallback(reason: "autocomplete" | "restore"): void {
+      formStateRestoreCallback(
+        state: string | File | FormData | null,
+        reason: "autocomplete" | "restore",
+      ): void {
         // eslint-disable-next-line
         // @ts-ignore
         super.formStateRestoreCallback?.call(this);
-        trigger(this, "formStateRestore", reason);
+        trigger(this, "formStateRestore", state, reason);
       }
     };
   };

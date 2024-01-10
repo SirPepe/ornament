@@ -1,4 +1,4 @@
-import { EMPTY_OBJ, NO_VALUE, isArray } from "./lib.js";
+import { NO_VALUE, isArray } from "./lib.js";
 
 declare global {
   interface OrnamentEventMap {
@@ -11,7 +11,10 @@ declare global {
     formAssociated: [owner: HTMLFormElement | null];
     formReset: [];
     formDisabled: [disabled: boolean];
-    formStateRestore: [reason: "autocomplete" | "restore"];
+    formStateRestore: [
+      state: string | File | FormData | null,
+      reason: "autocomplete" | "restore",
+    ];
   }
 }
 
