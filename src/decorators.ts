@@ -133,7 +133,7 @@ export function enhance<T extends CustomElementConstructor>(): (
       formAssociatedCallback(owner: HTMLFormElement | null): void {
         // eslint-disable-next-line
         // @ts-ignore
-        super.formAssociatedCallback?.call(this);
+        super.formAssociatedCallback?.call(this, owner);
         trigger(this, "formAssociated", owner);
       }
 

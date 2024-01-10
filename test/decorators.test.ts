@@ -582,23 +582,32 @@ describe("Decorators", () => {
 
   describe("@formAssociated", () => {
     test("fire on form association", async () => {
-      const fn = spy();
+      const decoratedSpy = spy();
+      const lifecycleCallbackSpy = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         static formAssociated = true;
-        @formAssociated() associated(owner: HTMLFormElement | null) {
-          fn(this, owner);
+        formAssociatedCallback(owner: HTMLFormElement | null): void {
+          lifecycleCallbackSpy(this, owner);
+        }
+        @formAssociated() associated(owner: HTMLFormElement | null): void {
+          decoratedSpy(this, owner);
         }
       }
       const instance = new Test();
       const form = document.createElement("form");
       new Document().append(form);
       form.append(instance);
-      expect(fn.callCount).to.equal(1);
-      expect(fn.getCalls()[0].args).to.eql([instance, form]);
+      expect(decoratedSpy.callCount).to.equal(1);
+      expect(decoratedSpy.getCalls()[0].args).to.eql([instance, form]);
       instance.remove();
-      expect(fn.callCount).to.equal(2);
-      expect(fn.getCalls()[1].args).to.eql([instance, null]);
+      expect(decoratedSpy.callCount).to.equal(2);
+      expect(decoratedSpy.getCalls()[1].args).to.eql([instance, null]);
+      // Ensure the base lifecycle callback gets called properly
+      expect(decoratedSpy.callCount).to.equal(lifecycleCallbackSpy.callCount);
+      expect(decoratedSpy.getCalls().map(({ args }) => args)).to.eql(
+        lifecycleCallbackSpy.getCalls().map(({ args }) => args),
+      );
     });
   });
 
@@ -626,16 +635,16 @@ describe("Decorators", () => {
 
   describe("@formDisabled", () => {
     test("fire on fieldset disable", async () => {
-      const fnDecorated = spy();
-      const fnLifecycleCallback = spy();
+      const decoratedSpy = spy();
+      const lifecycleCallbackSpy = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         static formAssociated = true;
         formDisabledCallback(state: boolean): void {
-          fnLifecycleCallback(this, state);
+          lifecycleCallbackSpy(this, state);
         }
         @formDisabled() disable(state: boolean): void {
-          fnDecorated(this, state);
+          decoratedSpy(this, state);
         }
       }
       const instance = new Test();
@@ -644,17 +653,17 @@ describe("Decorators", () => {
       new Document().append(form);
       form.append(fieldset);
       fieldset.append(instance);
-      expect(fnDecorated.callCount).to.equal(0);
+      expect(decoratedSpy.callCount).to.equal(0);
       fieldset.disabled = true;
-      expect(fnDecorated.callCount).to.equal(1);
-      expect(fnDecorated.getCalls()[0].args).to.eql([instance, true]);
+      expect(decoratedSpy.callCount).to.equal(1);
+      expect(decoratedSpy.getCalls()[0].args).to.eql([instance, true]);
       fieldset.disabled = false;
-      expect(fnDecorated.callCount).to.equal(2);
-      expect(fnDecorated.getCalls()[1].args).to.eql([instance, false]);
+      expect(decoratedSpy.callCount).to.equal(2);
+      expect(decoratedSpy.getCalls()[1].args).to.eql([instance, false]);
       // Ensure the base lifecycle callback gets called properly
-      expect(fnDecorated.callCount).to.equal(fnLifecycleCallback.callCount);
-      expect(fnDecorated.getCalls().map(({ args }) => args)).to.eql(
-        fnLifecycleCallback.getCalls().map(({ args }) => args),
+      expect(decoratedSpy.callCount).to.equal(lifecycleCallbackSpy.callCount);
+      expect(decoratedSpy.getCalls().map(({ args }) => args)).to.eql(
+        lifecycleCallbackSpy.getCalls().map(({ args }) => args),
       );
     });
   });
