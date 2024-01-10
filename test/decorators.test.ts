@@ -400,7 +400,9 @@ describe("Decorators", () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         // Using timeout because RAF is unreliable in headless browsers
-        @debounce({ fn: debounce.timeout(0) }) test = (x: number) => {
+        @debounce<Test, [number]>({ fn: debounce.timeout(0) }) test = (
+          x: number,
+        ) => {
           fn(x, this);
           return x;
         };
@@ -420,7 +422,9 @@ describe("Decorators", () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         // Using timeout because RAF is unreliable in headless browsers
-        @debounce({ fn: debounce.timeout(0) }) #test = (x: number) => {
+        @debounce<Test, [number]>({ fn: debounce.timeout(0) }) #test = (
+          x: number,
+        ) => {
           fn(x, this);
           return x;
         };
@@ -1293,7 +1297,7 @@ describe("Decorators", () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         // Using timeout because RAF is unreliable in headless browsers
-        @debounce({ fn: debounce.timeout(0) }) #a = () => {};
+        @debounce<Test, []>({ fn: debounce.timeout(0) }) #a = () => {};
         @reactive() #test() {}
       }
       new Test();
