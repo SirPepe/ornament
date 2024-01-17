@@ -332,7 +332,7 @@ function literalOptions<T extends HTMLElement, V>(
 ): LiteralOptions<T, V> {
   assertRecord(input, "options");
   const { values, transform } = input;
-  assertTransformer<T, V>(transform);
+  assertTransformer<T, V>(transform, "transform");
   if (!isArray(values)) {
     throw new TypeError(
       `Expected "values" to be array, got "${typeof values}".`,

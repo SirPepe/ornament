@@ -145,8 +145,9 @@ export function assertType<K extends keyof Types>(
 
 export function assertTransformer<T extends HTMLElement, V>(
   input: unknown,
+  fieldName = "transformer",
 ): asserts input is Transformer<T, V> {
-  assertRecord(input, "transformer");
+  assertRecord(input, fieldName);
   for (const method of [
     "init",
     "parse",
