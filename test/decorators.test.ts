@@ -1182,6 +1182,25 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
+      test("subscribe in capture mode", async () => {
+        const fn = spy();
+        const parent = document.createElement("div");
+        const target = document.createElement("div");
+        parent.append(target);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(parent, "test", { capture: true })
+          test(event: Event) {
+            fn(this, event, event.target);
+          }
+        }
+        const instance = new Test();
+        const event = new Event("test", { bubbles: false });
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
+      });
+
       test("subscribe to events on the shadow dom", async () => {
         const fn = spy();
         const target = document.createElement("div");

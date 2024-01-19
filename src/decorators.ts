@@ -277,9 +277,9 @@ function createEventSubscriberInitializer<
           : targetOrTargetFactory;
       for (const eventName of eventNames.trim().split(/\s+/)) {
         window[UNSUBSCRIBE_REGISTRY].register(this, () =>
-          eventTarget.removeEventListener(eventName, callback),
+          eventTarget.removeEventListener(eventName, callback, options),
         );
-        eventTarget.addEventListener(eventName, callback);
+        eventTarget.addEventListener(eventName, callback, options);
       }
     });
   };
