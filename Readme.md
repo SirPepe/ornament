@@ -5,8 +5,8 @@
   <img alt="" src="./assets/logo.png">
 </picture>
 
-Unopinionated, pareto-optimal micro-library (<= 4k) for building vanilla web
-component infrastructure:
+Unopinionated, pareto-optimal, tiny (<= 4k) anti-framework for building vanilla
+web component infrastructure:
 
 ```javascript
 import { define, attr, string, number, reactive } from "@sirpepe/ornament";
@@ -38,7 +38,7 @@ The code above
   - initial values initialized from HTML (when possible)
   - content attribute change handling (via `setAttribute()` and the like)
   - DOM attribute change handling via a JavaScript getter/setter pair, with type checking/coercion included (`name` is always a string, `age` is always a number >= 0)
-- a `greet()` method that...
+- implements a `greet()` method that...
   - automatically gets called when any of the attributes decorated with `@attr` change
   - automatically gets called when the element instance initializes
 - does not add any abstractions to any native API at all
@@ -142,16 +142,16 @@ class MyGreeter extends HTMLElement {
 window.customElements.define("my-greeter", MyGreeter);
 ```
 
-Ornament aims to make the most tedious bits of building vanilla web components
-(attribute handling and lifecycle reactions) easy by adding some primitives that
-really *should* be part of the standard, but aren't.
+Ornament aims to make *only the most tedious bits* of building vanilla web
+components (attribute handling and lifecycle reactions) easy by adding some
+primitives that really should be part of the standard, but aren't.
 
 ## Guide
 
 ### Installation
 
 Install [@sirpepe/ornament](https://www.npmjs.com/package/@sirpepe/ornament)
-with your favorite package manager. To get the decorator syntax working in 2023,
+with your favorite package manager. To get the decorator syntax working in 2024,
 you will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
 (with option `version` set to `"2023-05"`) or
 [TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
@@ -181,7 +181,7 @@ actually sophisticated up to you. Ornament does not come with *any* of the
 following:
 
 - state management (even though it is simple to connect components to signals or event targets)
-- rendering (but it works well with [uhtml](https://github.com/WebReflection/uhtml) and similar libraries)
+- rendering (but it works well with [uhtml](https://github.com/WebReflection/uhtml), [Preact](https://preactjs.com/) and similar libraries)
 - built-in solutions for client-side routing, data fetching, or anything beyond the components themselves
 - any preconceived notions about what should be going on server-side
 - specialized syntax for every (or any specific) use case
@@ -202,11 +202,11 @@ away:
   components and replace them only when the need for change arises. A
   compatibility wrapper for frameworks that are not quite friendly to web
   components (eg. React) may be required.
-- If you want to replace Ornament with hand-written logic, you can
-  **replace all attribute and update handling piecemeal.** Ornament's decorators
-  co-exist with native `attributeChangedCallback()` and friends just fine.
-  Ornament *extends* what you can do with custom elements, it does not abstract
-  anything away.
+- If you want to replace Ornament with hand-written logic for web components,
+  you can **replace all attribute and update handling piecemeal.** Ornament's
+  decorators co-exist with native `attributeChangedCallback()` and friends just
+  fine. Ornament *extends* what you can do with custom elements, it does not
+  abstract anything away.
 - Much of your migration will depend on **how you build on top of Ornament.**
   You should keep reusable components and app-specific state containers
   separate, just as you would do in e.g. React. This will make maintenance and
@@ -1603,7 +1603,7 @@ initial method call of a `reactive()` method is not debounced and will keep
 happening once the element's constructor runs to completion.
 </details>
 
-### Rendering shadow DOM
+### Rendering shadow DOM with uhtml
 
 Ornament does not directly concern itself with rendering Shadow DOM, but you
 can combine Ornament with suitable libraries such as
@@ -1634,6 +1634,42 @@ export class CounterElement extends HTMLElement {
 This component uses an event handler to update the decorated accessor `value`,
 which in turn causes the `@reactive()` method `#render()` to update the UI
 accordingly - debounced with `@debounce()` for batched updates.
+
+### Rendering shadow DOM with Preact
+
+If you want to use [Preact](https://preactjs.com/) to render shadow DOM, it
+makes sense of build root component with Preact and use Ornament ony as a
+wrapper to provide attribute data as top-level props:
+
+```javascript
+import { define, reactive, attr, number } from "@sirpepe/ornament";
+import { render, h, Fragment } from "preact";
+import { useState } from "preact/hooks";
+
+// Preact root component
+function ShadowDom(props) {
+  const [count, setCount] = useState(0);
+  return (
+    <button onClick={() => setCount(count + 1)}>
+      Value {count ** props.exponent}
+    </button>
+  );
+}
+
+// Web component wrapper to translate attributes to props
+@define("my-component")
+export class MyComponent extends HTMLElement {
+  #shadow = this.attachShadow({ mode: "open" });
+
+  @attr(number()) accessor exponent = 1;
+
+  @reactive()
+  #reRender() {
+    return render(<ShadowDom exponent={this.exponent} />, this.#shadow);
+  }
+}
+
+```
 
 ### Read-only property
 
