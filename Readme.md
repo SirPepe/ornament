@@ -419,6 +419,9 @@ let test = document.createElement("my-test");
 console.log(test.foo); // only type checks with the above interface declaration
 ```
 
+It is entirely possible to register base class and subclasses with separate tag
+names.
+
 ### `@enhance()`
 
 **Class decorator** to set up attribute observation and lifecycle hooks

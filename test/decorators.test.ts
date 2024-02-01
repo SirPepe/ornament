@@ -102,33 +102,71 @@ describe("Decorators", () => {
     });
 
     test("upgrading a base class and a derived class has no adverse effect", () => {
-      const fn = spy();
+      const fnBase = spy();
+      const fnTest = spy();
       @enhance()
       class Base extends HTMLElement {
         @prop(number()) accessor foo = 23;
+        @reactive({ initial: false }) methodBase() {
+          fnBase(); // called *once* if enhance only applies its effect once
+        }
       }
       @enhance()
       class Test extends Base {
         @prop(string()) accessor bar = "A";
-        @reactive({ initial: false }) method() {
-          fn(); // called *once* if enhance only applies its effect once
+        @reactive({ initial: false }) methodTest() {
+          fnTest(); // called *once* if enhance only applies its effect once
         }
       }
       window.customElements.define(generateTagName(), Test);
       const instance = new Test();
       instance.foo = 42;
-      expect(fn.callCount).to.equal(1);
+      expect(fnBase.callCount).to.equal(1);
+      expect(fnTest.callCount).to.equal(1);
       instance.bar = "B";
-      expect(fn.callCount).to.equal(2);
+      expect(fnTest.callCount).to.equal(2);
+      expect(fnTest.callCount).to.equal(2);
     });
   });
 
   describe("@define", () => {
     test("register element", () => {
-      @define("register-test")
+      const name = generateTagName();
+      @define(name)
       class Test extends HTMLElement {}
-      expect(window.customElements.get("register-test")).to.equal(Test);
-      expect(document.createElement("register-test")).to.be.instanceOf(Test);
+      expect(window.customElements.get(name)).to.equal(Test);
+      expect(document.createElement(name)).to.be.instanceOf(Test);
+    });
+
+    test("register base class and subclass as elements", () => {
+      const nameBase = generateTagName();
+      const nameTest = generateTagName();
+      @define(nameBase)
+      class Base extends HTMLElement {
+        baseFn = spy();
+        @prop(number()) accessor foo = 23;
+        @reactive({ initial: false }) methodBase() {
+          this.baseFn();
+        }
+      }
+      @define(nameTest)
+      class Test extends Base {
+        testFn = spy();
+        @prop(string()) accessor bar = "A";
+        @reactive({ initial: false }) methodTest() {
+          this.testFn();
+        }
+      }
+      const baseInstance = new Base();
+      baseInstance.foo = 42;
+      expect(baseInstance.baseFn.callCount).to.equal(1);
+      const testInstance = new Test();
+      testInstance.foo = 42;
+      expect(testInstance.testFn.callCount).to.equal(1);
+      expect(testInstance.baseFn.callCount).to.equal(1);
+      testInstance.bar = "B";
+      expect(testInstance.testFn.callCount).to.equal(2);
+      expect(testInstance.baseFn.callCount).to.equal(2);
     });
 
     test("reject invalid tag names", () => {
