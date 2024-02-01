@@ -13,6 +13,7 @@ import {
   json,
   string,
   list,
+  any,
 } from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 const test = it;
@@ -783,6 +784,37 @@ describe("Transformers", () => {
       }).to.throw();
       (el as any).foo = [1, 2, 3];
       expect(el.foo).to.eql(["1", "2", "3"]);
+    });
+  });
+
+  describe.only("any()", () => {
+    test("as attribute", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(any()) accessor foo: any = 42;
+      }
+      const el = new Test();
+      expect(el.foo).to.equal(42);
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.foo = "A";
+      expect(el.foo).to.equal("A");
+      expect(el.getAttribute("foo")).to.equal("A");
+      el.removeAttribute("foo");
+      expect(el.foo).to.equal(null);
+      expect(el.getAttribute("foo")).to.equal(null);
+      el.foo = "A";
+      el.foo = "";
+      expect(el.foo).to.equal("");
+      expect(el.getAttribute("foo")).to.equal("");
+      el.foo = null;
+      expect(el.foo).to.equal(null);
+      expect(el.getAttribute("foo")).to.equal("null");
+      el.foo = false;
+      expect(el.foo).to.equal(false);
+      expect(el.getAttribute("foo")).to.equal("false");
+      el.foo = [1, 2, 3];
+      expect(el.foo).to.eql([1, 2, 3]);
+      expect(el.getAttribute("foo")).to.equal("1,2,3");
     });
   });
 

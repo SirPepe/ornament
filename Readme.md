@@ -969,6 +969,7 @@ side effects.
 | `json()`          | Any (JSON serializable for use with `@attr()`) | `reviver`, `replacer`                |
 | `list()`          | Array                                          | `separator`, `transform`             |
 | `literal()`       | Any                                            | `values`, `transform`                |
+| `any()`           | `any`                                          |                                      |
 | `event()`         | `function | null`                              |                                      |
 
 A transformers is just a bag of functions with the following type signature:
@@ -1369,9 +1370,9 @@ around `JSON.parse()` and `JSON.stringify()` without any object validation.
 Equality is checked with `===`.
 
 **Note for TypeScript:** Even though the transformer will accept literally any
-value at runtime, TS may infer a more restrictive type from the accessor's
-initial values. Decorators can't currently change the type of class members they
-are applied to, so you man need to provide a type annotation.
+JSON-serializable value at runtime, TS may infer a more restrictive type from
+the accessor's initial values. Decorators can't currently change the type of
+class members they are applied to, so you man need to provide a type annotation.
 
 #### Options for `json(options?)`
 
@@ -1391,6 +1392,31 @@ are applied to, so you man need to provide a type annotation.
 | Operation                      | IDL attribute value | Content attribute |
 | -------------------------------| --------------------|-------------------|
 | Set IDL attribute value to `x` | `x`                 | -                 |
+
+### Transformer `any()`
+
+Implements a transformer that does no type checking at all and falls back to
+the global `String` function for serializing to content attributes. Use this if
+you really don't care about types:
+
+```javascript
+import { define, prop, any } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @prop(any()) accessor whatever: any = 42;
+}
+```
+
+Transformers returned from calling `any()` make for great prototypes for your
+own custom transformer. Just note that transformers are bags of functions and
+*not* classes, so you will need to use `Object.setPrototypeOf()` and friends to
+"extend" transformers.
+
+**Note for TypeScript:** Even though the transformer will accept literally any
+value at runtime, TS may infer a more restrictive type from the accessor's
+initial values. Decorators can't currently change the type of class members they
+are applied to, so you man need to provide an `any` type annotation.
 
 ### Transformer `event()`
 

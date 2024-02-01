@@ -7,7 +7,7 @@ import {
   type Optional,
 } from "./types.js";
 
-export const protoTransformer: Transformer<any, any> = {
+export const any: () => Transformer<any, any> = () => ({
   parse: (x: any) => x,
   validate: () => true,
   transform: (x: any) => x,
@@ -17,8 +17,9 @@ export const protoTransformer: Transformer<any, any> = {
   beforeSet: <T>(x: T) => x,
   transformGet: <T>(x: T) => x,
   updateContentAttr: () => true,
-};
+});
 
+const protoTransformer = any();
 function createTransformer<T extends HTMLElement, V, IntermediateV = V>(
   input: Partial<Transformer<T, V, IntermediateV>>,
 ): Transformer<T, V, IntermediateV> {
