@@ -787,7 +787,7 @@ describe("Transformers", () => {
     });
   });
 
-  describe.only("any()", () => {
+  describe("any()", () => {
     test("as attribute", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {

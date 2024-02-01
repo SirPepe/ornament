@@ -1,5 +1,5 @@
 import { listen, trigger } from "./bus.js";
-import { EMPTY_OBJ, NO_VALUE } from "./lib.js";
+import { BUS_TARGET, EMPTY_OBJ, NO_VALUE } from "./lib.js";
 import {
   type Transformer,
   type ClassAccessorDecorator,
@@ -14,6 +14,16 @@ import {
 const OBSERVABLE_ATTRS: unique symbol = Symbol.for("OBSERVABLE_ATTRS");
 const DEBOUNCED_METHODS: unique symbol = Symbol.for("DEBOUNCED_METHODS");
 const UNSUBSCRIBE_REGISTRY: unique symbol = Symbol.for("UNSUBSCRIBE_REGISTRY");
+
+// Presence of this symbol marks a custom element constructor as already
+// enhanced. @enhance() uses this to safeguard against enhancing the same class
+// twice, which can easily happen once class hierarchies become convoluted.
+const CLASS_IS_ENHANCED: unique symbol = Symbol.for("IS_ENHANCED");
+
+// Marks an instance as initialized. This is useful for non-enhanced subclasses
+// of an enhanced class that will miss the actual init event, but can use this
+// value to figure out whether that is indeed the case.
+const INSTANCE_IS_INITIALIZED: unique symbol = Symbol.for("IS_INITIALIZED");
 
 declare global {
   interface Window {
@@ -63,6 +73,14 @@ export function enhance<T extends CustomElementConstructor>(): (
 ) => T {
   return function (target: T, context: ClassDecoratorContext<T>): T {
     assertContext(context, "define", "class");
+
+    // In case @enhance() gets applied to a class more than once (either
+    // directly or via some convoluted OOP mess) the mixin class must NOT be
+    // be re-installed.
+    if ((target as any)[CLASS_IS_ENHANCED]) {
+      return target;
+    }
+
     const originalObservedAttributes = new Set<string>(
       (target as any).observedAttributes ?? [],
     );
@@ -73,17 +91,25 @@ export function enhance<T extends CustomElementConstructor>(): (
     // only affects lifecycle callbacks, which are not really "public" anyway.
     // See https://github.com/microsoft/TypeScript/issues/51347
     return class extends target {
-      // Instances will end up with an field [BUS_TARGET] containing the event
+      // Instances WILL end up with an field [BUS_TARGET] containing the event
       // target for the event bus. But because these targets may be needed
       // before the instances finish initializing (or they may be never needed),
-      // the event bus function just slap them on instances if an when they
+      // the event bus function just slaps them on instances if and when they
       // become important. And because TypeScript can't do anything with the
-      // mixin class type, there is no real reason to have anything related to
-      // the event targets here... apart from this comment.
+      // mixin class type, there is no *real* reason to have anything related to
+      // the event targets here... but just for fun:
+      [BUS_TARGET]!: EventTarget; // this is entirely useless
+
+      // Indicates that the class already has had the mixin applied to it
+      static readonly [CLASS_IS_ENHANCED] = true;
+
+      // Indicates that the instance has had its init event triggered
+      [INSTANCE_IS_INITIALIZED] = false;
 
       constructor(...args: any[]) {
         super(...args);
         trigger(this, "init");
+        this[INSTANCE_IS_INITIALIZED] = true;
       }
 
       static get observedAttributes(): string[] {
@@ -184,6 +210,20 @@ export function define<T extends CustomElementConstructor>(
   };
 }
 
+// Class members that need to run some init logic need to either wait for the
+// init event (for class members of enhanced classes) ir figure out whether an
+// init event has already happened (for class members of a subclass of an
+// enhanced class). This function handles both cases seamlessly.
+function runOnInit<T extends HTMLElement>(instance: T, fn: () => any): void {
+  // Init event has already happened, call init function ASAP
+  if ((instance as any)[INSTANCE_IS_INITIALIZED] === true) {
+    fn();
+    return;
+  }
+  // Init event is still going to happen
+  listen(instance, "init", fn, { once: true });
+}
+
 type ReactiveOptions<T> = {
   initial?: boolean;
   keys?: (string | symbol)[];
@@ -205,7 +245,7 @@ export function reactive<T extends HTMLElement>(
       const value = context.access.get(this);
       // Register the callback that performs the initial method call and sets up
       // listeners for subsequent methods calls.
-      listen(this, "init", () => {
+      runOnInit(this, () => {
         // Initial method call, if applicable. Uses the non-debounced method if
         // required and wraps it in predicate logic.
         if (
@@ -265,7 +305,7 @@ function createEventSubscriberInitializer<
   options: EventSubscribeOptions<T, E> = EMPTY_OBJ,
 ): (this: T) => void {
   return function (this: T) {
-    listen(this, "init", () => {
+    runOnInit(this, () => {
       const callback = (evt: any) => {
         if (!options.predicate || options.predicate(this, evt)) {
           context.access.get(this).call(this, evt);
@@ -319,7 +359,7 @@ function createSignalSubscriberInitializer<
   options: SignalSubscribeOptions<T, V> = EMPTY_OBJ,
 ): (this: T) => void {
   return function (this: T) {
-    listen(this, "init", () => {
+    runOnInit(this, () => {
       const value = context.access.get(this);
       const unsubscribe = target.subscribe(() => {
         if (!options.predicate || options.predicate(this, target.value)) {

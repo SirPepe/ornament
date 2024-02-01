@@ -439,7 +439,35 @@ console.log(document.createElement("my-test")); // instance of MyTest
 ```
 
 This decorator is only really useful if you need to handle element registration
-in some other way that what `@define()` provides.
+in some other way that what `@define()` provides. It is safe to apply
+`@enhance()` more than once on a class, or on both (or either) a base class and
+subclass:
+
+```javascript
+import { enhance } from "@sirpepe/ornament";
+
+// Not useful, but also not a problem
+@enhance()
+@enhance()
+@enhance()
+class MyTest0 extends HTMLElement {}
+
+// Works
+@enhance()
+class Base1 extends HTMLElement {}
+class MyTest1 extends Base1 {}
+
+// Works
+class Base2 extends HTMLElement {}
+@enhance()
+class MyTest2 extends Base2 {}
+
+// Works
+@enhance()
+class Base3 extends HTMLElement {}
+@enhance()
+class MyTest3 extends Base3 {}
+```
 
 ### `@prop(transformer: Transformer)`
 

@@ -32,6 +32,95 @@ describe("Decorators", () => {
         Boolean((Test as any).prototype.attributeChangedCallback),
       ).to.equal(true);
     });
+
+    test("upgrade only a subclass", () => {
+      const fnBase = spy();
+      const fnTest = spy();
+      class Base extends HTMLElement {
+        @prop(number()) accessor foo = 23;
+        @reactive({ initial: false }) methodBase() {
+          fnBase();
+        }
+      }
+      @enhance()
+      class Test extends Base {
+        @prop(string()) accessor bar = "A";
+        @reactive({ initial: false }) methodTest() {
+          fnTest();
+        }
+      }
+      window.customElements.define(generateTagName(), Test);
+      const instance = new Test();
+      instance.foo = 42;
+      expect(fnBase.callCount).to.equal(1);
+      expect(fnTest.callCount).to.equal(1);
+      instance.bar = "B";
+      expect(fnBase.callCount).to.equal(2);
+      expect(fnTest.callCount).to.equal(2);
+    });
+
+    test("upgrade only a base class", () => {
+      const fnBase = spy();
+      const fnTest = spy();
+      @enhance()
+      class Base extends HTMLElement {
+        @prop(number()) accessor foo = 23;
+        @reactive({ initial: false }) methodBase() {
+          fnBase();
+        }
+      }
+      class Test extends Base {
+        @prop(string()) accessor bar = "A";
+        @reactive({ initial: false }) methodTest() {
+          fnTest();
+        }
+      }
+      window.customElements.define(generateTagName(), Test);
+      const instance = new Test();
+      instance.foo = 42;
+      expect(fnBase.callCount).to.equal(1);
+      expect(fnTest.callCount).to.equal(1);
+      instance.bar = "B";
+      expect(fnBase.callCount).to.equal(2);
+      expect(fnTest.callCount).to.equal(2);
+    });
+
+    test("upgrading the class twice has no adverse effect", () => {
+      const fn = spy();
+      @enhance()
+      @enhance()
+      class Test extends HTMLElement {
+        @prop(number()) accessor test = 23;
+        @reactive({ initial: false }) method() {
+          fn(); // called *once* if enhance only applies its effect once
+        }
+      }
+      window.customElements.define(generateTagName(), Test);
+      const instance = new Test();
+      instance.test = 42;
+      expect(fn.callCount).to.equal(1);
+    });
+
+    test("upgrading a base class and a derived class has no adverse effect", () => {
+      const fn = spy();
+      @enhance()
+      class Base extends HTMLElement {
+        @prop(number()) accessor foo = 23;
+      }
+      @enhance()
+      class Test extends Base {
+        @prop(string()) accessor bar = "A";
+        @reactive({ initial: false }) method() {
+          fn(); // called *once* if enhance only applies its effect once
+        }
+      }
+      window.customElements.define(generateTagName(), Test);
+      const instance = new Test();
+      instance.foo = 42;
+      expect(fn.callCount).to.equal(1);
+      instance.bar = "B";
+      expect(fn.callCount).to.equal(2);
+    });
   });
 
   describe("@define", () => {
