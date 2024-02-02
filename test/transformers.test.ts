@@ -14,6 +14,7 @@ import {
   string,
   list,
   any,
+  reactive,
 } from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 const test = it;
@@ -408,6 +409,25 @@ describe("Transformers", () => {
       expect(el.foo).to.equal(1n);
       el.removeAttribute("foo");
       expect(el.foo).to.equal(0n);
+    });
+
+    test("initialize from attribute", async () => {
+      const fn = spy();
+      const tagName = generateTagName();
+      @define(tagName)
+      class Test extends HTMLElement {
+        @attr(int()) accessor foo: any;
+        @reactive() method() {
+          fn(this.foo);
+        }
+      }
+      const fixture = document.createElement("div");
+      document.body.append(fixture);
+      fixture.innerHTML = `<${tagName} foo="0"></${tagName}>`;
+      const el = fixture.children[0] as Test;
+      expect(el.foo).to.equal(0n);
+      expect(fn.callCount).to.equal(1); // initial call
+      expect(fn.getCalls()[0].args).to.eql([0n]) // initial call
     });
 
     test("as nullable attribute", async () => {

@@ -59,6 +59,55 @@ describe("Decorators", () => {
       expect(fnTest.callCount).to.equal(2);
     });
 
+    test("property access on the base class of an upgraded subclass", () => {
+      const fn = spy();
+      class Base extends HTMLElement {
+        @reactive()
+        method() {
+          fn((this as any).foo);
+        }
+      }
+      @enhance()
+      class Test extends Base {
+        @prop(string()) accessor foo = "A";
+      }
+      window.customElements.define(generateTagName(), Test);
+      const instance = new Test();
+      expect(fn.callCount).to.equal(1); // Initial call
+      expect(fn.getCalls()[0].args).to.eql(["A"]); // Initial call
+      instance.foo = "B";
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[1].args).to.eql(["B"]);
+    });
+
+    test("content attribute access on the base class of an upgraded subclass", () => {
+      const fn = spy();
+      class Base extends HTMLElement {
+        @reactive()
+        method() {
+          fn((this as any).foo);
+        }
+      }
+      @enhance()
+      class Test extends Base {
+        @attr(string()) accessor foo = "A";
+      }
+      const tagName = generateTagName();
+      window.customElements.define(tagName, Test);
+      const fixture = document.createElement("div");
+      document.body.append(fixture);
+      fixture.innerHTML = `<${tagName} foo="bar"></${tagName}>`;
+      const instance = fixture.children[0] as Test;
+      expect(fn.callCount).to.equal(1); // Initial call
+      expect(fn.getCalls()[0].args).to.eql(["bar"]); // Initial call
+      instance.foo = "baz";
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[1].args).to.eql(["baz"]);
+      instance.setAttribute("foo", "foo");
+      expect(fn.callCount).to.equal(3);
+      expect(fn.getCalls()[2].args).to.eql(["foo"]);
+    });
+
     test("upgrade only a base class", () => {
       const fnBase = spy();
       const fnTest = spy();
