@@ -95,10 +95,6 @@ export interface FunctionFieldOrMethodDecorator<T extends HTMLElement, A extends
   (value: Method<T, A>, context: ClassMethodDecoratorContext<T, Method<T, A>>): Method<T, A>;
   (value: undefined, context: ClassFieldDecoratorContext<T, Method<unknown, A>>): (init: Method<unknown, A>) => Method<unknown, A>;
 }
-
-export type FunctionFieldOrMethodDecorator_<T extends HTMLElement, A extends unknown[]> =
-  & ((value: Method<T, A>, context: ClassMethodDecoratorContext<T, Method<T, A>>) => Method<T, A>)
-  & ((value: undefined, context: ClassFieldDecoratorContext<T, Method<unknown, A>>) => (init: Method<unknown, A>) => Method<unknown, A>);
 /* eslint-enable */
 
 type Types = {
