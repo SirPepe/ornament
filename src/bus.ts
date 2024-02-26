@@ -1,6 +1,7 @@
 // Trigger and listener functions simply slap event targets onto the instances
 // as needed, because some event bus functionality is required even before the
-// instances have initialized completely.
+// instances themselves have initialized completely. Lazy initialization is the
+// only way this can work.
 
 import { BUS_TARGET } from "./lib";
 

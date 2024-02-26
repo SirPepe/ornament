@@ -7,7 +7,7 @@ import {
   type Optional,
 } from "./types.js";
 
-export const any: () => Transformer<any, any> = () => ({
+const protoTransformer = {
   parse: (x: any) => x,
   validate: () => true,
   transform: (x: any) => x,
@@ -17,9 +17,11 @@ export const any: () => Transformer<any, any> = () => ({
   beforeSet: <T>(x: T) => x,
   transformGet: <T>(x: T) => x,
   updateContentAttr: () => true,
-});
+};
 
-const protoTransformer = any();
+export const any: () => Transformer<any, any> = () =>
+  Object.create(protoTransformer);
+
 function createTransformer<T extends HTMLElement, V, IntermediateV = V>(
   input: Partial<Transformer<T, V, IntermediateV>>,
 ): Transformer<T, V, IntermediateV> {
@@ -107,7 +109,7 @@ export function href<T extends HTMLElement>(): Transformer<T, string> {
       if (currentValues.get(this) === null) {
         return defaultValues.get(this)!;
       }
-      return new URL(value, window.location.toString()).toString();
+      return String(new URL(value, String(window.location)));
     },
     init(value = "") {
       currentValues.set(this, null);

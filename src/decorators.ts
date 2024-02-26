@@ -11,26 +11,20 @@ import {
 
 // If some bundler or HMR process happens to include Ornament more than once, we
 // need to make sure that the metadata stores are globally unique.
-const OBSERVABLE_ATTRS: unique symbol = Symbol.for(
-  "ORNAMENT_OBSERVABLE_ATTRIBUTES",
-);
-const DEBOUNCED_METHODS: unique symbol = Symbol.for(
-  "ORNAMENT_DEBOUNCED_METHODS",
-);
-const UNSUBSCRIBE_REGISTRY: unique symbol = Symbol.for(
-  "ORNAMENT_UNSUBSCRIBE_REGISTRY",
-);
+const OBSERVABLE_ATTRS: unique symbol = Symbol.for("ORNAMENT_OBSERVABLE");
+const DEBOUNCED_METHODS: unique symbol = Symbol.for("ORNAMENT_DEBOUNCED");
+const UNSUBSCRIBE_REGISTRY: unique symbol = Symbol.for("ORNAMENT_UNSUBSCRIBE");
 
 // Presence of this symbol marks a custom element constructor as already
 // enhanced. @enhance() uses this to safeguard against enhancing the same class
 // twice, which can easily happen once class hierarchies become convoluted.
-const CLASS_IS_ENHANCED: unique symbol = Symbol.for("ORNAMENT_IS_ENHANCED");
+const CLASS_IS_ENHANCED: unique symbol = Symbol.for("ORNAMENT_ENHANCED");
 
 // Marks an instance as initialized. This is useful for non-enhanced subclasses
 // of an enhanced class that will miss the actual init event, but can use this
 // value to figure out whether that is indeed the case.
 const INSTANCE_IS_INITIALIZED: unique symbol = Symbol.for(
-  "ORNAMENT_IS_INITIALIZED",
+  "ORNAMENT_INITIALIZED",
 );
 
 declare global {
