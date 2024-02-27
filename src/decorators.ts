@@ -474,7 +474,7 @@ export function attr<T extends HTMLElement, V>(
     let contentAttrName: string;
     let idlAttrName: string;
     if (typeof context.name === "symbol" || context.private) {
-      if (typeof options.as === "undefined") {
+      if (!options.as) {
         throw new TypeError(
           "Content attribute names must not be symbols or private fields. Provide the `as` option and a public facade for your accessor or use a regular property name.",
         );
