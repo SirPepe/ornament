@@ -9,7 +9,7 @@ if (process.env.NODE_ENV === "test") {
     [
       "@babel/plugin-proposal-decorators",
       {
-        version: "2023-05",
+        version: "2023-11",
       },
     ],
   ];

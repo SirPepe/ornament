@@ -637,32 +637,48 @@ export function prop<T extends HTMLElement, V>(
   };
 }
 
-type DebounceOptions = {
-  fn?: (cb: () => void) => () => void;
+type DebounceOptions<T, A extends any[]> = {
+  fn?: (
+    cb: (this: T, ...args: A) => void,
+  ) => (this: T, ...args: A) => () => void;
 };
 
 function createDebouncedMethod<T extends object, A extends unknown[]>(
   originalMethod: Method<T, A>,
-  wait: (cb: () => void) => () => void,
+  fn: (cb: (...args: A) => void) => (...args: A) => () => void,
 ): Method<T, A> {
-  const cancelFns = new WeakMap<T, undefined | (() => void)>();
+  const cancelFns = new WeakMap<T, () => void>();
+  const debounced = fn(function (this: T, ...args: A): void {
+    originalMethod.call(this, ...args);
+    cancelFns.delete(this);
+  });
   function debouncedMethod(this: T, ...args: A): any {
     cancelFns.get(this)?.(); // call cancel function, if it exists
-    cancelFns.set(
-      this,
-      wait(() => {
-        originalMethod.call(this, ...args);
-        cancelFns.delete(this);
-      }),
-    );
+    cancelFns.set(this, debounced.call(this, ...args));
   }
   window[DEBOUNCED_METHODS].set(debouncedMethod, originalMethod);
   return debouncedMethod;
 }
 
+function createDebouncedFunction<T extends object, A extends unknown[]>(
+  bindTo: T,
+  originalFunction: (this: T, ...args: A) => any,
+  fn: (cb: (...args: A) => void) => (...args: A) => () => void,
+): (this: T, ...args: A) => void {
+  let cancelFn: null | (() => void) = null;
+  const debounced = fn((...args): void => {
+    originalFunction.call(bindTo, ...args);
+    cancelFn = null;
+  });
+  return (...args: A): void => {
+    cancelFn?.(); // call cancel function, if it exists
+    cancelFn = debounced(...args);
+  };
+}
+
 // The class field/method decorator @debounce() debounces functions.
 export function debounce<T extends HTMLElement, A extends unknown[]>(
-  options: DebounceOptions = EMPTY_OBJ,
+  options: DebounceOptions<T, A> = EMPTY_OBJ,
 ): FunctionFieldOrMethodDecorator<T, A> {
   const fn = options.fn ?? debounce.raf();
   function decorator(
@@ -671,57 +687,74 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
   ): Method<T, A>;
   function decorator(
     value: undefined,
-    context: ClassFieldDecoratorContext<T, Method<unknown, A>>,
-  ): (init: Method<unknown, A>) => Method<unknown, A>;
+    context: ClassFieldDecoratorContext<T, Method<T, A>>,
+  ): void;
   function decorator(
     value: Method<T, A> | undefined,
     context: FunctionFieldOrMethodContext<T, A>,
-  ): Method<T, A> | ((init: Method<unknown, A>) => Method<unknown, A>) {
+  ): Method<T, A> | void {
     assertContext(context, "debounce", ["field", "method"], true);
     if (context.kind === "field") {
       // Field decorator (bound methods)
-      return function init(
-        this: T,
-        func: Method<unknown, A>,
-      ): Method<unknown, A> {
+      return context.addInitializer(function () {
+        const func = context.access.get(this);
         if (typeof func !== "function") {
           throw new TypeError(
-            "@debounce() can only be applied to function class fields",
+            "@debounce() can only be applied to methods and functions",
           );
         }
-        return createDebouncedMethod(func, fn).bind(this);
-      };
+        context.access.set(this, createDebouncedFunction(this, func, fn));
+      });
     }
-    // if it's not a field decorator, it must be a method decorator
+    // if it's not a field decorator, it must be a method decorator (and value
+    // can only be a non-undefined method definition)
     return createDebouncedMethod(value as Method<T, A>, fn);
   }
   return decorator;
 }
 
-debounce.asap = function (): (cb: () => void) => () => void {
-  return function (cb: () => void): () => void {
-    let canceled = false;
-    Promise.resolve().then(() => {
-      if (!canceled) {
-        cb();
-      }
-    });
-    return () => {
-      canceled = true;
+debounce.asap = function <T, A extends any[]>(): (
+  cb: (this: T, ...args: A) => void,
+) => (this: T, ...args: A) => () => void {
+  return function (
+    cb: (this: T, ...args: A) => void,
+  ): (this: T, ...args: A) => () => void {
+    return function (this: T, ...args: A): () => void {
+      let canceled = false;
+      Promise.resolve().then(() => {
+        if (!canceled) {
+          cb.call(this, ...args);
+        }
+      });
+      return () => {
+        canceled = true;
+      };
     };
   };
 };
 
-debounce.raf = function (): (cb: () => void) => () => void {
-  return function (cb: () => void): () => void {
-    const handle = requestAnimationFrame(cb);
-    return (): void => cancelAnimationFrame(handle);
+debounce.raf = function <T, A extends any[]>(): (
+  cb: (this: T, ...args: A) => void,
+) => (this: T, ...args: A) => () => void {
+  return function (
+    cb: (this: T, ...args: A) => void,
+  ): (this: T, ...args: A) => () => void {
+    return function (this: T, ...args: A): () => void {
+      const handle = requestAnimationFrame(() => cb.call(this, ...args));
+      return (): void => cancelAnimationFrame(handle);
+    };
   };
 };
 
-debounce.timeout = function (value: number): (cb: () => void) => () => void {
-  return function (cb: () => void): () => void {
-    const timerId = setTimeout(cb, value);
-    return (): void => clearTimeout(timerId);
+debounce.timeout = function <T, A extends any[]>(
+  value: number,
+): (cb: (this: T, ...args: A) => void) => (this: T, ...args: A) => () => void {
+  return function (
+    cb: (this: T, ...args: A) => void,
+  ): (this: T, ...args: A) => () => void {
+    return function (this: T, ...args: A): () => void {
+      const timerId = setTimeout(() => cb.call(this, ...args), value);
+      return (): void => clearTimeout(timerId);
+    };
   };
 };
