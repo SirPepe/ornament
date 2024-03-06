@@ -134,7 +134,7 @@ export function assertType<K extends keyof Types>(
     )
   ) {
     throw new TypeError(
-      `Expected "${name}" to be "${types.join("/")}" but got ${typeof value}`,
+      `Expected "${name}" to be ${types.join("/")} got ${typeof value}`,
     );
   }
 }
@@ -173,6 +173,6 @@ export function assertContext(
     throw new TypeError(`${expected} decorator @${name} used on ${ctx.kind}`);
   }
   if (ctx.static && !acceptStatic) {
-    throw new TypeError(`Decorator @${name} can't be used on static members`);
+    throw new TypeError(`@${name} can't be used on static members`);
   }
 }

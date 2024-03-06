@@ -262,9 +262,9 @@ export function reactive<T extends HTMLElement>(
         listen(this, "prop", (name) => {
           if (
             (!options.predicate || options.predicate(this)) &&
-            (!options.keys || options.keys?.includes(name)) &&
+            (!options.keys || options.keys.includes(name)) &&
             (!options.excludeKeys ||
-              options.excludeKeys?.includes(name) === false)
+              options.excludeKeys.includes(name) === false)
           ) {
             value.call(this);
           }
