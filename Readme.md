@@ -153,7 +153,7 @@ primitives that really should be part of the standard, but aren't.
 Install [@sirpepe/ornament](https://www.npmjs.com/package/@sirpepe/ornament)
 with your favorite package manager. To get the decorator syntax working in 2024,
 you will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
-(with option `version` set to `"2023-05"`) or
+(with option `version` set to `"2023-11"`) or
 [TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
 (with the option `experimentalDecorators` turned *off*).
 

@@ -93,7 +93,7 @@ export type FunctionFieldOrMethodContext<T, A extends unknown[]> =
 
 export interface FunctionFieldOrMethodDecorator<T extends HTMLElement, A extends unknown[]> {
   (value: Method<T, A>, context: ClassMethodDecoratorContext<T, Method<T, A>>): Method<T, A>;
-  (value: undefined, context: ClassFieldDecoratorContext<T, Method<unknown, A>>): (init: Method<unknown, A>) => Method<unknown, A>;
+  (value: undefined, context: ClassFieldDecoratorContext<T, Method<unknown, A>>): void | ((init: Method<unknown, A>) => Method<unknown, A>);
 }
 /* eslint-enable */
 
@@ -134,7 +134,7 @@ export function assertType<K extends keyof Types>(
     )
   ) {
     throw new TypeError(
-      `Expected "${name}" to be "${types.join("/")}" but got ${typeof value}`,
+      `Expected "${name}" to be ${types.join("/")} got ${typeof value}`,
     );
   }
 }
@@ -173,6 +173,6 @@ export function assertContext(
     throw new TypeError(`${expected} decorator @${name} used on ${ctx.kind}`);
   }
   if (ctx.static && !acceptStatic) {
-    throw new TypeError(`Decorator @${name} can't be used on static members`);
+    throw new TypeError(`@${name} can't be used on static members`);
   }
 }
