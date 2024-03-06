@@ -19,12 +19,12 @@ class MyGreeter extends HTMLElement {
   #shadow = this.attachShadow({ mode: "open" });
 
   // Define content attributes alongside corresponding getter/setter pairs
-  // for a JS api and attribute change handling and type checking
+  // for a JS api and attribute change handling and type checking.
   @attr(string()) accessor name = "Anonymous";
   @attr(number({ min: 0 })) accessor age = 0;
 
   // Mark the method as reactive to have it run every time one of the attributes
-  // change
+  // change.
   @reactive() greet() {
     this.#shadow.innerHTML = `Hello! My name is ${this.name}, my age is ${this.age}`;
   }
@@ -364,26 +364,27 @@ for something else, or combine any of the above with hand-written logic.
 
 ### API overview
 
-| Decorator             | Class element       | `static` | `#private` | Symbols          |
-| --------------------- | ------------------- | -------- | ---------- | ---------------- |
-| `@define()`           | Class               | -        | -          | -                |
-| `@enhance()`          | Class               | -        | -          | -                |
-| `@attr()`             | Accessor            | ✕        | ✓[^1]      | ✓[^1]            |
-| `@prop()`             | Accessor            | ✕        | ✓          | ✓                |
-| `@reactive()`         | Method              | ✕        | ✓          | -                |
-| `@connected()`        | Method              | ✕        | ✓          | -                |
-| `@disconnected()`     | Method              | ✕        | ✓          | -                |
-| `@adopted()`          | Method              | ✕        | ✓          | -                |
-| `@formAssociated()`   | Method              | ✕        | ✓          | -                |
-| `@formReset()`        | Method              | ✕        | ✓          | -                |
-| `@formDisabled()`     | Method              | ✕        | ✓          | -                |
-| `@formStateRestore()` | Method              | ✕        | ✓          | -                |
-| `@subscribe()`        | Method              | ✕        | ✓          | -                |
-| `@debounce()`         | Method, Class Field | ✕        | ✓          | ✓ (Class fields) |
+| Decorator             | Class element       | `static` | `#private` | Symbols |
+| --------------------- | ------------------- | -------- | ---------- | ------- |
+| `@define()`           | Class               | -        | -          | -       |
+| `@enhance()`          | Class               | -        | -          | -       |
+| `@attr()`             | Accessor            | ✕        | ✓[^1]      | ✓[^1]   |
+| `@prop()`             | Accessor            | ✕        | ✓          | ✓       |
+| `@reactive()`         | Method              | ✕        | ✓          | ✓       |
+| `@connected()`        | Method              | ✕        | ✓          | ✓       |
+| `@disconnected()`     | Method              | ✕        | ✓          | ✓       |
+| `@adopted()`          | Method              | ✕        | ✓          | ✓       |
+| `@formAssociated()`   | Method              | ✕        | ✓          | ✓       |
+| `@formReset()`        | Method              | ✕        | ✓          | ✓       |
+| `@formDisabled()`     | Method              | ✕        | ✓          | ✓       |
+| `@formStateRestore()` | Method              | ✕        | ✓          | ✓       |
+| `@subscribe()`        | Method              | ✕        | ✓          | ✓       |
+| `@debounce()`         | Method, Class Field | ✕        | ✓[^2]      | ✓[^2]   |
 
 [^1]: Can be `#private` or a symbol *if* a non-private non-symbol getter/setter
       pair for the attribute name exists and a content attribute name has been
       set using the `as` option.
+[^2]: Class field values must be of type `function`
 
 ### `@define(tagName: string, options: ElementDefinitionOptions = {})`
 
