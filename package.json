@@ -4,7 +4,6 @@
   "description": "Micro-library for building vanilla web components",
   "type": "module",
   "main": "dist/esm/index.js",
-  "browser": "dist/min/index.min.js",
   "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
