@@ -637,43 +637,8 @@ export function prop<T extends HTMLElement, V>(
 }
 
 type DebounceOptions<T, A extends any[]> = {
-  fn?: (
-    cb: (this: T, ...args: A) => void,
-  ) => (this: T, ...args: A) => () => void;
+  fn?: (cb: (this: T, ...args: A) => void) => (this: T, ...args: A) => void;
 };
-
-function createDebouncedMethod<T extends object, A extends unknown[]>(
-  originalMethod: Method<T, A>,
-  fn: (cb: (...args: A) => void) => (...args: A) => () => void,
-): Method<T, A> {
-  const cancelFns = new WeakMap<T, () => void>();
-  const debounced = fn(function (this: T, ...args: A): void {
-    originalMethod.call(this, ...args);
-    cancelFns.delete(this);
-  });
-  function debouncedMethod(this: T, ...args: A): any {
-    cancelFns.get(this)?.(); // call cancel function, if it exists
-    cancelFns.set(this, debounced.call(this, ...args));
-  }
-  window[DEBOUNCED_METHODS].set(debouncedMethod, originalMethod);
-  return debouncedMethod;
-}
-
-function createDebouncedFunction<T extends object, A extends unknown[]>(
-  bindTo: T,
-  originalFunction: (this: T, ...args: A) => any,
-  fn: (cb: (...args: A) => void) => (...args: A) => () => void,
-): (this: T, ...args: A) => void {
-  let cancelFn: null | (() => void) = null;
-  const debounced = fn((...args): void => {
-    originalFunction.call(bindTo, ...args);
-    cancelFn = null;
-  });
-  return (...args: A): void => {
-    cancelFn?.(); // call cancel function, if it exists
-    cancelFn = debounced(...args);
-  };
-}
 
 // The class field/method decorator @debounce() debounces functions.
 export function debounce<T extends HTMLElement, A extends unknown[]>(
@@ -702,58 +667,84 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
             "@debounce() can only be applied to methods and functions",
           );
         }
-        context.access.set(this, createDebouncedFunction(this, func, fn));
+        // Class field functions can't be reactive atm, so there is no need to
+        // store them in the map of debounced methods.
+        context.access.set(this, fn(func).bind(this));
       });
     }
     // if it's not a field decorator, it must be a method decorator (and value
     // can only be a non-undefined method definition)
-    return createDebouncedMethod(value as Method<T, A>, fn);
+    const debounced = fn(value as Method<T, A>);
+    window[DEBOUNCED_METHODS].set(debounced, value as Method<T, A>);
+    return debounced;
   }
   return decorator;
 }
 
-debounce.asap = function <T, A extends any[]>(): (
-  cb: (this: T, ...args: A) => void,
-) => (this: T, ...args: A) => () => void {
+// The following debouncing services for both methods and function class fields.
+// In latter case, storing the cancel functions on a per-instance-basis in a
+// WeakMap is overkill, but for methods (where multiple instances share the same
+// function object) this is just right.
+const KEY_TO_USE_WHEN_THIS_IS_UNDEFINED = Symbol(); // for bound functions
+
+debounce.asap = function <T extends object, A extends any[]>(): (
+  original: (this: T, ...args: A) => void,
+) => (this: T, ...args: A) => void {
   return function (
-    cb: (this: T, ...args: A) => void,
-  ): (this: T, ...args: A) => () => void {
-    return function (this: T, ...args: A): () => void {
-      let canceled = false;
+    original: (this: T, ...args: A) => void,
+  ): (this: T, ...args: A) => void {
+    const handles = new WeakMap<T | symbol, symbol>();
+    return function (this: T, ...args: A): void {
+      const token = Symbol();
+      handles.set(this ?? KEY_TO_USE_WHEN_THIS_IS_UNDEFINED, token);
       Promise.resolve().then(() => {
-        if (!canceled) {
-          cb.call(this, ...args);
+        if (handles.get(this ?? KEY_TO_USE_WHEN_THIS_IS_UNDEFINED) === token) {
+          original.call(this, ...args);
+          handles.delete(this ?? KEY_TO_USE_WHEN_THIS_IS_UNDEFINED);
         }
       });
-      return () => {
-        canceled = true;
-      };
     };
   };
 };
 
-debounce.raf = function <T, A extends any[]>(): (
-  cb: (this: T, ...args: A) => void,
-) => (this: T, ...args: A) => () => void {
+debounce.raf = function <T extends object, A extends any[]>(): (
+  original: (this: T, ...args: A) => void,
+) => (this: T, ...args: A) => void {
   return function (
-    cb: (this: T, ...args: A) => void,
-  ): (this: T, ...args: A) => () => void {
-    return function (this: T, ...args: A): () => void {
-      const handle = requestAnimationFrame(() => cb.call(this, ...args));
-      return (): void => cancelAnimationFrame(handle);
+    original: (this: T, ...args: A) => void,
+  ): (this: T, ...args: A) => void {
+    const handles = new WeakMap<T | symbol, number>();
+    return function (this: T, ...args: A): void {
+      const handle = handles.get(this ?? KEY_TO_USE_WHEN_THIS_IS_UNDEFINED);
+      if (handle) {
+        cancelAnimationFrame(handle);
+        handles.delete(this ?? KEY_TO_USE_WHEN_THIS_IS_UNDEFINED);
+      }
+      handles.set(
+        this ?? KEY_TO_USE_WHEN_THIS_IS_UNDEFINED,
+        requestAnimationFrame(() => original.call(this, ...args)),
+      );
     };
   };
 };
 
-debounce.timeout = function <T, A extends any[]>(
+debounce.timeout = function <T extends object, A extends any[]>(
   value: number,
-): (cb: (this: T, ...args: A) => void) => (this: T, ...args: A) => () => void {
+): (original: (this: T, ...args: A) => void) => (this: T, ...args: A) => void {
   return function (
-    cb: (this: T, ...args: A) => void,
-  ): (this: T, ...args: A) => () => void {
-    return function (this: T, ...args: A): () => void {
-      const timerId = setTimeout(() => cb.call(this, ...args), value);
-      return (): void => clearTimeout(timerId);
+    original: (this: T, ...args: A) => void,
+  ): (this: T, ...args: A) => void {
+    const handles = new WeakMap<T | symbol, NodeJS.Timeout>();
+    return function (this: T, ...args: A): void {
+      const handle = handles.get(this ?? KEY_TO_USE_WHEN_THIS_IS_UNDEFINED);
+      if (handle) {
+        clearTimeout(handle);
+        handles.delete(this ?? KEY_TO_USE_WHEN_THIS_IS_UNDEFINED);
+      }
+      handles.set(
+        this ?? KEY_TO_USE_WHEN_THIS_IS_UNDEFINED,
+        setTimeout(() => original.call(this, ...args), value),
+      );
     };
   };
 };
