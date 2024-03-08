@@ -1486,7 +1486,7 @@ describe("Decorators", () => {
   });
 
   describe("Regressions", () => {
-    test.skip("co-existence of @debounce() and @reactive() on private fields does not blow up", async () => {
+    test("co-existence of @debounce() and @reactive() on private fields does not blow up", async () => {
       // This problem only manifests itself when @debounce is applied to a
       // private field and a private method is decorated with @reactive
       @define(generateTagName())

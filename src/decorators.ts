@@ -244,10 +244,15 @@ export function reactive<T extends HTMLElement>(
   return function (_, context): void {
     assertContext(context, "reactive", "method");
     context.addInitializer(function () {
-      const value = context.access.get(this);
       // Register the callback that performs the initial method call and sets up
       // listeners for subsequent methods calls.
       runOnInit(this, () => {
+        // We must NOT access the value outside (that is, before) the init
+        // callback function. The method's initializer function runs before
+        // accessors' initializer functions, which may lead to errors on the
+        // method's initial run (where the instance has not finished
+        // initializing).
+        const value = context.access.get(this);
         // Initial method call, if applicable. Uses the non-debounced method if
         // required and wraps it in predicate logic.
         if (
