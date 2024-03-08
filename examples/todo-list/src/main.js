@@ -70,7 +70,7 @@ function createEventClass(name) {
 // on top of the framework and Ornament's decorators.
 
 // Some signals to store the application state. As far as ornament is concerned,
-// this could also be implemented with Event Targets, bot those are way less
+// this could also be implemented with Event Targets, but those are way less
 // cool these days.
 let id = 0;
 
