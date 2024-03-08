@@ -11,7 +11,6 @@ import {
 
 // If some bundler or HMR process happens to include Ornament more than once, we
 // need to make sure that the metadata stores are globally unique.
-const OBSERVABLE_ATTRS: unique symbol = Symbol.for("ORNAMENT_OBSERVABLE");
 const DEBOUNCED_METHODS: unique symbol = Symbol.for("ORNAMENT_DEBOUNCED");
 const UNSUBSCRIBE_REGISTRY: unique symbol = Symbol.for("ORNAMENT_UNSUBSCRIBE");
 
@@ -29,14 +28,6 @@ const INSTANCE_IS_INITIALIZED: unique symbol = Symbol.for(
 
 declare global {
   interface Window {
-    // Accessor decorators initialize *after* custom elements access their
-    // observedAttributes getter. This means that, in the absence of the
-    // decorators metadata feature, there is no way to associate observed
-    // attributes with specific elements or constructors from inside the @attr()
-    // decorator. Instead we simply track *all* attributes defined by @attr() on
-    // any class and decide inside the attribute changed callback* whether they
-    // are actually observed by a given element.
-    [OBSERVABLE_ATTRS]: Set<string>;
     // Maps debounced methods to original methods. Needed for initial calls of
     // @reactive() methods, as the initial calls are not supposed to be async.
     [DEBOUNCED_METHODS]: WeakMap<Method<any, any>, Method<any, any>>;
@@ -46,7 +37,6 @@ declare global {
   }
 }
 
-window[OBSERVABLE_ATTRS] ??= new Set();
 window[DEBOUNCED_METHODS] ??= new WeakMap();
 window[UNSUBSCRIBE_REGISTRY] ??= new FinalizationRegistry((f) => f());
 
@@ -83,6 +73,8 @@ export function enhance<T extends CustomElementConstructor>(): (
       return target;
     }
 
+    const ornamentObservedAttributes = (context.metadata.observedAttributes ??
+      new Set()) as Set<string>;
     const originalObservedAttributes = new Set<string>(
       (target as any).observedAttributes ?? [],
     );
@@ -115,7 +107,7 @@ export function enhance<T extends CustomElementConstructor>(): (
       }
 
       static get observedAttributes(): string[] {
-        return [...originalObservedAttributes, ...window[OBSERVABLE_ATTRS]];
+        return [...originalObservedAttributes, ...ornamentObservedAttributes];
       }
 
       connectedCallback(): void {
@@ -493,7 +485,9 @@ export function attr<T extends HTMLElement, V>(
     // Add the name to the set of all observed attributes, even if "reflective"
     // if false. The content attribute must in all cases be observed to enable
     // the message bus to emit events.
-    window[OBSERVABLE_ATTRS].add(contentAttrName);
+    ((context.metadata.observedAttributes ??= new Set()) as any).add(
+      contentAttrName,
+    );
 
     // If the attribute needs to be observed and the accessor initializes,
     // register the attribute handler callback with the current element
