@@ -5,7 +5,7 @@
   <img alt="" src="./assets/logo.png">
 </picture>
 
-Unopinionated, pareto-optimal, tiny (<= 4k) anti-framework for building vanilla
+Unopinionated, pareto-optimal, tiny (< 4k) anti-framework for building vanilla
 web component infrastructure:
 
 ```javascript

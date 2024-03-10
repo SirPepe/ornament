@@ -204,18 +204,19 @@ export function define<T extends CustomElementConstructor>(
   };
 }
 
-// Class members that need to run some init logic need to either wait for the
-// init event (for class members of enhanced classes) ir figure out whether an
-// init event has already happened (for class members of a subclass of an
-// enhanced class). This function handles both cases seamlessly.
-function runOnInit<T extends HTMLElement>(instance: T, fn: () => any): void {
-  // Init event has already happened, call init function ASAP
-  if ((instance as any)[INSTANCE_IS_INITIALIZED] === true) {
-    fn();
-    return;
-  }
-  // Init event is still going to happen
-  listen(instance, "init", fn, { once: true });
+function runContextInitializerOnOrnamentInit<
+  T extends HTMLElement,
+  C extends ClassMethodDecoratorContext<T, any>,
+>(context: C, initializer: (instance: T) => any): void {
+  context.addInitializer(function (this: T) {
+    // Init event has already happened, call initializer function ASAP
+    if ((this as any)[INSTANCE_IS_INITIALIZED] === true) {
+      initializer(this);
+      return;
+    }
+    // Init event has not happened yet, register the initializer for the event
+    listen(this, "init", () => initializer(this), { once: true });
+  });
 }
 
 type ReactiveOptions<T> = {
@@ -226,7 +227,7 @@ type ReactiveOptions<T> = {
 };
 
 type ReactiveDecorator<T extends HTMLElement> = (
-  value: () => any,
+  value: unknown,
   context: ClassMethodDecoratorContext<T, () => any>,
 ) => void;
 
@@ -235,37 +236,34 @@ export function reactive<T extends HTMLElement>(
 ): ReactiveDecorator<T> {
   return function (_, context): void {
     assertContext(context, "reactive", "method");
-    context.addInitializer(function () {
-      // Register the callback that performs the initial method call and sets up
-      // listeners for subsequent methods calls.
-      runOnInit(this, () => {
-        // We must NOT access the value outside (that is, before) the init
-        // callback function. The method's initializer function runs before
-        // accessors' initializer functions, which may lead to errors on the
-        // method's initial run (where the instance has not finished
-        // initializing).
-        const value = context.access.get(this);
-        // Initial method call, if applicable. Uses the non-debounced method if
-        // required and wraps it in predicate logic.
+    // Register the callback that performs the initial method call and sets up
+    // listeners for subsequent methods calls.
+    runContextInitializerOnOrnamentInit(context, (instance: T): void => {
+      // We must NOT access the value outside (that is, before) ornament's init event has occurred.
+      // callback function. The method's initializer function runs before
+      // accessors' initializer functions, which may lead to errors on the
+      // method's initial run (where the instance has not finished
+      // initializing).
+      const value = context.access.get(instance);
+      // Initial method call, if applicable. Uses the non-debounced method if
+      // required and wraps it in predicate logic.
+      if (
+        options.initial !== false &&
+        (!options.predicate || options.predicate(instance))
+      ) {
+        (window[DEBOUNCED_METHODS].get(value) ?? value).call(instance);
+      }
+      // Start listening only once the element's constructor has run to
+      // completion. This prevents prop set-up in the constructor from
+      // triggering reactive methods.
+      listen(instance, "prop", (name) => {
         if (
-          options.initial !== false &&
-          (!options.predicate || options.predicate(this))
+          (!options.predicate || options.predicate(instance)) &&
+          (!options.keys || options.keys.includes(name)) &&
+          (!options.excludeKeys || !options.excludeKeys.includes(name))
         ) {
-          (window[DEBOUNCED_METHODS].get(value) ?? value).call(this);
+          value.call(instance);
         }
-        // Start listening only once the element's constructor has run to
-        // completion. This prevents prop set-up in the constructor from
-        // triggering reactive methods.
-        listen(this, "prop", (name) => {
-          if (
-            (!options.predicate || options.predicate(this)) &&
-            (!options.keys || options.keys.includes(name)) &&
-            (!options.excludeKeys ||
-              options.excludeKeys.includes(name) === false)
-          ) {
-            value.call(this);
-          }
-        });
       });
     });
   };
@@ -294,36 +292,6 @@ type EventTargetFactory<T, E extends EventTarget = EventTarget> = (
   instance: T,
 ) => E;
 
-function createEventSubscriberInitializer<
-  T extends HTMLElement,
-  E extends Event,
->(
-  context: ClassMethodDecoratorContext<T>,
-  targetOrTargetFactory: EventTarget | EventTargetFactory<T>,
-  eventNames: string,
-  options: EventSubscribeOptions<T, E> = EMPTY_OBJ,
-): (this: T) => void {
-  return function (this: T) {
-    runOnInit(this, () => {
-      const callback = (evt: any) => {
-        if (!options.predicate || options.predicate(this, evt)) {
-          context.access.get(this).call(this, evt);
-        }
-      };
-      const eventTarget =
-        typeof targetOrTargetFactory === "function"
-          ? targetOrTargetFactory(this)
-          : targetOrTargetFactory;
-      for (const eventName of eventNames.trim().split(/\s+/)) {
-        window[UNSUBSCRIBE_REGISTRY].register(this, () =>
-          eventTarget.removeEventListener(eventName, callback, options),
-        );
-        eventTarget.addEventListener(eventName, callback, options);
-      }
-    });
-  };
-}
-
 type SignalSubscribeDecorator<T> = (
   value: Method<T, []>,
   context: ClassMethodDecoratorContext<T>,
@@ -336,39 +304,11 @@ type SignalLike<T> = {
 
 type SignalType<T> = T extends SignalLike<infer V> ? V : any;
 
-function isSignalLike(value: unknown): value is SignalLike<any> {
-  if (
-    value &&
-    typeof value === "object" &&
-    "subscribe" in value &&
-    typeof value.subscribe === "function"
-  ) {
-    return true;
-  }
-  return false;
-}
-
-function createSignalSubscriberInitializer<
-  T extends HTMLElement,
-  V,
-  S extends SignalLike<V>,
->(
-  context: ClassMethodDecoratorContext<T>,
-  target: S,
-  options: SignalSubscribeOptions<T, V> = EMPTY_OBJ,
-): (this: T) => void {
-  return function (this: T) {
-    runOnInit(this, () => {
-      const value = context.access.get(this);
-      const unsubscribe = target.subscribe(() => {
-        if (!options.predicate || options.predicate(this, target.value)) {
-          value.call(this, target);
-        }
-      });
-      window[UNSUBSCRIBE_REGISTRY].register(this, unsubscribe);
-    });
-  };
-}
+const isSignalLike = (value: unknown): value is SignalLike<any> =>
+  !!value &&
+  typeof value === "object" &&
+  "subscribe" in value &&
+  typeof value.subscribe === "function";
 
 export function subscribe<T extends HTMLElement, S extends SignalLike<any>>(
   target: S,
@@ -386,33 +326,54 @@ export function subscribe<
 ): EventSubscribeDecorator<T, E>;
 export function subscribe<T extends HTMLElement>(
   this: unknown,
-  target: EventTarget | EventTargetFactory<any> | SignalLike<any>,
+  targetOrFactory: EventTarget | EventTargetFactory<any> | SignalLike<any>,
   eventsOrOptions?: SubscribeOptions<T, any> | string,
-  options?: SubscribeOptions<T, any>,
+  options: SubscribeOptions<T, any> = EMPTY_OBJ,
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
   return function (_: unknown, context: ClassMethodDecoratorContext<T>): void {
     assertContext(context, "subscribe", "method");
+    // Arguments for subscribing to an event target
     if (
-      (typeof target === "function" || target instanceof EventTarget) &&
+      (typeof targetOrFactory === "function" ||
+        targetOrFactory instanceof EventTarget) &&
       typeof eventsOrOptions === "string"
     ) {
-      return context.addInitializer(
-        createEventSubscriberInitializer(
-          context,
-          target,
-          eventsOrOptions,
-          options,
-        ),
-      );
+      return runContextInitializerOnOrnamentInit(context, (instance: T) => {
+        const callback = (evt: any) => {
+          if (!options.predicate || options.predicate(instance, evt)) {
+            context.access.get(instance).call(instance, evt);
+          }
+        };
+        const target =
+          typeof targetOrFactory === "function"
+            ? targetOrFactory(instance)
+            : targetOrFactory;
+        for (const eventName of eventsOrOptions.trim().split(/\s+/)) {
+          window[UNSUBSCRIBE_REGISTRY].register(instance, () =>
+            target.removeEventListener(eventName, callback, options as any),
+          );
+          target.addEventListener(eventName, callback, options as any);
+        }
+      });
     }
+    // Arguments for subscribing to a signal
     if (
-      isSignalLike(target) &&
+      isSignalLike(targetOrFactory) &&
       (typeof eventsOrOptions === "object" ||
         typeof eventsOrOptions === "undefined")
     ) {
-      return context.addInitializer(
-        createSignalSubscriberInitializer(context, target, eventsOrOptions),
-      );
+      return runContextInitializerOnOrnamentInit(context, (instance: T) => {
+        const value = context.access.get(instance);
+        const unsubscribe = targetOrFactory.subscribe(() => {
+          if (
+            !eventsOrOptions?.predicate ||
+            eventsOrOptions.predicate(instance, targetOrFactory.value)
+          ) {
+            value.call(instance, targetOrFactory);
+          }
+        });
+        window[UNSUBSCRIBE_REGISTRY].register(instance, unsubscribe);
+      });
     }
     throw new Error("Invalid arguments to @subscribe");
   };
@@ -448,7 +409,7 @@ export const formDisabled = createLifecycleDecorator("formDisabled");
 export const formStateRestore = createLifecycleDecorator("formStateRestore");
 
 type AttrOptions = {
-  as?: string; // defaults to the attribute name
+  as?: string; // defaults to the accessor's name
   reflective?: boolean; // defaults to true
 };
 
