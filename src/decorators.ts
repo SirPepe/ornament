@@ -10,20 +10,24 @@ import {
 } from "./types.js";
 
 // Let's be extra paranoid about colliding with other metadata
-const METADATA_SYMBOL: unique symbol = Symbol.for("ORNAMENT_METADATA");
+const META: unique symbol = Symbol();
+const META_IS_ENHANCED: unique symbol = Symbol();
+const META_ATTRIBUTES: unique symbol = Symbol();
+const META_DEBOUNCED_METHODS: unique symbol = Symbol();
+const META_UNSUBSCRIBE: unique symbol = Symbol();
 
 type Metadata = {
-  isEnhanced: boolean;
-  observedAttributes: Set<string>;
-  debouncedMethods: Map<Method<any, any>, Method<any, any>>;
-  unsubscribeRegistry: FinalizationRegistry<() => void>;
+  [META_IS_ENHANCED]: boolean;
+  [META_ATTRIBUTES]: Set<string>;
+  [META_DEBOUNCED_METHODS]: Map<Method<any, any>, Method<any, any>>;
+  [META_UNSUBSCRIBE]: FinalizationRegistry<() => void>;
 };
 
 const metadataFactory = (): Metadata => ({
-  isEnhanced: false,
-  observedAttributes: new Set(),
-  debouncedMethods: new Map(),
-  unsubscribeRegistry: new FinalizationRegistry((f) => f()),
+  [META_IS_ENHANCED]: false,
+  [META_ATTRIBUTES]: new Set(),
+  [META_DEBOUNCED_METHODS]: new Map(),
+  [META_UNSUBSCRIBE]: new FinalizationRegistry((f) => f()),
 });
 
 function setMetadata<K extends keyof Metadata>(
@@ -31,22 +35,20 @@ function setMetadata<K extends keyof Metadata>(
   key: K,
   value: Metadata[K],
 ): void {
-  ((context.metadata[METADATA_SYMBOL] as Metadata) ??= metadataFactory())[key] =
-    value;
+  ((context.metadata[META] as Metadata) ??= metadataFactory())[key] = value;
 }
 
 function getMetadata<K extends keyof Metadata>(
   context: any, // the "proper" type DecoratorContext is too restrictive to work
   key: K,
 ): Metadata[K] {
-  return ((context.metadata[METADATA_SYMBOL] as Metadata) ??=
-    metadataFactory())[key];
+  return ((context.metadata[META] as Metadata) ??= metadataFactory())[key];
 }
 
 // Marks an instance as initialized. This is useful for non-enhanced subclasses
 // of an enhanced class that will miss the actual init event, but can use this
 // value to figure out whether that is indeed the case.
-const IS_INITIALIZED: unique symbol = Symbol.for("ORNAMENT_INITIALIZED");
+const IS_INITIALIZED: unique symbol = Symbol();
 
 // Un-clobber an accessor's name if the element upgrades after a property with
 // a matching name has already been set.
@@ -78,11 +80,11 @@ export function enhance<T extends CustomElementConstructor>(): (
     // directly or via some convoluted OOP mess) the mixin class must NOT be
     // be re-installed. A metadata flag indicates whether the class already has
     // had the mixin applied to it
-    if (getMetadata(context, "isEnhanced")) {
+    if (getMetadata(context, META_IS_ENHANCED)) {
       return target;
     }
 
-    setMetadata(context, "isEnhanced", true);
+    setMetadata(context, META_IS_ENHANCED, true);
 
     const originalObservedAttributes = new Set<string>(
       (target as any).observedAttributes ?? [],
@@ -103,7 +105,8 @@ export function enhance<T extends CustomElementConstructor>(): (
       // to have anything related to the event targets here... but just for fun:
       [BUS_TARGET]!: EventTarget; // this is entirely useless
 
-      // Indicates that the instance has had its init event triggered
+      // Indicates that the instance has had its init event triggered at the end
+      // of the constructor.
       [IS_INITIALIZED] = false;
 
       constructor(...args: any[]) {
@@ -115,7 +118,7 @@ export function enhance<T extends CustomElementConstructor>(): (
       static get observedAttributes(): string[] {
         return [
           ...originalObservedAttributes,
-          ...getMetadata(context, "observedAttributes"),
+          ...getMetadata(context, META_ATTRIBUTES),
         ];
       }
 
@@ -213,6 +216,8 @@ export function define<T extends CustomElementConstructor>(
   };
 }
 
+// Registers function to run when the context initializer and ornament's init
+// event have both run.
 function runContextInitializerOnOrnamentInit<
   T extends HTMLElement,
   C extends ClassMethodDecoratorContext<T, any>,
@@ -248,11 +253,11 @@ export function reactive<T extends HTMLElement>(
     // Register the callback that performs the initial method call and sets up
     // listeners for subsequent methods calls.
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
-      // We must NOT access the value outside (that is, before) ornament's init event has occurred.
-      // callback function. The method's initializer function runs before
-      // accessors' initializer functions, which may lead to errors on the
-      // method's initial run (where the instance has not finished
-      // initializing).
+      // We must NOT access the value outside (that is, before) ornament's init
+      // event has occurred. The method's initializer function runs before
+      // accessors' initializer functions, which may lead to errors with regards
+      // to private fields on the method's initial run (where the instance has
+      // not finished initializing).
       const value = context.access.get(instance);
       // Initial method call, if applicable. Uses the non-debounced method if
       // required and wraps it in predicate logic.
@@ -260,7 +265,7 @@ export function reactive<T extends HTMLElement>(
         options.initial !== false &&
         (!options.predicate || options.predicate(instance))
       ) {
-        (getMetadata(context, "debouncedMethods").get(value) ?? value).call(
+        (getMetadata(context, META_DEBOUNCED_METHODS).get(value) ?? value).call(
           instance,
         );
       }
@@ -360,7 +365,7 @@ export function subscribe<T extends HTMLElement>(
             ? targetOrFactory(instance)
             : targetOrFactory;
         for (const eventName of eventsOrOptions.trim().split(/\s+/)) {
-          getMetadata(context, "unsubscribeRegistry").register(instance, () =>
+          getMetadata(context, META_UNSUBSCRIBE).register(instance, () =>
             target.removeEventListener(eventName, callback, options as any),
           );
           target.addEventListener(eventName, callback, options as any);
@@ -383,7 +388,7 @@ export function subscribe<T extends HTMLElement>(
             value.call(instance, targetOrFactory);
           }
         });
-        getMetadata(context, "unsubscribeRegistry").register(instance, cancel);
+        getMetadata(context, META_UNSUBSCRIBE).register(instance, cancel);
       });
     }
     throw new Error("Invalid arguments to @subscribe");
@@ -457,7 +462,7 @@ export function attr<T extends HTMLElement, V>(
     // Add the name to the set of all observed attributes, even if "reflective"
     // if false. The content attribute must in all cases be observed to enable
     // the message bus to emit events.+
-    getMetadata(context, "observedAttributes").add(contentAttrName);
+    getMetadata(context, META_ATTRIBUTES).add(contentAttrName);
 
     // If the attribute needs to be observed and the accessor initializes,
     // register the attribute handler callback with the current element
@@ -645,7 +650,7 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
     // if it's not a field decorator, it must be a method decorator (and value
     // can only be a non-undefined method definition)
     const debounced = fn(value as Method<T, A>);
-    getMetadata(context, "debouncedMethods").set(
+    getMetadata(context, META_DEBOUNCED_METHODS).set(
       debounced,
       value as Method<T, A>,
     );
