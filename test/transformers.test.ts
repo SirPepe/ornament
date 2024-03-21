@@ -427,7 +427,7 @@ describe("Transformers", () => {
       const el = fixture.children[0] as Test;
       expect(el.foo).to.equal(0n);
       expect(fn.callCount).to.equal(1); // initial call
-      expect(fn.getCalls()[0].args).to.eql([0n]) // initial call
+      expect(fn.getCalls()[0].args).to.eql([0n]); // initial call
     });
 
     test("as nullable attribute", async () => {
