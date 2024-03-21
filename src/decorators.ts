@@ -9,40 +9,57 @@ import {
   assertContext,
 } from "./types.js";
 
-// Let's be extra paranoid about colliding with other metadata
-const META: unique symbol = Symbol();
 const META_IS_ENHANCED: unique symbol = Symbol();
 const META_ATTRIBUTES: unique symbol = Symbol();
 const META_DEBOUNCED_METHODS: unique symbol = Symbol();
 const META_UNSUBSCRIBE: unique symbol = Symbol();
 
 type Metadata = {
-  [META_IS_ENHANCED]: boolean;
-  [META_ATTRIBUTES]: Set<string>;
-  [META_DEBOUNCED_METHODS]: Map<Method<any, any>, Method<any, any>>;
-  [META_UNSUBSCRIBE]: FinalizationRegistry<() => void>;
+  [META_ATTRIBUTES]: { context: any; value: Set<string> };
+  [META_DEBOUNCED_METHODS]: {
+    context: HTMLElement;
+    value: WeakMap<Method<any, any>, Method<any, any>>;
+  };
+  [META_UNSUBSCRIBE]: { context: any; value: FinalizationRegistry<() => void> };
 };
 
-const metadataFactory = (): Metadata => ({
-  [META_IS_ENHANCED]: false,
-  [META_ATTRIBUTES]: new Set(),
-  [META_DEBOUNCED_METHODS]: new Map(),
-  [META_UNSUBSCRIBE]: new FinalizationRegistry((f) => f()),
-});
+// Decorator Metadata is not exactly useable as long as this bug is present in
+// babel: https://github.com/babel/babel/issues/16356
+// The workaround is to use a bunch of weak maps and have the API of setMetadata
+// and getMetadata be compatible with both decorator metadata and the current
+// workaround, more or less. All this can be re-rolled back to about
+// 98f4d068b5722608cd1d653edfb66a506545744b once the babel bug is fixed.
 
-function setMetadata<K extends keyof Metadata>(
-  context: any, // the "proper" type DecoratorContext is too restrictive to work
-  key: K,
-  value: Metadata[K],
-): void {
-  ((context.metadata[META] as Metadata) ??= metadataFactory())[key] = value;
-}
+// This should really be split on a class-by-class basis, but the @attr()
+// decorator has no context without decorator metadata. The list of observable
+// attributes must be available before the accessor initializers run, so the
+// only way forward is to observe every attribute defined by @attr() on all
+// classes.
+const ALL_ATTRIBUTES = new Set<string>();
 
+// Scoped by component instance
+const ALL_DEBOUNCED_METHODS = new WeakMap<any, WeakMap<Method<any, any>, Method<any, any>>>(); // eslint-disable-line
+
+// Global, just like the attributes
+const UNSUBSCRIBE_REGISTRY = new FinalizationRegistry<() => void>((f) => f());
+
+// Can be rewritten to support Decorator metadata once that's fixed.
 function getMetadata<K extends keyof Metadata>(
-  context: any, // the "proper" type DecoratorContext is too restrictive to work
+  context: Metadata[K]["context"],
   key: K,
-): Metadata[K] {
-  return ((context.metadata[META] as Metadata) ??= metadataFactory())[key];
+): Metadata[K]["value"] {
+  if (key === META_ATTRIBUTES) {
+    return ALL_ATTRIBUTES as any;
+  }
+  if (key === META_DEBOUNCED_METHODS) {
+    let methodMap = ALL_DEBOUNCED_METHODS.get(context);
+    if (!methodMap) {
+      methodMap = new WeakMap();
+      ALL_DEBOUNCED_METHODS.set(context, methodMap);
+    }
+    return methodMap as any;
+  }
+  return UNSUBSCRIBE_REGISTRY as any;
 }
 
 // Marks an instance as initialized. This is useful for non-enhanced subclasses
@@ -80,11 +97,9 @@ export function enhance<T extends CustomElementConstructor>(): (
     // directly or via some convoluted OOP mess) the mixin class must NOT be
     // be re-installed. A metadata flag indicates whether the class already has
     // had the mixin applied to it
-    if (getMetadata(context, META_IS_ENHANCED)) {
+    if ((target as any)[META_IS_ENHANCED]) {
       return target;
     }
-
-    setMetadata(context, META_IS_ENHANCED, true);
 
     const originalObservedAttributes = new Set<string>(
       (target as any).observedAttributes ?? [],
@@ -108,6 +123,9 @@ export function enhance<T extends CustomElementConstructor>(): (
       // Indicates that the instance has had its init event triggered at the end
       // of the constructor.
       [IS_INITIALIZED] = false;
+
+      // Indicates that the class has been enhanced
+      static [META_IS_ENHANCED] = true;
 
       constructor(...args: any[]) {
         super(...args);
@@ -265,9 +283,9 @@ export function reactive<T extends HTMLElement>(
         options.initial !== false &&
         (!options.predicate || options.predicate(instance))
       ) {
-        (getMetadata(context, META_DEBOUNCED_METHODS).get(value) ?? value).call(
-          instance,
-        );
+        (
+          getMetadata(instance, META_DEBOUNCED_METHODS).get(value) ?? value
+        ).call(instance);
       }
       // Start listening only once the element's constructor has run to
       // completion. This prevents prop set-up in the constructor from
@@ -635,7 +653,7 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
     assertContext(context, "debounce", ["field", "method"], true);
     if (context.kind === "field") {
       // Field decorator (bound methods)
-      return context.addInitializer(function () {
+      return context.addInitializer(function (): void {
         const func = context.access.get(this);
         if (typeof func !== "function") {
           throw new TypeError(
@@ -650,10 +668,12 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
     // if it's not a field decorator, it must be a method decorator (and value
     // can only be a non-undefined method definition)
     const debounced = fn(value as Method<T, A>);
-    getMetadata(context, META_DEBOUNCED_METHODS).set(
-      debounced,
-      value as Method<T, A>,
-    );
+    context.addInitializer(function (this: T): void {
+      getMetadata(this, META_DEBOUNCED_METHODS).set(
+        debounced,
+        value as Method<T, A>,
+      );
+    });
     return debounced;
   }
   return decorator;
