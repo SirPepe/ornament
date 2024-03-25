@@ -106,19 +106,26 @@ export function enhance<T extends CustomElementConstructor>(): (
     );
 
     // Installs the mixin class. This kindof changes the type of the input
-    // constructor T, but as TypeScript can currently not use class decorators
-    // to change the type, we don't bother. The changes are really small and
-    // only affects lifecycle callbacks, which are not really "public" anyway.
+    // constructor T, but as TypeScript can as of December 2022 not understand
+    // decorators that change their target's types, we don't bother. The changes
+    // are extremely small anyway and the only publicly visible changes affect
+    // lifecycle callbacks, which are de facto public, but not meant to be
+    // "public" as commonly understood by TypeScript (or anyone, really).
     // See https://github.com/microsoft/TypeScript/issues/51347
     return class extends target {
-      // Instances WILL end up with an field [BUS_TARGET] containing the event
-      // target for the event bus. But because these targets may be needed
-      // before the class declarations, including this code, finish initializing
-      // (or they may be never needed), the event bus function just slaps them
-      // on instances if and when they become important. And because TypeScript
-      // can't do anything with the mixin class type, there is no *real* reason
-      // to have anything related to the event targets here... but just for fun:
-      [BUS_TARGET]!: EventTarget; // this is entirely useless
+      // Instances will most likely end up with an field [BUS_TARGET] containing
+      // the event target for the event bus. But because these targets may be
+      // needed before the class declarations, including this code, finish
+      // initializing (or they may be never needed), the event bus functions
+      // just slap them on instances if and when they become important. And
+      // because TypeScript can't do anything with the mixin class type, there
+      // is no *real* reason to have any code related to the event targets here,
+      // but if TS worked as advertised, the line below would accurately
+      // describe the observable effects the program has:
+      // [BUS_TARGET]!: EventTarget; // this is entirely useless
+      // March 2023: a workaround for a plugin ordering issue in babel requires
+      // the line above to be commented out. See the entire thread at
+      // https://github.com/babel/babel/issues/16373#issuecomment-2017480546
 
       // Indicates that the instance has had its init event triggered at the end
       // of the constructor.
