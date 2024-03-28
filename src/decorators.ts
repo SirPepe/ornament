@@ -259,6 +259,7 @@ function runContextInitializerOnOrnamentInit<
   });
 }
 
+// Method decorator @init() runs a methods once an instance initializes.
 export function init<T extends HTMLElement>(): MethodDecorator<T, Method<T>> {
   return function (_, context): void {
     assertContext(context, "init", "method");

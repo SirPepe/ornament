@@ -623,15 +623,40 @@ describe("Decorators", () => {
       expect(fn.getCalls()[0].args).to.eql([3, el]);
     });
 
+    test("debouncing private class methods", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) }) #test(x: number): number {
+          fn(x, this);
+          return x;
+        }
+        test(x: number): void {
+          this.#test(x);
+        }
+      }
+      const el = new Test();
+      el.test(1);
+      el.test(2);
+      el.test(3);
+      await wait(100);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([3, el]);
+    });
+
     test("access to private fields", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         #foo = 42;
         // Using timeout because RAF is unreliable in headless browsers
-        @debounce({ fn: debounce.timeout(0) }) test(x: number): number {
+        @debounce({ fn: debounce.timeout(0) }) #test(x: number): number {
           fn(x, this.#foo, this);
           return x;
+        }
+        test(x: number): void {
+          this.#test(x);
         }
       }
       const el = new Test();
