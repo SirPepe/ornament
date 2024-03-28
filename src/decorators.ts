@@ -425,7 +425,9 @@ function createLifecycleDecorator<K extends keyof OrnamentEventMap>(
     ): void {
       assertContext(context, name, "method");
       context.addInitializer(function () {
-        listen(this, name, context.access.get(this));
+        listen(this, name, (...args) =>
+          context.access.get(this).call(this, ...args),
+        );
       });
     };
 }

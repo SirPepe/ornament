@@ -6,3 +6,4 @@
   The `initial` option has been removed. Use `@init()` instead.
 * **Feature**: new decorator `@init()` runs methods on instance initialization
   (that is, when the constructor has completed)
+* **Bigfix**: [@connected() on private methods throws when an already-connected component initializes](https://github.com/SirPepe/ornament/issues/7)

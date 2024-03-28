@@ -709,6 +709,22 @@ describe("Decorators", () => {
       expect(disconnectFn.callCount).to.equal(1);
       expect(disconnectFn.getCalls()[0].args).to.eql([instance, 42]);
     });
+
+    test("fire private method on connect with access to private fields when already connected", async () => {
+      const connectFn = spy();
+      const tagName = generateTagName();
+      const instance = document.createElement(tagName);
+      document.body.append(instance);
+      @define(tagName)
+      class Test extends HTMLElement {
+        #test = 42;
+        @connected() #connected() {
+          connectFn(this, this.#test);
+        }
+      }
+      expect(connectFn.callCount).to.equal(1);
+      expect(connectFn.getCalls()[0].args).to.eql([instance, 42]);
+    });
   });
 
   describe("@adopted", () => {
