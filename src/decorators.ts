@@ -649,7 +649,7 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
     value: Method<T, A> | undefined,
     context: FunctionFieldOrMethodContext<T, A>,
   ): Method<T, A> | void {
-    assertContext(context, "debounce", ["field", "method"], true);
+    assertContext(context, "debounce", ["field", "method"]);
     if (context.kind === "field") {
       // Field decorator (bound methods)
       return context.addInitializer(function (): void {

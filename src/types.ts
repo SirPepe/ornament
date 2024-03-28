@@ -168,16 +168,15 @@ export function assertContext(
   ctx: any,
   name: string,
   kinds: DecoratorContext["kind"] | DecoratorContext["kind"][],
-  acceptStatic: boolean = false,
 ): void {
   kinds = isArray(kinds) ? kinds : [kinds];
+  if (ctx.static) {
+    throw new TypeError(`@${name} can't be used on static members`);
+  }
   if (!kinds.includes(ctx.kind)) {
     const expected = kinds
       .map((kind) => kind[0].toUpperCase() + kind.slice(1))
       .join("/");
     throw new TypeError(`${expected} decorator @${name} used on ${ctx.kind}`);
-  }
-  if (ctx.static && !acceptStatic) {
-    throw new TypeError(`@${name} can't be used on static members`);
   }
 }
