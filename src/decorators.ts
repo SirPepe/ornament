@@ -6,6 +6,7 @@ import {
   type FunctionFieldOrMethodDecorator,
   type FunctionFieldOrMethodContext,
   type Method,
+  type MethodDecorator,
   assertContext,
 } from "./types.js";
 
@@ -258,52 +259,41 @@ function runContextInitializerOnOrnamentInit<
   });
 }
 
+export function init<T extends HTMLElement>(): MethodDecorator<T, Method<T>> {
+  return function (_, context): void {
+    assertContext(context, "init", "method");
+    runContextInitializerOnOrnamentInit(context, (instance: T): void => {
+      const method = context.access.get(instance);
+      (
+        getMetadata(instance, META_DEBOUNCED_METHODS).get(method) ?? method
+      ).call(instance);
+    });
+  };
+}
+
 type ReactiveOptions<T> = {
-  initial?: boolean;
   keys?: (string | symbol)[];
   excludeKeys?: (string | symbol)[];
   predicate?: (instance: T) => boolean;
 };
 
-type ReactiveDecorator<T extends HTMLElement> = (
-  value: unknown,
-  context: ClassMethodDecoratorContext<T, () => any>,
-) => void;
-
 export function reactive<T extends HTMLElement>(
   options: ReactiveOptions<T> = EMPTY_OBJ,
-): ReactiveDecorator<T> {
+): MethodDecorator<T> {
   return function (_, context): void {
     assertContext(context, "reactive", "method");
-    // Register the callback that performs the initial method call and sets up
-    // listeners for subsequent methods calls.
+    // Start listening only once the element's constructor has run to
+    // completion. This prevents prop set-up in the constructor from triggering
+    // reactive methods.
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
-      // We must NOT access the value outside (that is, before) ornament's init
-      // event has occurred. The method's initializer function runs before
-      // accessors' initializer functions, which may lead to errors with regards
-      // to private fields on the method's initial run (where the instance has
-      // not finished initializing).
-      const value = context.access.get(instance);
-      // Initial method call, if applicable. Uses the non-debounced method if
-      // required and wraps it in predicate logic.
-      if (
-        options.initial !== false &&
-        (!options.predicate || options.predicate(instance))
-      ) {
-        (
-          getMetadata(instance, META_DEBOUNCED_METHODS).get(value) ?? value
-        ).call(instance);
-      }
-      // Start listening only once the element's constructor has run to
-      // completion. This prevents prop set-up in the constructor from
-      // triggering reactive methods.
+      const method = context.access.get(instance);
       listen(instance, "prop", (name) => {
         if (
           (!options.predicate || options.predicate(instance)) &&
           (!options.keys || options.keys.includes(name)) &&
           (!options.excludeKeys || !options.excludeKeys.includes(name))
         ) {
-          value.call(instance);
+          method.call(instance);
         }
       });
     });
@@ -673,7 +663,8 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
       });
     }
     // if it's not a field decorator, it must be a method decorator (and value
-    // can only be a non-undefined method definition)
+    // can only be a non-undefined method definition, that we can replace with
+    // a debounced equivalent)
     const debounced = fn(value as Method<T, A>);
     context.addInitializer(function (this: T): void {
       getMetadata(this, META_DEBOUNCED_METHODS).set(

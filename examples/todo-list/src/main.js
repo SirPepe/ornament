@@ -1,6 +1,6 @@
 // This example is a simple Todo SPA built with Ornament, uhtml and Signals. It
 // demonstrates how Ornament plus some addons (a base class and a custom
-// decorator) can deliver a reasonable DX.
+// decorator) can deliver a reasonable DX with next to no custom code.
 
 import {
   define,

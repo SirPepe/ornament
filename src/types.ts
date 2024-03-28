@@ -82,11 +82,16 @@ export type Transformer<
   ) => boolean | null;
 };
 
+export type MethodDecorator<
+  T extends HTMLElement,
+  M extends () => any = () => any,
+> = (value: M, context: ClassMethodDecoratorContext<T, M>) => void;
+
 /* eslint-disable */
 export type ClassAccessorDecorator<T extends HTMLElement, V, R extends ClassAccessorDecoratorResult<unknown, unknown> | void = ClassAccessorDecoratorResult<T, V>>
   = (target: ClassAccessorDecoratorTarget<T, V>, context: ClassAccessorDecoratorContext<T, V>) => R;
 
-export type Method<T, A extends unknown[]> = (this: T, ...args: A) => any;
+export type Method<T, A extends unknown[] = []> = (this: T, ...args: A) => any;
 export type FunctionFieldOrMethodContext<T, A extends unknown[]> =
   | ClassMethodDecoratorContext<T, Method<T, A>>
   | ClassFieldDecoratorContext<T, Method<T, A>>;

@@ -18,6 +18,7 @@ import {
   json,
   number,
   string,
+  init,
 } from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 import { signal } from "@preact/signals-core";
@@ -38,14 +39,14 @@ describe("Decorators", () => {
       const fnTest = spy();
       class Base extends HTMLElement {
         @prop(number()) accessor foo = 23;
-        @reactive({ initial: false }) methodBase() {
+        @reactive() methodBase() {
           fnBase();
         }
       }
       @enhance()
       class Test extends Base {
         @prop(string()) accessor bar = "A";
-        @reactive({ initial: false }) methodTest() {
+        @reactive() methodTest() {
           fnTest();
         }
       }
@@ -73,11 +74,9 @@ describe("Decorators", () => {
       }
       window.customElements.define(generateTagName(), Test);
       const instance = new Test();
-      expect(fn.callCount).to.equal(1); // Initial call
-      expect(fn.getCalls()[0].args).to.eql(["A"]); // Initial call
       instance.foo = "B";
-      expect(fn.callCount).to.equal(2);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
     test("content attribute access on the base class of an upgraded subclass", () => {
@@ -98,14 +97,12 @@ describe("Decorators", () => {
       document.body.append(fixture);
       fixture.innerHTML = `<${tagName} foo="bar"></${tagName}>`;
       const instance = fixture.children[0] as Test;
-      expect(fn.callCount).to.equal(1); // Initial call
-      expect(fn.getCalls()[0].args).to.eql(["bar"]); // Initial call
       instance.foo = "baz";
-      expect(fn.callCount).to.equal(2);
-      expect(fn.getCalls()[1].args).to.eql(["baz"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["baz"]);
       instance.setAttribute("foo", "foo");
-      expect(fn.callCount).to.equal(3);
-      expect(fn.getCalls()[2].args).to.eql(["foo"]);
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[1].args).to.eql(["foo"]);
     });
 
     test("upgrade only a base class", () => {
@@ -114,13 +111,13 @@ describe("Decorators", () => {
       @enhance()
       class Base extends HTMLElement {
         @prop(number()) accessor foo = 23;
-        @reactive({ initial: false }) methodBase() {
+        @reactive() methodBase() {
           fnBase();
         }
       }
       class Test extends Base {
         @prop(string()) accessor bar = "A";
-        @reactive({ initial: false }) methodTest() {
+        @reactive() methodTest() {
           fnTest();
         }
       }
@@ -140,7 +137,7 @@ describe("Decorators", () => {
       @enhance()
       class Test extends HTMLElement {
         @prop(number()) accessor test = 23;
-        @reactive({ initial: false }) method() {
+        @reactive() method() {
           fn(); // called *once* if enhance only applies its effect once
         }
       }
@@ -156,14 +153,14 @@ describe("Decorators", () => {
       @enhance()
       class Base extends HTMLElement {
         @prop(number()) accessor foo = 23;
-        @reactive({ initial: false }) methodBase() {
+        @reactive() methodBase() {
           fnBase(); // called *once* if enhance only applies its effect once
         }
       }
       @enhance()
       class Test extends Base {
         @prop(string()) accessor bar = "A";
-        @reactive({ initial: false }) methodTest() {
+        @reactive() methodTest() {
           fnTest(); // called *once* if enhance only applies its effect once
         }
       }
@@ -194,7 +191,7 @@ describe("Decorators", () => {
       class Base extends HTMLElement {
         baseFn = spy();
         @prop(number()) accessor foo = 23;
-        @reactive({ initial: false }) methodBase() {
+        @reactive() methodBase() {
           this.baseFn();
         }
       }
@@ -202,7 +199,7 @@ describe("Decorators", () => {
       class Test extends Base {
         testFn = spy();
         @prop(string()) accessor bar = "A";
-        @reactive({ initial: false }) methodTest() {
+        @reactive() methodTest() {
           this.testFn();
         }
       }
@@ -342,7 +339,7 @@ describe("Decorators", () => {
         attributeChangedCallback(name: string): void {
           userDefinedCallback(this, name);
         }
-        @reactive({ initial: false }) test() {
+        @reactive() test() {
           reactiveCallback(this);
         }
       }
@@ -378,22 +375,6 @@ describe("Decorators", () => {
       const container = document.createElement("div");
       container.innerHTML = `<${tagName} x="B"></${tagName}>`;
       expect((container.children[0] as any).x).to.equal("B");
-    });
-
-    test("initialize attribute value early", async () => {
-      const fn = spy();
-      const tagName = generateTagName();
-      @define(tagName)
-      class Test extends HTMLElement {
-        @attr(string()) accessor x = "A"; // this never appears
-        @reactive()
-        test() {
-          fn(this.x);
-        }
-      }
-      const container = document.createElement("div");
-      container.innerHTML = `<${tagName} x="B"></${tagName}>`;
-      expect(fn.getCalls().map(({ args }) => args)).to.eql([["B"]]);
     });
 
     test("Non-reflective attribute", async () => {
@@ -856,21 +837,24 @@ describe("Decorators", () => {
 
   describe.skip("@formStateRestore", () => undefined);
 
-  describe("@reactive", () => {
-    test("initial call with reactive property", async () => {
+  describe("@init", () => {
+    test("run on init", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
-        @reactive() test() {
+        @init() test() {
           fn(this.x);
         }
       }
-      new Test();
+      const el = new Test();
+      el.x = "B";
       expect(fn.callCount).to.equal(1);
       expect(fn.getCalls()[0].args).to.eql(["A"]);
     });
+  });
 
+  describe("@reactive", () => {
     test("prop change", async () => {
       const fn = spy();
       @define(generateTagName())
@@ -882,9 +866,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "B";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A"]);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
     test("prop changes in the constructor cause no reaction", async () => {
@@ -902,9 +885,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "C";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["B"]);
-      expect(fn.getCalls()[1].args).to.eql(["C"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["C"]);
     });
 
     test("two prop changes", async () => {
@@ -920,10 +902,9 @@ describe("Decorators", () => {
       const el = new Test();
       el.x = "B";
       el.y = "Y";
-      expect(fn.callCount).to.equal(3); // initial + two updates
-      expect(fn.getCalls()[0].args).to.eql(["A", "Z"]);
-      expect(fn.getCalls()[1].args).to.eql(["B", "Z"]);
-      expect(fn.getCalls()[2].args).to.eql(["B", "Y"]);
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[0].args).to.eql(["B", "Z"]);
+      expect(fn.getCalls()[1].args).to.eql(["B", "Y"]);
     });
 
     test("multiple prop changes with the same value only cause one effect to run", async () => {
@@ -939,9 +920,8 @@ describe("Decorators", () => {
       el.x = "B";
       el.x = "B";
       el.x = "B";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A"]);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
     test("multiple attr changes with the same value only cause one effect to run (primitives)", async () => {
@@ -957,9 +937,8 @@ describe("Decorators", () => {
       el.x = "B";
       el.x = "B";
       el.x = "B";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A"]);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
     test("attr change causes only one effect to run, not also the attributeChangedCallback (objects)", async () => {
@@ -973,9 +952,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = [2];
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql([[1]]);
-      expect(fn.getCalls()[1].args).to.eql([[2]]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([[2]]);
     });
 
     test("attr change causes only one effect to run, not also the attributeChangedCallback (two primitive updates)", async () => {
@@ -984,7 +962,7 @@ describe("Decorators", () => {
       class Test extends HTMLElement {
         @attr(string()) accessor foo = "a";
         @attr(string()) accessor bar = "x";
-        @reactive({ initial: false }) test() {
+        @reactive() test() {
           fn(this.foo, this.bar);
         }
       }
@@ -1002,7 +980,6 @@ describe("Decorators", () => {
       class Test extends HTMLElement {
         @prop(number()) accessor value = 0;
         @reactive({
-          initial: false,
           predicate: (instance) => instance.value % 2 === 0,
         })
         test() {
@@ -1033,7 +1010,6 @@ describe("Decorators", () => {
           return instance.#value % 2 === 0;
         }
         @reactive({
-          initial: false,
           predicate: (instance) => Test.triggerReactive(instance),
         })
         test() {
@@ -1065,10 +1041,10 @@ describe("Decorators", () => {
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
         @prop(string()) accessor y = "Z";
-        @reactive({ keys: ["x"], initial: false }) testX() {
+        @reactive({ keys: ["x"] }) testX() {
           fnX(this.x, this.y);
         }
-        @reactive({ keys: ["y"], initial: false }) testY() {
+        @reactive({ keys: ["y"] }) testY() {
           fnY(this.x, this.y);
         }
       }
@@ -1094,10 +1070,10 @@ describe("Decorators", () => {
         setX(value: string): void {
           this.#x = value;
         }
-        @reactive({ keys: ["#x"], initial: false }) testX() {
+        @reactive({ keys: ["#x"] }) testX() {
           fnX(this.#x, this.y);
         }
-        @reactive({ keys: ["y"], initial: false }) testY() {
+        @reactive({ keys: ["y"] }) testY() {
           fnY(this.#x, this.y);
         }
       }
@@ -1124,9 +1100,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "B";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A"]);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
     test("attributes changes via setAttribute trigger @reactive", async () => {
@@ -1140,46 +1115,7 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.setAttribute("x", "B");
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A"]);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
-    });
-
-    test("skip initial call with options.initial = false", async () => {
-      const fn = spy();
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        @prop(string()) accessor x = "A";
-        @reactive({ initial: false }) test() {
-          fn(this.x);
-        }
-      }
-      const el = new Test();
-      el.x = "B";
-      expect(fn.callCount).to.equal(1); // one update
-      expect(fn.getCalls()[0].args).to.eql(["B"]);
-    });
-
-    test("skip initial call when options.predicate returns false", async () => {
-      const fn = spy();
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        value = false;
-        @prop(string()) accessor x = "A";
-        @reactive({
-          predicate(instance) {
-            const result = instance.value;
-            instance.value = true;
-            return result;
-          },
-        })
-        test() {
-          fn(this.x);
-        }
-      }
-      const el = new Test();
-      el.x = "B";
-      expect(fn.callCount).to.equal(1); // one update
+      expect(fn.callCount).to.equal(1);
       expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
@@ -1195,9 +1131,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "B";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A", 42]);
-      expect(fn.getCalls()[1].args).to.eql(["B", 42]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B", 42]);
     });
 
     test("on a base class", async () => {
@@ -1213,7 +1148,7 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.foo = 23;
-      expect(fn.callCount).to.equal(2); // initial + 1 update
+      expect(fn.callCount).to.equal(1);
     });
 
     test("reject on static methods", async () => {
@@ -1467,7 +1402,7 @@ describe("Decorators", () => {
   });
 
   describe("@reactive + @debounce", () => {
-    test("debounced @reactive method", async () => {
+    test("debounced reactive method", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -1475,6 +1410,30 @@ describe("Decorators", () => {
         @reactive()
         // Using timeout because RAF is unreliable in headless browsers
         @debounce({ fn: debounce.timeout(0) })
+        test() {
+          fn(this.x);
+        }
+      }
+      const el = new Test();
+      el.x = "B";
+      el.x = "C";
+      el.x = "D";
+      await wait(25);
+      expect(fn.callCount).to.equal(1); // only one update
+      expect(fn.getCalls()[0].args).to.eql(["D"]);
+    });
+  });
+
+  describe("@reactive + @init + @debounce", () => {
+    test("debounced reactive init method", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive()
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) })
+        @init()
         test() {
           fn(this.x);
         }
