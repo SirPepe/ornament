@@ -411,20 +411,23 @@ export function subscribe<T extends HTMLElement>(
   };
 }
 
-type LifecycleDecorator<T extends HTMLElement, Arguments extends any[]> = (
-  _: Method<T, Arguments>,
-  context: ClassMethodDecoratorContext<T, (this: T, ...args: any) => any>,
-) => void;
+type LifecycleDecorator<T extends HTMLElement, A extends any[]> = {
+  (
+    _: unknown,
+    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => any>,
+  ): void;
+  (
+    _: unknown,
+    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => any>,
+  ): void;
+};
 
 function createLifecycleDecorator<K extends keyof OrnamentEventMap>(
   name: K,
 ): <T extends HTMLElement>() => LifecycleDecorator<T, OrnamentEventMap[K]> {
-  return <T extends HTMLElement>() =>
-    function (
-      _: Method<T, OrnamentEventMap[K]>,
-      context: ClassMethodDecoratorContext<T>,
-    ): void {
-      assertContext(context, name, "method");
+  return <T extends HTMLElement>(): LifecycleDecorator<T, OrnamentEventMap[K]> => // eslint-disable-line
+    function (_, context) {
+      assertContext(context, name, ["method", "field-function"]);
       context.addInitializer(function () {
         listen(this, name, (...args) =>
           context.access.get(this).call(this, ...args),

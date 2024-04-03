@@ -670,7 +670,7 @@ describe("Decorators", () => {
   });
 
   describe("@connected/@disconnected", () => {
-    test("fire on (dis)connect", async () => {
+    test("methods fire on (dis)connect", async () => {
       const connectFn = spy();
       const disconnectFn = spy();
       @define(generateTagName())
@@ -689,6 +689,33 @@ describe("Decorators", () => {
       expect(connectFn.getCalls()[0].args).to.eql([instance]);
       expect(disconnectFn.callCount).to.equal(1);
       expect(disconnectFn.getCalls()[0].args).to.eql([instance]);
+    });
+
+    test("field functions fire on (dis)connect", async () => {
+      const connectFn = spy();
+      const disconnectFn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @connected() connected = () => connectFn(this);
+        @disconnected() disconnected = () => disconnectFn(this);
+      }
+      const instance = new Test();
+      document.body.append(instance);
+      instance.remove();
+      expect(connectFn.callCount).to.equal(1);
+      expect(connectFn.getCalls()[0].args).to.eql([instance]);
+      expect(disconnectFn.callCount).to.equal(1);
+      expect(disconnectFn.getCalls()[0].args).to.eql([instance]);
+    });
+
+    test("fail on non-functions type fields", async () => {
+      expect(() => {
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @connected() connected: any = 42;
+        }
+        new Test();
+      }).to.throw();
     });
 
     test("no duplicate registration from multiple instances", async () => {
@@ -753,13 +780,25 @@ describe("Decorators", () => {
   });
 
   describe("@adopted", () => {
-    test("fire on adoption", async () => {
+    test("fire methods on adoption", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @adopted() adopted() {
           fn(this);
         }
+      }
+      const instance = new Test();
+      new Document().adoptNode(instance);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([instance]);
+    });
+
+    test("fire field functions on adoption", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @adopted() adopted = () => fn(this);
       }
       const instance = new Test();
       new Document().adoptNode(instance);
@@ -789,7 +828,7 @@ describe("Decorators", () => {
   });
 
   describe("@formAssociated", () => {
-    test("fire on form association", async () => {
+    test("fire methods on form association", async () => {
       const decoratedSpy = spy();
       const lifecycleCallbackSpy = spy();
       @define(generateTagName())
@@ -817,10 +856,29 @@ describe("Decorators", () => {
         lifecycleCallbackSpy.getCalls().map(({ args }) => args),
       );
     });
+
+    test("fire field functions on form association", async () => {
+      const decoratedSpy = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        static formAssociated = true;
+        @formAssociated() associated = (owner: HTMLFormElement | null) =>
+          decoratedSpy(this, owner);
+      }
+      const instance = new Test();
+      const form = document.createElement("form");
+      new Document().append(form);
+      form.append(instance);
+      expect(decoratedSpy.callCount).to.equal(1);
+      expect(decoratedSpy.getCalls()[0].args).to.eql([instance, form]);
+      instance.remove();
+      expect(decoratedSpy.callCount).to.equal(2);
+      expect(decoratedSpy.getCalls()[1].args).to.eql([instance, null]);
+    });
   });
 
   describe("@formReset", () => {
-    test("fire on form reset", async () => {
+    test("fire methods on form reset", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -839,10 +897,28 @@ describe("Decorators", () => {
       expect(fn.getCalls()[0].args).to.eql([instance]);
       document.body.removeChild(form);
     });
+
+    test("fire field functions on form reset", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        static formAssociated = true;
+        @formReset() reset = () => fn(this);
+      }
+      const instance = new Test();
+      const form = document.createElement("form");
+      document.body.append(form);
+      form.append(instance);
+      form.reset();
+      await wait(); // The reset algorithm is async
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([instance]);
+      document.body.removeChild(form);
+    });
   });
 
   describe("@formDisabled", () => {
-    test("fire on fieldset disable", async () => {
+    test("fire methods on fieldset disable", async () => {
       const decoratedSpy = spy();
       const lifecycleCallbackSpy = spy();
       @define(generateTagName())
@@ -874,8 +950,31 @@ describe("Decorators", () => {
         lifecycleCallbackSpy.getCalls().map(({ args }) => args),
       );
     });
+
+    test("fire class fields on fieldset disable", async () => {
+      const decoratedSpy = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        static formAssociated = true;
+        @formDisabled() disable = (state: boolean) => decoratedSpy(this, state);
+      }
+      const instance = new Test();
+      const form = document.createElement("form");
+      const fieldset = document.createElement("fieldset");
+      new Document().append(form);
+      form.append(fieldset);
+      fieldset.append(instance);
+      expect(decoratedSpy.callCount).to.equal(0);
+      fieldset.disabled = true;
+      expect(decoratedSpy.callCount).to.equal(1);
+      expect(decoratedSpy.getCalls()[0].args).to.eql([instance, true]);
+      fieldset.disabled = false;
+      expect(decoratedSpy.callCount).to.equal(2);
+      expect(decoratedSpy.getCalls()[1].args).to.eql([instance, false]);
+    });
   });
 
+  // Don't know how to properly test this one ¯\_(ツ)_/¯
   describe.skip("@formStateRestore", () => undefined);
 
   describe("@init", () => {

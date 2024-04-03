@@ -5,9 +5,9 @@
   <img alt="" src="./assets/logo.png">
 </picture>
 
-Unopinionated, pareto-optimal, tiny (< 4k) anti-framework for building vanilla
-web component infrastructure. Makes dealing with attributes, updates and
-lifecycle callbacks declarative and simple...
+Mid-level, pareto-optimal, tiny (< 4k) anti-framework for building vanilla web
+component infrastructure. Makes dealing with attributes, updates and lifecycle
+callbacks declarative and simple...
 
 ```javascript
 import { define, attr, string, number, connected, reactive } from "@sirpepe/ornament";
@@ -145,10 +145,10 @@ Both snippets perform the same function:
   - initial values initialized from HTML (when possible)
   - content attribute change handling (via `setAttribute()` and the like)
   - DOM attribute change handling via a JavaScript getter/setter pair, with type checking/coercion included (`name` is always a string, `age` is always a number >= 0)
-  - safeguarding against shadows prototype properties in case of delayed upgrades
+  - safeguarding against shadowed prototype properties in case of delayed upgrades
 - implement a `greet()` method that...
-  - automatically gets called when any of the attributes decorated with `@attr` change
-  - automatically gets called when the element instance connects to the DOM
+  - automatically executes when any of the attributes decorated with `@attr()` change
+  - automatically executes when the element instance connects to the DOM
 
 Ornament makes *only the most tedious bits* of building vanilla web components
 (attribute handling and lifecycle reactions) easy by adding some primitives that
@@ -374,23 +374,23 @@ for something else, or combine any of the above with hand-written logic.
 
 ### API overview
 
-| Decorator             | Class element | `static` | `#private` | Symbols | Summary                                                                                                          |
-| --------------------- | -------- ---- | -------- | ---------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
-| `@define()`           | Class         | -        | -          | -       | Register a custom element class with a tag name and set it up for use with Ornament's other decorators           |
-| `@enhance()`          | Class         | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do *not* register it with a tag name |
-| `@prop()`             | Accessor      | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                            |
-| `@attr()`             | Accessor      | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type            |
-| `@init()`             | Method        | ✕        | ✓          | ✓       | Run a method after the class constructor finishes                                                                |
-| `@reactive()`         | Method        | ✕        | ✓          | ✓       | Run a method when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions)        |
-| `@connected()`        | Method        | ✕        | ✓          | ✓       | Run a method when the element connects to the DOM                                                                |
-| `@disconnected()`     | Method        | ✕        | ✓          | ✓       | Run a method when the element disconnects from the DOM                                                           |
-| `@adopted()`          | Method        | ✕        | ✓          | ✓       | Run a method when the element is adopted by a new document                                                       |
-| `@formAssociated()`   | Method        | ✕        | ✓          | ✓       | Run a method when the element is associated with a form element                                                  |
-| `@formReset()`        | Method        | ✕        | ✓          | ✓       | Run a method when the element's form owner resets                                                                |
-| `@formDisabled()`     | Method        | ✕        | ✓          | ✓       | Run a method when the element's ancestor fieldset is disabled                                                    |
-| `@formStateRestore()` | Method        | ✕        | ✓          | ✓       | Run a method when the element's `formStateRestoreCallback` fires                                                 |
-| `@subscribe()`        | Method        | ✕        | ✓          | ✓       | Run a method to react to changes to a signal or to events on an EventTarget                                      |
-| `@debounce()`         | Method, Field | ✕        | ✓[^2]      | ✓[^2]   | Debounce a method or class field function                                                                        |
+| Decorator             | Class element     | `static` | `#private` | Symbols | Summary                                                                                                          |
+| --------------------- | ----------------- | -------- | ---------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `@define()`           | Class             | -        | -          | -       | Register a custom element class with a tag name and set it up for use with Ornament's other decorators           |
+| `@enhance()`          | Class             | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do *not* register it with a tag name |
+| `@prop()`             | Accessor          | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                            |
+| `@attr()`             | Accessor          | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type            |
+| `@init()`             | Method            | ✕        | ✓          | ✓       | Run a method after the class constructor finishes                                                                |
+| `@reactive()`         | Method            | ✕        | ✓          | ✓       | Run a method when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions)        |
+| `@connected()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element connects to the DOM                                        |
+| `@disconnected()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element disconnects from the DOM                                   |
+| `@adopted()`          | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is adopted by a new document                               |
+| `@formAssociated()`   | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is associated with a form element                          |
+| `@formReset()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's form owner resets                                        |
+| `@formDisabled()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                            |
+| `@formStateRestore()` | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                         |
+| `@subscribe()`        | Method            | ✕        | ✓          | ✓       | Run a method to react to changes to a signal or to events on an EventTarget                                      |
+| `@debounce()`         | Method, Field[^2] | ✕        | ✓          | ✓       | Debounce a method or class field function                                                                        |
 
 [^1]: Can be `#private` or a symbol *if* a non-private non-symbol getter/setter
       pair for the attribute name exists and a content attribute name has been
@@ -674,8 +674,9 @@ true:
 
 ### `@connected()`
 
-**Method decorator** that causes decorated class methods to run when the
-component connects to the DOM  and the component's `connectedCallback()` fires:
+**Method and class field decorator** that causes decorated class methods to run
+when the component connects to the DOM  and the component's
+`connectedCallback()` fires:
 
 ```javascript
 import { define, connected } from "@sirpepe/ornament";
@@ -692,11 +693,13 @@ document.body.append(testEl);
 // testEl.log logs "Connected!"
 ```
 
+You can also still use the regular `connectedCallback()`.
+
 ### `@disconnected()`
 
-**Method decorator** that causes decorated class methods to run when the
-component disconnects from the DOM and the component's `disconnectedCallback()`
-fires:
+**Method and class field decorator** that causes decorated class methods to run
+when the component disconnects from the DOM and the component's
+`disconnectedCallback()` fires:
 
 ```javascript
 import { define, adopted } from "@sirpepe/ornament";
@@ -714,11 +717,13 @@ testEl.remove();
 // testEl.log logs "Disconnected!"
 ```
 
+You can also still use the regular `disconnectedCallback()`.
+
 ### `@adopted()`
 
-**Method decorator** that causes decorated class methods to run when the
-component is moved to a new document and the component's `adoptedCallback()`
-fires:
+**Method and class field decorator** that causes decorated class methods to run
+when the component is moved to a new document and the component's
+`adoptedCallback()` fires:
 
 ```javascript
 import { define, adopted } from "@sirpepe/ornament";
@@ -736,11 +741,13 @@ newDocument.adoptNode(testEl);
 // testEl.log logs "Adopted!"
 ```
 
+You can also still use the regular `adoptedCallback()`.
+
 ### `@formAssociated()`
 
-**Method decorator** that causes decorated class methods to run when a
-form-associated component's form owner changes and its `formAssociatedCallback()`
-fires:
+**Method and class field decorator** that causes decorated class methods to run
+when a form-associated component's form owner changes and its
+`formAssociatedCallback()` fires:
 
 ```javascript
 import { define, formAssociated } from "@sirpepe/ornament";
@@ -759,11 +766,13 @@ form.append(testEl);
 // testEl.log logs "form"
 ```
 
+You can also still use the regular `formAssociatedCallback()`.
+
 ### `@formReset()`
 
-**Method decorator** that causes decorated class methods to run when a
-form-associated component's form owner resets and its `formResetCallback()`
-fires:
+**Method and class field decorator** that causes decorated class methods to run
+when a form-associated component's form owner resets and its
+`formResetCallback()` fires:
 
 ```javascript
 import { define, formReset } from "@sirpepe/ornament";
@@ -784,13 +793,15 @@ form.reset();
 // testEl.log logs "Reset!"
 ```
 
-Not that form reset events are observably asynchronous, unlike all other
+Note that form reset events are observably asynchronous, unlike all other
 lifecycle events. This is due to the form reset algorithm itself being async.
+
+You can also still use the regular `formResetCallback()`.
 
 ### `@formDisabled()`
 
-**Method decorator** that causes decorated class methods to run when a
-form-associated component's fieldset gets disabled and its
+**Method and class field decorator** that causes decorated class methods to run
+when a form-associated component's fieldset gets disabled and its
 `formDisabledCallback()` fires:
 
 ```javascript
@@ -813,11 +824,13 @@ fieldset.disabled = true;
 // testEl.log logs "Disabled via fieldset: true"
 ```
 
+You can also still use the regular `formDisabledCallback()`.
+
 ### `@formStateRestore()`
 
-**Method decorator** that causes decorated class methods to run when a
-form-associated component's `formStateRestoreCallback()` fires. This is not
-supported in Chrome-based browsers as of November 2023.
+**Method and class field decorator** that causes decorated class methods to run
+when a form-associated component's `formStateRestoreCallback()` fires. This does
+not work in Chrome-based browsers as of November 2023.
 
 ### `@subscribe(...args)`
 
