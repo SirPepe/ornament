@@ -1,9 +1,8 @@
 import { listen, trigger } from "./bus.js";
-import { BUS_TARGET, EMPTY_OBJ, NO_VALUE } from "./lib.js";
+import { EMPTY_OBJ, NO_VALUE } from "./lib.js";
 import {
   type Transformer,
   type ClassAccessorDecorator,
-  type FunctionFieldOrMethodDecorator,
   type FunctionFieldOrMethodContext,
   type Method,
   assertContext,
@@ -640,10 +639,21 @@ type DebounceOptions<T, A extends any[]> = {
   fn?: (cb: (this: T, ...args: A) => void) => (this: T, ...args: A) => void;
 };
 
+type DebounceDecorator<T extends HTMLElement, A extends any[]> = {
+  (
+    value: (this: T, ...args: A) => any,
+    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => any>,
+  ): (this: T, ...args: A) => any;
+  (
+    _: undefined,
+    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => any>,
+  ): void;
+};
+
 // The class field/method decorator @debounce() debounces functions.
 export function debounce<T extends HTMLElement, A extends unknown[]>(
   options: DebounceOptions<T, A> = EMPTY_OBJ,
-): FunctionFieldOrMethodDecorator<T, A> {
+): DebounceDecorator<T, A> {
   const fn = options.fn ?? debounce.raf();
   function decorator(
     value: Method<T, A>,
@@ -657,30 +667,22 @@ export function debounce<T extends HTMLElement, A extends unknown[]>(
     value: Method<T, A> | undefined,
     context: FunctionFieldOrMethodContext<T, A>,
   ): Method<T, A> | void {
-    assertContext(context, "debounce", ["field", "method"]);
+    assertContext(context, "debounce", ["method", "field-function"]);
     if (context.kind === "field") {
-      // Field decorator (bound methods)
       return context.addInitializer(function (): void {
         const func = context.access.get(this);
-        if (typeof func !== "function") {
-          throw new TypeError(
-            "@debounce() can only be applied to methods and functions",
-          );
-        }
-        // Class field functions can't be reactive atm, so there is no need to
-        // store them in the map of debounced methods.
-        context.access.set(this, fn(func).bind(this));
+        const debounced = fn(func).bind(this);
+        getMetadata(this, META_DEBOUNCED_METHODS).set(debounced, func);
+        context.access.set(this, debounced);
       });
     }
     // if it's not a field decorator, it must be a method decorator (and value
     // can only be a non-undefined method definition, that we can replace with
     // a debounced equivalent)
-    const debounced = fn(value as Method<T, A>);
+    const func = value as Method<T, A>;
+    const debounced = fn(func);
     context.addInitializer(function (this: T): void {
-      getMetadata(this, META_DEBOUNCED_METHODS).set(
-        debounced,
-        value as Method<T, A>,
-      );
+      getMetadata(this, META_DEBOUNCED_METHODS).set(debounced, func);
     });
     return debounced;
   }

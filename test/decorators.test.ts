@@ -1598,6 +1598,25 @@ describe("Decorators", () => {
       expect(fn.callCount).to.equal(1); // only one update
       expect(fn.getCalls()[0].args).to.eql(["D"]);
     });
+
+    test("debounced reactive class field function", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive()
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) })
+        test = () => fn(this.x); // eslint-disable-line
+      }
+      const el = new Test();
+      el.x = "B";
+      el.x = "C";
+      el.x = "D";
+      await wait(25);
+      expect(fn.callCount).to.equal(1); // only one update
+      expect(fn.getCalls()[0].args).to.eql(["D"]);
+    });
   });
 
   describe("@reactive + @init + @debounce", () => {
@@ -1613,6 +1632,28 @@ describe("Decorators", () => {
         test() {
           fn(this.x);
         }
+      }
+      const el = new Test();
+      el.x = "B";
+      el.x = "C";
+      el.x = "D";
+      expect(fn.callCount).to.equal(1); // initial
+      expect(fn.getCalls()[0].args).to.eql(["A"]);
+      await wait(25);
+      expect(fn.callCount).to.equal(2); // initial + one update
+      expect(fn.getCalls()[1].args).to.eql(["D"]);
+    });
+
+    test("debounced reactive init class field function", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive()
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) })
+        @init()
+        test = () => fn(this.x); // eslint-disable-line
       }
       const el = new Test();
       el.x = "B";
