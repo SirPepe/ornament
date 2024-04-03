@@ -246,7 +246,7 @@ export function define<T extends CustomElementConstructor>(
 // event have both run.
 function runContextInitializerOnOrnamentInit<
   T extends HTMLElement,
-  C extends ClassMethodDecoratorContext<T, any>,
+  C extends ClassMethodDecoratorContext<T, any> | ClassFieldDecoratorContext<T, any>, // eslint-disable-line
 >(context: C, initializer: (instance: T) => any): void {
   context.addInitializer(function (this: T) {
     // Init event has already happened, call initializer function ASAP
@@ -260,9 +260,9 @@ function runContextInitializerOnOrnamentInit<
 }
 
 // Method decorator @init() runs a methods once an instance initializes.
-export function init<T extends HTMLElement>(): MethodDecorator<T, Method<T>> {
+export function init<T extends HTMLElement>(): LifecycleDecorator<T, OrnamentEventMap["init"]> { // eslint-disable-line
   return function (_, context): void {
-    assertContext(context, "init", "method");
+    assertContext(context, "init", ["method", "field-function"]);
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
       const method = context.access.get(instance);
       (

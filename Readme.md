@@ -380,8 +380,8 @@ for something else, or combine any of the above with hand-written logic.
 | `@enhance()`          | Class             | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do *not* register it with a tag name |
 | `@prop()`             | Accessor          | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                            |
 | `@attr()`             | Accessor          | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type            |
-| `@init()`             | Method            | ✕        | ✓          | ✓       | Run a method after the class constructor finishes                                                                |
 | `@reactive()`         | Method            | ✕        | ✓          | ✓       | Run a method when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions)        |
+| `@init()`             | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function after the class constructor finishes                                        |
 | `@connected()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element connects to the DOM                                        |
 | `@disconnected()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element disconnects from the DOM                                   |
 | `@adopted()`          | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is adopted by a new document                               |
@@ -595,34 +595,6 @@ attributes will not cause `@reactive()` methods to run.
 - **`as` (string, optional)**: Sets an attribute name different from the accessor's name, similar to how the `class` content attribute works for the `className` IDL attribute on built-in elements. If `as` is not set, the content attribute's name will be equal to the accessor's name. `as` is required when the decorator is applied to a symbol or private property.
 - **`reflective` (boolean, optional)**: If `false`, prevents the content attribute from updating when the IDL attribute is updated, similar to how `value` works on `input` elements. Defaults to true.
 
-### `@init()`
-
-**Method decorator** that runs class methods when the class constructor
-finishes.
-
-```javascript
-import { define, init } from "@sirpepe/ornament";
-
-@define("my-test")
-class Test extends HTMLElement {
-  constructor() {
-    super();
-    console.log(23);
-  }
-
-  @init()
-  log() {
-    console.log(42);
-  }
-}
-
-let testEl = document.createElement("my-test");
-// first logs 23, then logs 42
-```
-
-Decorated methods are called with no arguments. This decorator is useful if you
-need to run `@reactive()` methods once on component initialization.
-
 ### `@reactive(options: ReactiveOptions = {})`
 
 **Method decorator** that causes class methods to run when accessors decorated
@@ -672,11 +644,40 @@ true:
 - **`excludeKeys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) not to monitor. Can include private names and symbols. Defaults to an empty array.
 - **`predicate` (Function `(instance: T) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change
 
+### `@init()`
+
+**Method and class field decorator** that runs class members when the class
+constructor finishes. This has the same effect as adding method calls to the end
+of the constructor's body.
+
+```javascript
+import { define, init } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  constructor() {
+    super();
+    console.log(23);
+  }
+
+  @init()
+  log() {
+    console.log(42);
+  }
+}
+
+let testEl = document.createElement("my-test");
+// first logs 23, then logs 42
+```
+
+Decorated members are run with no arguments. This decorator is particularly
+useful if you need to run `@reactive()` methods once on component
+initialization.
+
 ### `@connected()`
 
-**Method and class field decorator** that causes decorated class methods to run
-when the component connects to the DOM  and the component's
-`connectedCallback()` fires:
+**Method and class field decorator** that runs class members when the component
+connects to the DOM and the component's `connectedCallback()` fires:
 
 ```javascript
 import { define, connected } from "@sirpepe/ornament";
@@ -693,13 +694,14 @@ document.body.append(testEl);
 // testEl.log logs "Connected!"
 ```
 
-You can also still use the regular `connectedCallback()`.
+Decorated members are run with no arguments. You can also still use the regular
+`connectedCallback()`.
 
 ### `@disconnected()`
 
-**Method and class field decorator** that causes decorated class methods to run
-when the component disconnects from the DOM and the component's
-`disconnectedCallback()` fires:
+**Method and class field decorator** that runs decorated class members when the
+component disconnects from the DOM and the component's `disconnectedCallback()`
+fires:
 
 ```javascript
 import { define, adopted } from "@sirpepe/ornament";
@@ -717,13 +719,14 @@ testEl.remove();
 // testEl.log logs "Disconnected!"
 ```
 
-You can also still use the regular `disconnectedCallback()`.
+Decorated members are run with no arguments. You can also still use the regular
+`disconnectedCallback()`.
 
 ### `@adopted()`
 
-**Method and class field decorator** that causes decorated class methods to run
-when the component is moved to a new document and the component's
-`adoptedCallback()` fires:
+**Method and class field decorator** that runs decorated class members when the
+component is moved to a new document and the component's `adoptedCallback()`
+fires:
 
 ```javascript
 import { define, adopted } from "@sirpepe/ornament";
@@ -741,12 +744,13 @@ newDocument.adoptNode(testEl);
 // testEl.log logs "Adopted!"
 ```
 
-You can also still use the regular `adoptedCallback()`.
+Decorated members are run with no arguments. You can also still use the regular
+`adoptedCallback()`.
 
 ### `@formAssociated()`
 
-**Method and class field decorator** that causes decorated class methods to run
-when a form-associated component's form owner changes and its
+**Method and class field decorator** that runs decorated class members when a
+form-associated component's form owner changes and its
 `formAssociatedCallback()` fires:
 
 ```javascript
@@ -766,13 +770,14 @@ form.append(testEl);
 // testEl.log logs "form"
 ```
 
-You can also still use the regular `formAssociatedCallback()`.
+Decorated members are passed the new form owner (if any) as an argument. You can
+also still use the regular `formAssociatedCallback()`.
 
 ### `@formReset()`
 
-**Method and class field decorator** that causes decorated class methods to run
-when a form-associated component's form owner resets and its
-`formResetCallback()` fires:
+**Method and class field decorator** that runs decorated class members when a
+form-associated component's form owner resets and its `formResetCallback()`
+fires:
 
 ```javascript
 import { define, formReset } from "@sirpepe/ornament";
@@ -793,15 +798,16 @@ form.reset();
 // testEl.log logs "Reset!"
 ```
 
+Decorated members are run with no arguments. You can also still use the regular
+`formResetCallback()`.
+
 Note that form reset events are observably asynchronous, unlike all other
 lifecycle events. This is due to the form reset algorithm itself being async.
 
-You can also still use the regular `formResetCallback()`.
-
 ### `@formDisabled()`
 
-**Method and class field decorator** that causes decorated class methods to run
-when a form-associated component's fieldset gets disabled and its
+**Method and class field decorator** that runs decorated class members when a
+form-associated component's fieldset gets disabled and its
 `formDisabledCallback()` fires:
 
 ```javascript
@@ -824,7 +830,8 @@ fieldset.disabled = true;
 // testEl.log logs "Disabled via fieldset: true"
 ```
 
-You can also still use the regular `formDisabledCallback()`.
+Decorated members are passed the new form disabled state as an argument. You
+can also still use the regular `formDisabledCallback()`.
 
 ### `@formStateRestore()`
 

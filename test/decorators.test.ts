@@ -978,7 +978,7 @@ describe("Decorators", () => {
   describe.skip("@formStateRestore", () => undefined);
 
   describe("@init", () => {
-    test("run on init", async () => {
+    test("run method on init", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -991,6 +991,29 @@ describe("Decorators", () => {
       el.x = "B";
       expect(fn.callCount).to.equal(1);
       expect(fn.getCalls()[0].args).to.eql(["A"]);
+    });
+
+    test("run field function on init", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @init() test = () => fn(this.x);
+      }
+      const el = new Test();
+      el.x = "B";
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["A"]);
+    });
+
+    test("fail on non-functions type fields", async () => {
+      expect(() => {
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @init() test: any = 42;
+        }
+        new Test();
+      }).to.throw();
     });
   });
 
