@@ -1018,7 +1018,7 @@ describe("Decorators", () => {
   });
 
   describe("@reactive", () => {
-    test("prop change", async () => {
+    test("method runs on prop change", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -1026,6 +1026,19 @@ describe("Decorators", () => {
         @reactive() test() {
           fn(this.x);
         }
+      }
+      const el = new Test();
+      el.x = "B";
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
+    });
+
+    test("class field function runs on prop change", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive() test = () => fn(this.x);
       }
       const el = new Test();
       el.x = "B";

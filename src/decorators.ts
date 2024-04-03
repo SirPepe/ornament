@@ -6,7 +6,6 @@ import {
   type FunctionFieldOrMethodDecorator,
   type FunctionFieldOrMethodContext,
   type Method,
-  type MethodDecorator,
   assertContext,
 } from "./types.js";
 
@@ -259,7 +258,8 @@ function runContextInitializerOnOrnamentInit<
   });
 }
 
-// Method decorator @init() runs a methods once an instance initializes.
+// Method/class fields decorator @init() runs a method or class field function
+// once an instance initializes.
 export function init<T extends HTMLElement>(): LifecycleDecorator<T, OrnamentEventMap["init"]> { // eslint-disable-line
   return function (_, context): void {
     assertContext(context, "init", ["method", "field-function"]);
@@ -278,23 +278,27 @@ type ReactiveOptions<T> = {
   predicate?: (instance: T) => boolean;
 };
 
+type ReactiveDecorator<T extends HTMLElement> = {
+  (_: unknown, context: ClassMethodDecoratorContext<T, (this: T) => any>): void;
+  (_: unknown, context: ClassFieldDecoratorContext<T, (this: T) => any>): void;
+};
+
 export function reactive<T extends HTMLElement>(
   options: ReactiveOptions<T> = EMPTY_OBJ,
-): MethodDecorator<T> {
-  return function (_, context): void {
-    assertContext(context, "reactive", "method");
+): ReactiveDecorator<T> {
+  return function (_, context) {
+    assertContext(context, "reactive", ["method", "field-function"]);
     // Start listening only once the element's constructor has run to
     // completion. This prevents prop set-up in the constructor from triggering
     // reactive methods.
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
-      const method = context.access.get(instance);
       listen(instance, "prop", (name) => {
         if (
           (!options.predicate || options.predicate(instance)) &&
           (!options.keys || options.keys.includes(name)) &&
           (!options.excludeKeys || !options.excludeKeys.includes(name))
         ) {
-          method.call(instance);
+          context.access.get(instance).call(instance);
         }
       });
     });

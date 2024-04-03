@@ -374,23 +374,23 @@ for something else, or combine any of the above with hand-written logic.
 
 ### API overview
 
-| Decorator             | Class element     | `static` | `#private` | Symbols | Summary                                                                                                          |
-| --------------------- | ----------------- | -------- | ---------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
-| `@define()`           | Class             | -        | -          | -       | Register a custom element class with a tag name and set it up for use with Ornament's other decorators           |
-| `@enhance()`          | Class             | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do *not* register it with a tag name |
-| `@prop()`             | Accessor          | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                            |
-| `@attr()`             | Accessor          | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type            |
-| `@reactive()`         | Method            | ✕        | ✓          | ✓       | Run a method when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions)        |
-| `@init()`             | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function after the class constructor finishes                                        |
-| `@connected()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element connects to the DOM                                        |
-| `@disconnected()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element disconnects from the DOM                                   |
-| `@adopted()`          | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is adopted by a new document                               |
-| `@formAssociated()`   | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is associated with a form element                          |
-| `@formReset()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's form owner resets                                        |
-| `@formDisabled()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                            |
-| `@formStateRestore()` | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                         |
-| `@subscribe()`        | Method            | ✕        | ✓          | ✓       | Run a method to react to changes to a signal or to events on an EventTarget                                      |
-| `@debounce()`         | Method, Field[^2] | ✕        | ✓          | ✓       | Debounce a method or class field function                                                                        |
+| Decorator             | Class element     | `static` | `#private` | Symbols | Summary                                                                                                                           |
+| --------------------- | ----------------- | -------- | ---------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `@define()`           | Class             | -        | -          | -       | Register a custom element class with a tag name and set it up for use with Ornament's other decorators                            |
+| `@enhance()`          | Class             | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do *not* register it with a tag name                  |
+| `@prop()`             | Accessor          | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                                             |
+| `@attr()`             | Accessor          | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type                             |
+| `@reactive()`         | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions) |
+| `@init()`             | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function after the class constructor finishes                                                         |
+| `@connected()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element connects to the DOM                                                         |
+| `@disconnected()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element disconnects from the DOM                                                    |
+| `@adopted()`          | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is adopted by a new document                                                |
+| `@formAssociated()`   | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is associated with a form element                                           |
+| `@formReset()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's form owner resets                                                         |
+| `@formDisabled()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                                             |
+| `@formStateRestore()` | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                                          |
+| `@subscribe()`        | Method            | ✕        | ✓          | ✓       | Run a method to react to changes to a signal or to events on an EventTarget                                                       |
+| `@debounce()`         | Method, Field[^2] | ✕        | ✓          | ✓       | Debounce a method or class field function                                                                                         |
 
 [^1]: Can be `#private` or a symbol *if* a non-private non-symbol getter/setter
       pair for the attribute name exists and a content attribute name has been
@@ -508,7 +508,8 @@ class Test extends HTMLElement {
 
   // Automatically runs when "foo" (or any accessor decorated with @prop() or
   // @attr()) changes
-  @reactive() log() {
+  @reactive()
+  log() {
     console.log(`Foo changed to ${this.foo}`);
   }
 }
@@ -597,8 +598,8 @@ attributes will not cause `@reactive()` methods to run.
 
 ### `@reactive(options: ReactiveOptions = {})`
 
-**Method decorator** that causes class methods to run when accessors decorated
-with `@prop()` or `@attr()` change their values:
+**Method and class field decorator** that runs class members to run when
+accessors decorated with `@prop()` or `@attr()` change their values:
 
 ```javascript
 import { define, reactive, prop, number } from "@sirpepe/ornament";
@@ -608,7 +609,8 @@ class Test extends HTMLElement {
   @prop(number()) accessor foo = 0;
   @prop(number()) accessor bar = 0;
 
-  @reactive() log() {
+  @reactive()
+  log() {
     console.log(`foo is now ${this.foo}, bar is now ${this.bar}`);
   }
 }
@@ -621,15 +623,15 @@ testEl.bar = 2;
 // then logs "foo is now 1, bar is now 2"
 ```
 
-Decorated methods are called with no arguments. They react to changes to the
+Decorated members are called with no arguments. They react to changes to the
 instances' internal state and should therefore be able to access all relevant
 data through `this`. In many cases you may want to apply `@reactive()` to
 methods decorated with [@debounce()](#reactiveoptions) to prevent excessive
 calls.
 
 The `predicate` and/or `keys` options can be used to control whether the
-function reacts to an update. For the function to run, the following needs to be
-true:
+decorated method or function reacts to an update. For the decorated member to
+run, the following needs to be true:
 
 1. `options.keys` must either have been omitted or must contain the IDL or
    content attribute name that changed
@@ -642,7 +644,7 @@ true:
 
 - **`keys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) to monitor. Can include private names and symbols. Defaults to monitoring all content and IDL attributes defined by `@prop()` or `@attr()`.
 - **`excludeKeys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) not to monitor. Can include private names and symbols. Defaults to an empty array.
-- **`predicate` (Function `(instance: T) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change
+- **`predicate` (Function `(instance: T) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change. Note that this function is not part of the class declaration itself and can therefore *not* access private fields on `instance`.
 
 ### `@init()`
 
