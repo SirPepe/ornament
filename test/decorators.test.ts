@@ -563,12 +563,8 @@ describe("Decorators", () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         // Using timeout because RAF is unreliable in headless browsers
-        @debounce<Test, [number]>({ fn: debounce.timeout(0) }) test = (
-          x: number,
-        ) => {
+        @debounce({ fn: debounce.timeout(0) }) test = (x: number) =>
           fn(x, this);
-          return x;
-        };
       }
       const el = new Test();
       const func = el.test;
@@ -585,12 +581,8 @@ describe("Decorators", () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         // Using timeout because RAF is unreliable in headless browsers
-        @debounce<Test, [number]>({ fn: debounce.timeout(0) }) #test = (
-          x: number,
-        ) => {
+        @debounce({ fn: debounce.timeout(0) }) #test = (x: number) =>
           fn(x, this);
-          return x;
-        };
         runTest() {
           this.#test(1);
           this.#test(2);
@@ -666,6 +658,41 @@ describe("Decorators", () => {
       await wait(100);
       expect(fn.callCount).to.equal(1);
       expect(fn.getCalls()[0].args).to.eql([3, 42, el]);
+    });
+
+    test("debouncing static class methods", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) })
+        static test(x: number): void {
+          fn(x, this);
+        }
+      }
+      Test.test(1);
+      Test.test(2);
+      Test.test(3);
+      await wait(100);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([3, Test]);
+    });
+
+    test("debouncing static class field functions", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) }) static test = (
+          x: number,
+        ): void => fn(x, this);
+      }
+      Test.test(1);
+      Test.test(2);
+      Test.test(3);
+      await wait(100);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([3, Test]);
     });
   });
 
@@ -1674,7 +1701,7 @@ describe("Decorators", () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         // Using timeout because RAF is unreliable in headless browsers
-        @debounce<Test, []>({ fn: debounce.timeout(0) }) #a = () => {};
+        @debounce({ fn: debounce.timeout(0) }) #a = () => {};
         @reactive() #test() {}
       }
       new Test();

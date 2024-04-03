@@ -85,12 +85,9 @@ export type Transformer<
 /* eslint-disable */
 export type ClassAccessorDecorator<T extends HTMLElement, V, R extends ClassAccessorDecoratorResult<unknown, unknown> | void = ClassAccessorDecoratorResult<T, V>>
   = (target: ClassAccessorDecoratorTarget<T, V>, context: ClassAccessorDecoratorContext<T, V>) => R;
+/* eslint-enable */
 
 export type Method<T, A extends unknown[] = []> = (this: T, ...args: A) => any;
-export type FunctionFieldOrMethodContext<T, A extends unknown[]> =
-  | ClassMethodDecoratorContext<T, Method<T, A>>
-  | ClassFieldDecoratorContext<T, Method<T, A>>;
-/* eslint-enable */
 
 type Types = {
   string: string;
@@ -160,9 +157,10 @@ export function assertContext(
   ctx: any,
   name: string,
   kinds: Kind | Kind[],
+  allowStatic = false,
 ): void {
   kinds = isArray(kinds) ? kinds : [kinds];
-  if (ctx.static) {
+  if (ctx.static && !allowStatic) {
     throw new TypeError(`@${name} can't be used on static members`);
   }
   for (const kind of kinds) {

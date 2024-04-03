@@ -3,7 +3,6 @@ import { EMPTY_OBJ, NO_VALUE } from "./lib.js";
 import {
   type Transformer,
   type ClassAccessorDecorator,
-  type FunctionFieldOrMethodContext,
   type Method,
   assertContext,
 } from "./types.js";
@@ -635,58 +634,62 @@ export function prop<T extends HTMLElement, V>(
   };
 }
 
-type DebounceOptions<T, A extends any[]> = {
-  fn?: (cb: (this: T, ...args: A) => void) => (this: T, ...args: A) => void;
+// The class field/method decorator @debounce() debounces functions and consists
+// primarily of TypeScript bullshit.
+
+type DebounceOptions<
+  T extends object,
+  F extends (this: T, ...args: any[]) => any,
+> = {
+  fn?: (
+    cb: (this: T, ...args: Parameters<F>) => void,
+  ) => (this: T, ...args: Parameters<F>) => void;
 };
 
-type DebounceDecorator<T extends HTMLElement, A extends any[]> = {
-  (
-    value: (this: T, ...args: A) => any,
-    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => any>,
-  ): (this: T, ...args: A) => any;
-  (
-    _: undefined,
-    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => any>,
-  ): void;
-};
+type DebounceDecorator<
+  T extends object,
+  F extends (this: T, ...args: any[]) => any,
+> = (
+  value: F | undefined,
+  context: ClassMethodDecoratorContext<T, F> | ClassFieldDecoratorContext<T, F>,
+) => void;
 
-// The class field/method decorator @debounce() debounces functions.
-export function debounce<T extends HTMLElement, A extends unknown[]>(
-  options: DebounceOptions<T, A> = EMPTY_OBJ,
-): DebounceDecorator<T, A> {
+export function debounce<
+  T extends object,
+  F extends (this: T, ...args: any[]) => any,
+>(options: DebounceOptions<T, F> = EMPTY_OBJ): DebounceDecorator<T, F> {
   const fn = options.fn ?? debounce.raf();
-  function decorator(
-    value: Method<T, A>,
-    context: ClassMethodDecoratorContext<T, Method<T, A>>,
-  ): Method<T, A>;
-  function decorator(
-    value: undefined,
-    context: ClassFieldDecoratorContext<T, Method<T, A>>,
-  ): void;
-  function decorator(
-    value: Method<T, A> | undefined,
-    context: FunctionFieldOrMethodContext<T, A>,
-  ): Method<T, A> | void {
-    assertContext(context, "debounce", ["method", "field-function"]);
+  return function decorator(
+    value: F | undefined,
+    context: ClassMethodDecoratorContext<T, F> | ClassFieldDecoratorContext<T, F>, // eslint-disable-line
+  ): F | void {
+    assertContext(context, "debounce", ["method", "field-function"], true);
     if (context.kind === "field") {
       return context.addInitializer(function (): void {
         const func = context.access.get(this);
         const debounced = fn(func).bind(this);
-        getMetadata(this, META_DEBOUNCED_METHODS).set(debounced, func);
-        context.access.set(this, debounced);
+        if (!context.static) {
+          // The line below only runs when "this" is an instance of HTMLElement,
+          // but TS does not understand that.
+          getMetadata(this as any, META_DEBOUNCED_METHODS).set(debounced, func);
+        }
+        context.access.set(this, debounced as F);
       });
     }
     // if it's not a field decorator, it must be a method decorator (and value
     // can only be a non-undefined method definition, that we can replace with
     // a debounced equivalent)
-    const func = value as Method<T, A>;
+    const func = value as F;
     const debounced = fn(func);
-    context.addInitializer(function (this: T): void {
-      getMetadata(this, META_DEBOUNCED_METHODS).set(debounced, func);
-    });
-    return debounced;
-  }
-  return decorator;
+    if (!context.static) {
+      context.addInitializer(function (this: T): void {
+        // The line below only runs when "this" is an instance of HTMLElement,
+        // but TS does not understand that.
+        getMetadata(this as any, META_DEBOUNCED_METHODS).set(debounced, func);
+      });
+    }
+    return debounced as F;
+  };
 }
 
 // The following debouncing services for both methods and function class fields.

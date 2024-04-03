@@ -390,7 +390,7 @@ for something else, or combine any of the above with hand-written logic.
 | `@formDisabled()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                                             |
 | `@formStateRestore()` | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                                          |
 | `@subscribe()`        | Method            | ✕        | ✓          | ✓       | Run a method to react to changes to a signal or to events on an EventTarget                                                       |
-| `@debounce()`         | Method, Field[^2] | ✕        | ✓          | ✓       | Debounce a method or class field function                                                                                         |
+| `@debounce()`         | Method, Field[^2] | ✓        | ✓          | ✓       | Debounce a method or class field function                                                                                         |
 
 [^1]: Can be `#private` or a symbol *if* a non-private non-symbol getter/setter
       pair for the attribute name exists and a content attribute name has been
@@ -672,9 +672,12 @@ let testEl = document.createElement("my-test");
 // first logs 23, then logs 42
 ```
 
-Decorated members are run with no arguments. This decorator is particularly
-useful if you need to run `@reactive()` methods once on component
-initialization.
+This decorator is particularly useful if you need to run `@reactive()` methods
+once on component initialization.
+
+Decorated members are run with no arguments and *always* right after the
+constructor finishes, even methods and class field functions decorated with
+`@debounce()`.
 
 ### `@connected()`
 
@@ -1002,13 +1005,12 @@ import { define, debounce } from "@sirpepe/ornament";
 @define("my-test")
 class Test extends HTMLElement {
   // Debounce a class method
-  @debounce() test1(x) {
+  @debounce()
+  test1(x) {
     console.log(x);
   }
   // Debounce a class field function
-  @debounce() test2 = (x) => {
-    console.log(x);
-  }
+  @debounce() test2 = (x) => console.log(x);
 }
 
 const el = new Test();
@@ -1047,9 +1049,9 @@ able to return anything but `undefined`.
 ## Transformers
 
 Transformers define how the accessor decorators `@attr()` and `@prop()`
-implement attribute and property handling. This includes converting content
-attributes from and to IDL attributes, type checks on IDL setters, and running
-side effects.
+implement attribute handling and type transformations. This includes converting
+content attributes from and to IDL attributes, type checks on IDL setters, and
+running side effects.
 
 ### Transformers overview
 
@@ -1064,9 +1066,9 @@ side effects.
 | `list()`          | Array                                          | `separator`, `transform`             |
 | `literal()`       | Any                                            | `values`, `transform`                |
 | `any()`           | `any`                                          |                                      |
-| `event()`         | `function | null`                              |                                      |
+| `event()`         | `function \| null`                             |                                      |
 
-A transformers is just a bag of functions with the following type signature:
+A transformer is just a bag of functions with the following type signature:
 
 ```typescript
 export type Transformer<
@@ -1141,7 +1143,7 @@ liking.
 #### For use with both `@prop()` and `@attr()`
 
 In principle all transformers can be used with both `@prop()` and `@attr()`.
-Very few transformers are limited to use with either decorator, such als
+Very few transformers are limited to use with either decorator, such as
 `event()` (which makes very little sense outside of content attributes).
 
 The accessor's initial value serves as fallback value in case no other data is
@@ -1171,9 +1173,9 @@ document.body.innerHTML += `<my-test foo="other value"></my-test>`
 
 The attributes `foo`, `bar` and `baz` behave as follows:
 
-- The element initializes with a content attribute **`foo`** already set. The IDL attribute `foo` will therefore (because it uses the string type via the `string()` transformer) contain `"other value"`. Should the content attribute `foo` get removed, the IDL attribute will contain `"default value"`.
-- The content attribute **`bar`** is not set, which will result in the IDL attribute `bar` containing the accessor's default value `"default value"`.
-- The content attribute **`baz`** is also not set *and* the accessor has no initial value, so the `string()` transformer's built-in fallback value `""` gets used.
+- The element initializes with a content attribute **`foo`** already set in HTML. The IDL attribute `foo` will therefore (because it uses the string type via the `string()` transformer) contain `"other value"`. Should the content attribute `foo` get removed, the IDL attribute will contain `"default value"`.
+- The content attribute **`bar`** is not set in HTML, which will result in the IDL attribute `bar` containing the accessor's default value `"default value"`.
+- The content attribute **`baz`** is also not set in HTML *and* the accessor has no initial value, so the `string()` transformer's built-in fallback value `""` gets used.
 
 ### Transformer `string()`
 
@@ -1277,7 +1279,7 @@ initializer throw exceptions.
 ### Transformer `int(options?)`
 
 Implements a bigint attribute. Content attribute values are expressed as plain
-numeric strings without the tailing `n` used in JavaScript bigints.
+numeric strings without the tailing `n` used in JavaScript's BigInt.
 
 ```javascript
 import { define, attr, int } from "@sirpepe/ornament";
@@ -1288,14 +1290,14 @@ class Test extends HTMLElement {
   @attr(int()) accessor foo = 0n;
 
  // With all options set
-  @attr(int({ min: 0n, max: 10n })) accessor bar = 0n;
+  @attr(int({ min: 0n, max: 10n, nullable: false })) accessor bar = 0n;
 }
 ```
 
 The transformer allows `null` and `undefined` (with the latter converting to
-`null`) if the option `nullable` is set to `true`. In all other cases, the IDL#
+`null`) if the option `nullable` is set to `true`. In all other cases, the IDL
 attribute setter throws an exception when its input cannot be converted to
-bigint.
+BigInt.
 
 #### Options for transformer `int()`
 
@@ -1389,7 +1391,7 @@ console.log(el.foo); // > [1, 2, 3]
 
 #### Options for `list(options?)`
 
-- **`separator` (string, optional)**: Seperator string. Defaults to `","`
+- **`separator` (string, optional)**: Separator string. Defaults to `","`
 - **`transform` (Transformer)**: Transformer to use, eg. `string()` for a list of strings, `number()` for numbers etc.
 
 #### Behavior overview for transformer `list()`
@@ -1467,7 +1469,7 @@ Equality is checked with `===`.
 <summary>Notes for TypeScript</summary>
 Even though the transformer will accept literally any JSON-serializable value at
 runtime, TypeScript may infer a more restrictive type from the accessor's
-initial values. Decorators can't currently change the type of class members they
+initial value. Decorators can't currently change the type of class members they
 are applied to, so you man need to provide a type annotation.
 </details>
 
@@ -1494,7 +1496,7 @@ are applied to, so you man need to provide a type annotation.
 
 Implements a transformer that does no type checking at all and falls back to
 the global `String` function for serializing to content attributes. Use this if
-you really don't care about types:
+you really don't care about types.
 
 ```javascript
 import { define, prop, any } from "@sirpepe/ornament";
@@ -1522,8 +1524,8 @@ need to provide an `any` type annotation.
 
 Implements old-school inline event handler attributes in the style of
 `onclick="console.log(42)"`. To work properly, this should only be used in
-conjunction with `@attr()` (with reflectivity enabled) and on an accessor that
-has a name starting with `on`:
+conjunction with `@attr()` (with reflectivity enabled) and on a non-private,
+non-static accessor that has a name starting with `on`:
 
 ```javascript
 import { define, attr, eventHandler } from "@sirpepe/ornament";
@@ -1572,18 +1574,18 @@ Ornament runs intra-component communication over an internal event bus. You will
 almost certainly never need to access it directly, but there is is an API just
 in case.
 
-| Event              | Cause                                     | Event type                        | Payload (`args` property on the event object)                        |
-| ------------------ | ------------------------------------------|---------------------------------- |----------------------------------------------------------------------|
-| `init`             | Constructor ran to completion             | OrnamentEvent<"init">             | `[]`                                                                 |
-| `connected`        | `connectedCallback()` fired               | OrnamentEvent<"connected">        | `[]`                                                                 |
-| `disconnected`     | `disconnectedCallback()` fired            | OrnamentEvent<"disconnected">     | `[]`                                                                 |
-| `adopted`          | `adoptedCallback()` fired                 | OrnamentEvent<"adopted">          | `[]`                                                                 |
-| `prop`             | IDL attribute change (`@prop` or `@attr`) | OrnamentEvent<"prop">             | `[Name: string \| symbol, NewValue: any]`                            |
-| `attr`             | Content attribute change (`@attr`)        | OrnamentEvent<"attr">             | `[Name: string, OldValue: string \| null, NewValue: string \| null]` |
-| `formAssociated`   | `formAssociatedCallback()` fired          | OrnamentEvent<"formAssociated">   | `[Owner: HTMLFormElement \| null]                                    |
-| `formReset`        | `formResetCallback()` fired               | OrnamentEvent<"formReset">        | `[]`                                                                 |
-| `formDisabled`     | `formDisabledCallback()` fired            | OrnamentEvent<"formDisabled">     | `[Disabled: boolean]`                                                |
-| `formStateRestore` | `formStateRestoreCallback()` fired        | OrnamentEvent<"formStateRestore"> | `[Reason: "autocomplete" \| "restore"]`                              |
+| Event              | Cause                                     | Event type                          | Payload (`args` property on the event object)                        |
+| ------------------ | ------------------------------------------|------------------------------------ |----------------------------------------------------------------------|
+| `init`             | Constructor ran to completion             | `OrnamentEvent<"init">`             | `[]`                                                                 |
+| `connected`        | `connectedCallback()` fired               | `OrnamentEvent<"connected">`        | `[]`                                                                 |
+| `disconnected`     | `disconnectedCallback()` fired            | `OrnamentEvent<"disconnected">`     | `[]`                                                                 |
+| `adopted`          | `adoptedCallback()` fired                 | `OrnamentEvent<"adopted">`          | `[]`                                                                 |
+| `prop`             | IDL attribute change (`@prop` or `@attr`) | `OrnamentEvent<"prop">`             | `[Name: string \| symbol, NewValue: any]`                            |
+| `attr`             | Content attribute change (`@attr`)        | `OrnamentEvent<"attr">`             | `[Name: string, OldValue: string \| null, NewValue: string \| null]` |
+| `formAssociated`   | `formAssociatedCallback()` fired          | `OrnamentEvent<"formAssociated">`   | `[Owner: HTMLFormElement \| null]                                    |
+| `formReset`        | `formResetCallback()` fired               | `OrnamentEvent<"formReset">`        | `[]`                                                                 |
+| `formDisabled`     | `formDisabledCallback()` fired            | `OrnamentEvent<"formDisabled">`     | `[Disabled: boolean]`                                                |
+| `formStateRestore` | `formStateRestoreCallback()` fired        | `OrnamentEvent<"formStateRestore">` | `[Reason: "autocomplete" \| "restore"]`                              |
 
 <details>
 <summary>Notes for TypeScript</summary>
@@ -1623,7 +1625,7 @@ import { listen } from "@sirpepe/ornament";
 // Listen for "prop" event on the event bus for "someElement"
 listen(someElement, "prop", (evt) => {
   const [ name, value ] = event.args;
-  window.alert(`IDL attribute ${name} was changed to ${value}!`);
+  window.alert(`Attribute ${name} was changed to ${value}!`);
 });
 ```
 
@@ -1906,7 +1908,7 @@ also want to use event delegation
 
 ### Custom defaults
 
-If you don't like ornament's defaults, remember that decorators and transformers
+If you don't like Ornament's defaults, remember that decorators and transformers
 are just functions. This means that you can use partial application to change
 the default options:
 
