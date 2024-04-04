@@ -318,8 +318,8 @@ type SubscribeOptions<T, V> =
   | SignalSubscribeOptions<T, V>;
 
 type EventSubscribeDecorator<T, E extends Event> = (
-  value: Method<T, [E]>,
-  context: ClassMethodDecoratorContext<T>,
+  value: unknown,
+  context: ClassMethodDecoratorContext<T, Method<T, [E]>> | ClassFieldDecoratorContext<T, Method<T, [E]>>, // eslint-disable-line
 ) => void;
 
 type EventTargetFactory<T, E extends EventTarget = EventTarget> = (
@@ -327,8 +327,8 @@ type EventTargetFactory<T, E extends EventTarget = EventTarget> = (
 ) => E;
 
 type SignalSubscribeDecorator<T> = (
-  value: Method<T, []>,
-  context: ClassMethodDecoratorContext<T>,
+  value: unknown,
+  context: ClassMethodDecoratorContext<T> | ClassFieldDecoratorContext<T>,
 ) => void;
 
 type SignalLike<T> = {
@@ -364,8 +364,11 @@ export function subscribe<T extends HTMLElement>(
   eventsOrOptions?: SubscribeOptions<T, any> | string,
   options: SubscribeOptions<T, any> = EMPTY_OBJ,
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
-  return function (_: unknown, context: ClassMethodDecoratorContext<T>): void {
-    assertContext(context, "subscribe", "method");
+  return function (
+    _: unknown,
+    context: ClassMethodDecoratorContext<T, Method<T, [any]>> | ClassFieldDecoratorContext<T, Method<T, [any]>>, // eslint-disable-line
+  ): void {
+    assertContext(context, "subscribe", ["method", "field-function"]);
     // Arguments for subscribing to an event target
     if (
       (typeof targetOrFactory === "function" ||

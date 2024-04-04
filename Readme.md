@@ -389,8 +389,8 @@ for something else, or combine any of the above with hand-written logic.
 | `@formReset()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's form owner resets                                                         |
 | `@formDisabled()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                                             |
 | `@formStateRestore()` | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                                          |
-| `@subscribe()`        | Method            | ✕        | ✓          | ✓       | Run a method to react to changes to a signal or to events on an EventTarget                                                       |
-| `@debounce()`         | Method, Field[^2] | ✓        | ✓          | ✓       | Debounce a method or class field function                                                                                         |
+| `@subscribe()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function to react to changes to a signal or to events on an EventTarget                               |
+| `@debounce()`         | Method, Field[^2] | ✓        | ✓          | ✓       | Debounce a method or class field function, (including `static`)                                                                   |
 
 [^1]: Can be `#private` or a symbol *if* a non-private non-symbol getter/setter
       pair for the attribute name exists and a content attribute name has been

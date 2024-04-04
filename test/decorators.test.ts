@@ -1368,7 +1368,7 @@ describe("Decorators", () => {
 
   describe("@subscribe", () => {
     describe("@subscribe on signals", () => {
-      test("subscribe to a signal", async () => {
+      test("subscribe a method to a signal", async () => {
         const fn = spy();
         const counter = signal(0);
         @define(generateTagName())
@@ -1389,7 +1389,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[3].args).to.eql([instance, 3]);
       });
 
-      test("subscribe to a signal with a predicate", async () => {
+      test("subscribe a method to a signal with a predicate", async () => {
         const fn = spy();
         const counter = signal(0);
         @define(generateTagName())
@@ -1407,10 +1407,28 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, 0]);
         expect(fn.getCalls()[1].args).to.eql([instance, 2]);
       });
+
+      test("subscribe a field function to a signal", async () => {
+        const fn = spy();
+        const counter = signal(0);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(counter) test = () => fn(this, counter.value);
+        }
+        const instance = new Test();
+        counter.value = 1;
+        counter.value = 2;
+        counter.value = 3;
+        expect(fn.callCount).to.equal(4);
+        expect(fn.getCalls()[0].args).to.eql([instance, 0]);
+        expect(fn.getCalls()[1].args).to.eql([instance, 1]);
+        expect(fn.getCalls()[2].args).to.eql([instance, 2]);
+        expect(fn.getCalls()[3].args).to.eql([instance, 3]);
+      });
     });
 
     describe("@subscribe on event targets", () => {
-      test("subscribe to an event target", async () => {
+      test("subscribe a method to an event target", async () => {
         const fn = spy();
         const target = new EventTarget();
         @define(generateTagName())
@@ -1427,7 +1445,21 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe to multiple events on an event target", async () => {
+      test("subscribe a field function to an event target", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "foo") test = (event: Event) => fn(this, event, event.target); // eslint-disable-line
+        }
+        const instance = new Test();
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
+      });
+
+      test("subscribe a method to multiple events on an event target", async () => {
         const fn = spy();
         const target = new EventTarget();
         @define(generateTagName())
@@ -1450,7 +1482,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[2].args).to.eql([instance, event3, target]);
       });
 
-      test("subscribe to an event target and access private fields", async () => {
+      test("subscribe a method to an event target and access private fields", async () => {
         const fn = spy();
         const target = new EventTarget();
         @define(generateTagName())
@@ -1468,7 +1500,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target, 42]);
       });
 
-      test("subscribe to an event target factory", async () => {
+      test("subscribe a method to an event target factory", async () => {
         const fn = spy();
         const target = new EventTarget();
         @define(generateTagName())
@@ -1485,7 +1517,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe to an element", async () => {
+      test("subscribe a method to an element", async () => {
         const fn = spy();
         const target = document.createElement("div");
         @define(generateTagName())
@@ -1502,7 +1534,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe in capture mode", async () => {
+      test("subscribe a method in capture mode", async () => {
         const fn = spy();
         const parent = document.createElement("div");
         const target = document.createElement("div");
@@ -1521,7 +1553,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe to events on the shadow dom", async () => {
+      test("subscribe a method to events on the shadow dom", async () => {
         const fn = spy();
         const target = document.createElement("div");
         @define(generateTagName())
@@ -1543,7 +1575,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe to events on shadow dom from the constructor", async () => {
+      test("subscribe a method to events on shadow dom from the constructor", async () => {
         const fn = spy();
         const target = document.createElement("div");
         @define(generateTagName())
@@ -1564,7 +1596,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe with a predicate", async () => {
+      test("subscribe a method with a predicate", async () => {
         const fn = spy();
         const target = new EventTarget();
         class TestEvent extends Event {
@@ -1580,6 +1612,30 @@ describe("Decorators", () => {
           test(event: TestEvent) {
             fn(this, event.value);
           }
+        }
+        const instance = new Test();
+        target.dispatchEvent(new TestEvent(true));
+        target.dispatchEvent(new TestEvent(false));
+        target.dispatchEvent(new TestEvent(true));
+        target.dispatchEvent(new TestEvent(false));
+        expect(fn.callCount).to.equal(2);
+        expect(fn.getCalls()[0].args).to.eql([instance, true]);
+        expect(fn.getCalls()[1].args).to.eql([instance, true]);
+      });
+
+      test("subscribe a field function with a predicate", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        class TestEvent extends Event {
+          value: boolean;
+          constructor(value: boolean) {
+            super("test");
+            this.value = value;
+          }
+        }
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "test", { predicate: (_, evt) => evt.value }) test = (event: TestEvent) => fn(this, event.value); // eslint-disable-line
         }
         const instance = new Test();
         target.dispatchEvent(new TestEvent(true));
