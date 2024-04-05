@@ -85,17 +85,9 @@ export type Transformer<
 /* eslint-disable */
 export type ClassAccessorDecorator<T extends HTMLElement, V, R extends ClassAccessorDecoratorResult<unknown, unknown> | void = ClassAccessorDecoratorResult<T, V>>
   = (target: ClassAccessorDecoratorTarget<T, V>, context: ClassAccessorDecoratorContext<T, V>) => R;
-
-export type Method<T, A extends unknown[]> = (this: T, ...args: A) => any;
-export type FunctionFieldOrMethodContext<T, A extends unknown[]> =
-  | ClassMethodDecoratorContext<T, Method<T, A>>
-  | ClassFieldDecoratorContext<T, Method<T, A>>;
-
-export interface FunctionFieldOrMethodDecorator<T extends HTMLElement, A extends unknown[]> {
-  (value: Method<T, A>, context: ClassMethodDecoratorContext<T, Method<T, A>>): Method<T, A>;
-  (value: undefined, context: ClassFieldDecoratorContext<T, Method<unknown, A>>): void | ((init: Method<unknown, A>) => Method<unknown, A>);
-}
 /* eslint-enable */
+
+export type Method<T, A extends unknown[] = []> = (this: T, ...args: A) => any;
 
 type Types = {
   string: string;
@@ -159,20 +151,34 @@ export function assertTransformer<T extends HTMLElement, V>(
   }
 }
 
+type Kind = DecoratorContext["kind"] | "field-function";
+
 export function assertContext(
   ctx: any,
   name: string,
-  kinds: DecoratorContext["kind"] | DecoratorContext["kind"][],
-  acceptStatic: boolean = false,
+  kinds: Kind | Kind[],
+  allowStatic = false,
 ): void {
   kinds = isArray(kinds) ? kinds : [kinds];
-  if (!kinds.includes(ctx.kind)) {
-    const expected = kinds
-      .map((kind) => kind[0].toUpperCase() + kind.slice(1))
-      .join("/");
-    throw new TypeError(`${expected} decorator @${name} used on ${ctx.kind}`);
-  }
-  if (ctx.static && !acceptStatic) {
+  if (ctx.static && !allowStatic) {
     throw new TypeError(`@${name} can't be used on static members`);
   }
+  for (const kind of kinds) {
+    if (kind === ctx.kind) {
+      return;
+    }
+    if (kind === "field-function" && ctx.kind === "field") {
+      ctx.addInitializer(function (this: any): void {
+        if (typeof ctx.access.get(this) !== "function") {
+          throw new TypeError(
+            `decorator @${name} used on non-function type field`,
+          );
+        }
+      });
+      return;
+    }
+  }
+  throw new TypeError(
+    `${kinds.join("/")} decorator @${name} used on ${ctx.kind}`,
+  );
 }

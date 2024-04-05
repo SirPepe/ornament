@@ -5,11 +5,12 @@
   <img alt="" src="./assets/logo.png">
 </picture>
 
-Unopinionated, pareto-optimal, tiny (< 4k) anti-framework for building vanilla
-web component infrastructure:
+Mid-level, pareto-optimal, tiny (< 4k) anti-framework for building vanilla web
+component infrastructure. Makes dealing with attributes, updates and lifecycle
+callbacks declarative and simple...
 
 ```javascript
-import { define, attr, string, number, reactive } from "@sirpepe/ornament";
+import { define, attr, string, number, connected, reactive } from "@sirpepe/ornament";
 
 // Register the element with the specified tag name
 @define("my-greeter")
@@ -24,26 +25,17 @@ class MyGreeter extends HTMLElement {
   @attr(number({ min: 0 })) accessor age = 0;
 
   // Mark the method as reactive to have it run every time one of the attributes
-  // change.
-  @reactive() greet() {
+  // change, and also run it when the component first connects to the DOM.
+  @reactive()
+  @connected()
+  greet() {
     this.#shadow.innerHTML = `Hello! My name is ${this.name}, my age is ${this.age}`;
   }
 }
 ```
 
-The code above
-
-- registers the class `MyGreeter` with the tag name `my-greeter`
-- implements two content attributes named `name` and `age`, which includes
-  - initial values initialized from HTML (when possible)
-  - content attribute change handling (via `setAttribute()` and the like)
-  - DOM attribute change handling via a JavaScript getter/setter pair, with type checking/coercion included (`name` is always a string, `age` is always a number >= 0)
-- implements a `greet()` method that...
-  - automatically gets called when any of the attributes decorated with `@attr` change
-  - automatically gets called when the element instance initializes
-- does not add any abstractions to any native API at all
-
-This translates to the following boilerplate monstrosity when written by hand:
+... when compared to the equivalent boilerplate monstrosity that one would have
+to write by hand otherwise:
 
 ```javascript
 class MyGreeter extends HTMLElement {
@@ -63,7 +55,11 @@ class MyGreeter extends HTMLElement {
       age = 0;
     }
     this.#age = 0;
-    this.greet(); // Remember to run the method on initialization
+  }
+
+  // Remember to run the reactive method when connecting to the DOM
+  connectedCallback() {
+    this.greet();
   }
 
   // Method to run each time `#name` or `#age` changes
@@ -142,23 +138,24 @@ class MyGreeter extends HTMLElement {
 window.customElements.define("my-greeter", MyGreeter);
 ```
 
-Ornament aims to make *only the most tedious bits* of building vanilla web
-components (attribute handling and lifecycle reactions) easy by adding some
-primitives that really should be part of the standard, but aren't.
+Both snippets perform the same function:
+
+- register the class `MyGreeter` with the tag name `my-greeter`
+- implement two content attributes named `name` and `age`, which includes
+  - initial values initialized from HTML (when possible)
+  - content attribute change handling (via `setAttribute()` and the like)
+  - DOM attribute change handling via a JavaScript getter/setter pair, with type checking/coercion included (`name` is always a string, `age` is always a number >= 0)
+  - safeguarding against shadowed prototype properties in case of delayed upgrades
+- implement a `greet()` method that...
+  - automatically executes when any of the attributes decorated with `@attr()` change
+  - automatically executes when the element instance connects to the DOM
+
+Ornament makes *only the most tedious bits* of building vanilla web components
+(attribute handling and lifecycle reactions) easy by adding some primitives that
+really should be part of the standard, but aren't. Ornament is not a framework,
+but something that you might want to build your own framework on top of.
 
 ## Guide
-
-### Installation
-
-Install [@sirpepe/ornament](https://www.npmjs.com/package/@sirpepe/ornament)
-with your favorite package manager. To get the decorator syntax working in 2024,
-you will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
-(with option `version` set to `"2023-11"`) or
-[TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
-(with the option `experimentalDecorators` turned *off*).
-
-Apart from that, Ornament is just a bunch of functions. No further setup
-required, no extra concepts to learn.
 
 ### General philosophy
 
@@ -173,7 +170,7 @@ Ornament is **not a framework** but instead aims to be:
 - **fast and lean** by being nothing more than just a bag of relatively small and simple functions
 - **malleable** by being easy to extend, easy to customize (through partial application) and easy to get rid of
 - **universal** by adhering to (the spirit of) web standards, thereby staying compatible with vanilla web component code as well as all sorts of web frameworks
-- equipped with useful type definitions (and work within the constraints of TypeScript)
+- equipped with **useful type definitions** (and work within the constraints of TypeScript)
 
 Ornament is *infrastructure for web components* and not a framework itself. It
 makes dealing with the native APIs bearable and leaves building something
@@ -187,8 +184,19 @@ following:
 - specialized syntax for every (or any specific) use case
 
 You can (and probably have to) therefore pick or write your own solutions for
-the above features. Check out `main.js` in `examples/todo-list/src` for an
-example!
+the above features. Check out the `examples` folder for inspiration!
+
+### Installation
+
+Install [@sirpepe/ornament](https://www.npmjs.com/package/@sirpepe/ornament)
+with your favorite package manager. To get the decorator syntax working in 2024,
+you will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
+(with option `version` set to `"2023-11"`) or
+[TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
+(with the option `experimentalDecorators` turned *off*).
+
+Apart from that, Ornament is just a bunch of functions. No further setup
+required, no extra concepts to learn.
 
 ### Exit strategy
 
@@ -340,7 +348,9 @@ import { attr, define number } from "@sirpepe/ornament";
 @define("my-test")
 class MyTest extends HTMLElement {
   @attr(number({ min: -100, max: 100 })) accessor value = 0;
-  @reactive log() {
+
+  @reactive()
+  log() {
     console.log(this.value);
   }
 }
@@ -364,22 +374,23 @@ for something else, or combine any of the above with hand-written logic.
 
 ### API overview
 
-| Decorator             | Class element       | `static` | `#private` | Symbols |
-| --------------------- | ------------------- | -------- | ---------- | ------- |
-| `@define()`           | Class               | -        | -          | -       |
-| `@enhance()`          | Class               | -        | -          | -       |
-| `@attr()`             | Accessor            | ✕        | ✓[^1]      | ✓[^1]   |
-| `@prop()`             | Accessor            | ✕        | ✓          | ✓       |
-| `@reactive()`         | Method              | ✕        | ✓          | ✓       |
-| `@connected()`        | Method              | ✕        | ✓          | ✓       |
-| `@disconnected()`     | Method              | ✕        | ✓          | ✓       |
-| `@adopted()`          | Method              | ✕        | ✓          | ✓       |
-| `@formAssociated()`   | Method              | ✕        | ✓          | ✓       |
-| `@formReset()`        | Method              | ✕        | ✓          | ✓       |
-| `@formDisabled()`     | Method              | ✕        | ✓          | ✓       |
-| `@formStateRestore()` | Method              | ✕        | ✓          | ✓       |
-| `@subscribe()`        | Method              | ✕        | ✓          | ✓       |
-| `@debounce()`         | Method, Class Field | ✕        | ✓[^2]      | ✓[^2]   |
+| Decorator             | Class element     | `static` | `#private` | Symbols | Summary                                                                                                                           |
+| --------------------- | ----------------- | -------- | ---------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `@define()`           | Class             | -        | -          | -       | Register a custom element class with a tag name and set it up for use with Ornament's other decorators                            |
+| `@enhance()`          | Class             | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do *not* register it with a tag name                  |
+| `@prop()`             | Accessor          | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                                             |
+| `@attr()`             | Accessor          | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type                             |
+| `@reactive()`         | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions) |
+| `@init()`             | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function after the class constructor finishes                                                         |
+| `@connected()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element connects to the DOM                                                         |
+| `@disconnected()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element disconnects from the DOM                                                    |
+| `@adopted()`          | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is adopted by a new document                                                |
+| `@formAssociated()`   | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is associated with a form element                                           |
+| `@formReset()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's form owner resets                                                         |
+| `@formDisabled()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                                             |
+| `@formStateRestore()` | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                                          |
+| `@subscribe()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function to react to changes to a signal or to events on an EventTarget                               |
+| `@debounce()`         | Method, Field[^2] | ✓        | ✓          | ✓       | Debounce a method or class field function, (including `static`)                                                                   |
 
 [^1]: Can be `#private` or a symbol *if* a non-private non-symbol getter/setter
       pair for the attribute name exists and a content attribute name has been
@@ -401,8 +412,11 @@ class MyTest extends HTMLElement {}
 console.log(document.createElement("my-test")); // instance of MyTest
 ```
 
-**Note for TypeScript:** you should add your custom element's interface to
-`HTMLElementTagNameMap` to make it work with native DOM APIs:
+<details>
+<summary>Notes for TypeScript</summary>
+
+You should add your custom element's interface to `HTMLElementTagNameMap` to
+make it work with native DOM APIs:
 
 ```typescript
 @define("my-test")
@@ -419,9 +433,9 @@ declare global {
 let test = document.createElement("my-test");
 console.log(test.foo); // only type checks with the above interface declaration
 ```
+</details>
 
-It is entirely possible to register base class and subclasses with separate tag
-names.
+It is possible to register base class and subclasses with separate tag names.
 
 ### `@enhance()`
 
@@ -494,7 +508,8 @@ class Test extends HTMLElement {
 
   // Automatically runs when "foo" (or any accessor decorated with @prop() or
   // @attr()) changes
-  @reactive() log() {
+  @reactive()
+  log() {
     console.log(`Foo changed to ${this.foo}`);
   }
 }
@@ -583,8 +598,8 @@ attributes will not cause `@reactive()` methods to run.
 
 ### `@reactive(options: ReactiveOptions = {})`
 
-**Method decorator** that causes class methods to run when accessors decorated
-with `@prop()` or `@attr()` change their values:
+**Method and class field decorator** that runs class members to run when
+accessors decorated with `@prop()` or `@attr()` change their values:
 
 ```javascript
 import { define, reactive, prop, number } from "@sirpepe/ornament";
@@ -594,7 +609,8 @@ class Test extends HTMLElement {
   @prop(number()) accessor foo = 0;
   @prop(number()) accessor bar = 0;
 
-  @reactive({ initial: false }) log() { // note "initial: false"
+  @reactive()
+  log() {
     console.log(`foo is now ${this.foo}, bar is now ${this.bar}`);
   }
 }
@@ -607,19 +623,15 @@ testEl.bar = 2;
 // then logs "foo is now 1, bar is now 2"
 ```
 
-Reactive methods are called with no arguments. They react to changes to the
+Decorated members are called with no arguments. They react to changes to the
 instances' internal state and should therefore be able to access all relevant
-data through `this`.
-
-Unless the `initial` option is set to `false` (provided `options.predicate` was
-omitted or returns `true`), the decorated method will run once upon the
-element's constructor finishing. In many cases you may want to apply
-`@reactive()` to methods decorated with [@debounce()](#reactiveoptions) to
-prevent excessive calls.
+data through `this`. In many cases you may want to apply `@reactive()` to
+methods decorated with [@debounce()](#reactiveoptions) to prevent excessive
+calls.
 
 The `predicate` and/or `keys` options can be used to control whether the
-function reacts to an update. For the function to run, the following needs to be
-true:
+decorated method or function reacts to an update. For the decorated member to
+run, the following needs to be true:
 
 1. `options.keys` must either have been omitted or must contain the IDL or
    content attribute name that changed
@@ -630,15 +642,47 @@ true:
 
 #### Options for `@reactive()`
 
-- **`initial` (boolean, optional)**: Whether or not to run the function when the element's constructor finishes, before any actual changes to any decorated accessor. Defaults to `true`
 - **`keys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) to monitor. Can include private names and symbols. Defaults to monitoring all content and IDL attributes defined by `@prop()` or `@attr()`.
 - **`excludeKeys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) not to monitor. Can include private names and symbols. Defaults to an empty array.
-- **`predicate` (Function `(instance: T) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change
+- **`predicate` (Function `(instance: T) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change. Note that this function is not part of the class declaration itself and can therefore *not* access private fields on `instance`.
+
+### `@init()`
+
+**Method and class field decorator** that runs class members when the class
+constructor finishes. This has the same effect as adding method calls to the end
+of the constructor's body.
+
+```javascript
+import { define, init } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  constructor() {
+    super();
+    console.log(23);
+  }
+
+  @init()
+  log() {
+    console.log(42);
+  }
+}
+
+let testEl = document.createElement("my-test");
+// first logs 23, then logs 42
+```
+
+This decorator is particularly useful if you need to run `@reactive()` methods
+once on component initialization.
+
+Decorated members are run with no arguments and *always* right after the
+constructor finishes, even methods and class field functions decorated with
+`@debounce()`.
 
 ### `@connected()`
 
-**Method decorator** that causes decorated class methods to run when the
-component connects to the DOM  and the component's `connectedCallback()` fires:
+**Method and class field decorator** that runs class members when the component
+connects to the DOM and the component's `connectedCallback()` fires:
 
 ```javascript
 import { define, connected } from "@sirpepe/ornament";
@@ -655,9 +699,12 @@ document.body.append(testEl);
 // testEl.log logs "Connected!"
 ```
 
+Decorated members are run with no arguments. You can also still use the regular
+`connectedCallback()`.
+
 ### `@disconnected()`
 
-**Method decorator** that causes decorated class methods to run when the
+**Method and class field decorator** that runs decorated class members when the
 component disconnects from the DOM and the component's `disconnectedCallback()`
 fires:
 
@@ -677,9 +724,12 @@ testEl.remove();
 // testEl.log logs "Disconnected!"
 ```
 
+Decorated members are run with no arguments. You can also still use the regular
+`disconnectedCallback()`.
+
 ### `@adopted()`
 
-**Method decorator** that causes decorated class methods to run when the
+**Method and class field decorator** that runs decorated class members when the
 component is moved to a new document and the component's `adoptedCallback()`
 fires:
 
@@ -699,11 +749,14 @@ newDocument.adoptNode(testEl);
 // testEl.log logs "Adopted!"
 ```
 
+Decorated members are run with no arguments. You can also still use the regular
+`adoptedCallback()`.
+
 ### `@formAssociated()`
 
-**Method decorator** that causes decorated class methods to run when a
-form-associated component's form owner changes and its `formAssociatedCallback()`
-fires:
+**Method and class field decorator** that runs decorated class members when a
+form-associated component's form owner changes and its
+`formAssociatedCallback()` fires:
 
 ```javascript
 import { define, formAssociated } from "@sirpepe/ornament";
@@ -722,9 +775,12 @@ form.append(testEl);
 // testEl.log logs "form"
 ```
 
+Decorated members are passed the new form owner (if any) as an argument. You can
+also still use the regular `formAssociatedCallback()`.
+
 ### `@formReset()`
 
-**Method decorator** that causes decorated class methods to run when a
+**Method and class field decorator** that runs decorated class members when a
 form-associated component's form owner resets and its `formResetCallback()`
 fires:
 
@@ -747,12 +803,15 @@ form.reset();
 // testEl.log logs "Reset!"
 ```
 
-Not that form reset events are observably asynchronous, unlike all other
+Decorated members are run with no arguments. You can also still use the regular
+`formResetCallback()`.
+
+Note that form reset events are observably asynchronous, unlike all other
 lifecycle events. This is due to the form reset algorithm itself being async.
 
 ### `@formDisabled()`
 
-**Method decorator** that causes decorated class methods to run when a
+**Method and class field decorator** that runs decorated class members when a
 form-associated component's fieldset gets disabled and its
 `formDisabledCallback()` fires:
 
@@ -776,11 +835,14 @@ fieldset.disabled = true;
 // testEl.log logs "Disabled via fieldset: true"
 ```
 
+Decorated members are passed the new form disabled state as an argument. You
+can also still use the regular `formDisabledCallback()`.
+
 ### `@formStateRestore()`
 
-**Method decorator** that causes decorated class methods to run when a
-form-associated component's `formStateRestoreCallback()` fires. This is not
-supported in Chrome-based browsers as of November 2023.
+**Method and class field decorator** that causes decorated class methods to run
+when a form-associated component's `formStateRestoreCallback()` fires. This does
+not work in Chrome-based browsers as of November 2023.
 
 ### `@subscribe(...args)`
 
@@ -943,13 +1005,12 @@ import { define, debounce } from "@sirpepe/ornament";
 @define("my-test")
 class Test extends HTMLElement {
   // Debounce a class method
-  @debounce() test1(x) {
+  @debounce()
+  test1(x) {
     console.log(x);
   }
   // Debounce a class field function
-  @debounce() test2 = (x) => {
-    console.log(x);
-  }
+  @debounce() test2 = (x) => console.log(x);
 }
 
 const el = new Test();
@@ -968,12 +1029,15 @@ el.test2("c");
 `@debounce()` works with class methods, static methods, and class field
 functions.
 
-**Note for TypeScript:** Debouncing a method or class field function makes it
-impossible for the method/function to return anything but `undefined`.
-TypeScript does currently not allow decorators to modify its target's type, so
-`@debounce()` can't do that. If you apply `@debounce()` to a method
-`(x: number) => number`, TypeScript will keep using this signature, even though
-the decorated method will no longer be able to return anything but `undefined`.
+<details>
+<summary>Notes for TypeScript</summary>
+Debouncing a method or class field function makes it impossible for the method
+or function to return anything but `undefined`. TypeScript does currently not
+allow decorators to modify its target's type, so `@debounce()` can't do that. If
+you apply `@debounce()` to a method `(x: number) => number`, TypeScript will
+keep using this signature, even though the decorated method will no longer be
+able to return anything but `undefined`.
+</details>
 
 #### Options for `@debounce()`
 
@@ -985,9 +1049,9 @@ the decorated method will no longer be able to return anything but `undefined`.
 ## Transformers
 
 Transformers define how the accessor decorators `@attr()` and `@prop()`
-implement attribute and property handling. This includes converting content
-attributes from and to IDL attributes, type checks on IDL setters, and running
-side effects.
+implement attribute handling and type transformations. This includes converting
+content attributes from and to IDL attributes, type checks on IDL setters, and
+running side effects.
 
 ### Transformers overview
 
@@ -1002,9 +1066,9 @@ side effects.
 | `list()`          | Array                                          | `separator`, `transform`             |
 | `literal()`       | Any                                            | `values`, `transform`                |
 | `any()`           | `any`                                          |                                      |
-| `event()`         | `function | null`                              |                                      |
+| `event()`         | `function \| null`                             |                                      |
 
-A transformers is just a bag of functions with the following type signature:
+A transformer is just a bag of functions with the following type signature:
 
 ```typescript
 export type Transformer<
@@ -1079,7 +1143,7 @@ liking.
 #### For use with both `@prop()` and `@attr()`
 
 In principle all transformers can be used with both `@prop()` and `@attr()`.
-Very few transformers are limited to use with either decorator, such als
+Very few transformers are limited to use with either decorator, such as
 `event()` (which makes very little sense outside of content attributes).
 
 The accessor's initial value serves as fallback value in case no other data is
@@ -1109,9 +1173,9 @@ document.body.innerHTML += `<my-test foo="other value"></my-test>`
 
 The attributes `foo`, `bar` and `baz` behave as follows:
 
-- The element initializes with a content attribute **`foo`** already set. The IDL attribute `foo` will therefore (because it uses the string type via the `string()` transformer) contain `"other value"`. Should the content attribute `foo` get removed, the IDL attribute will contain `"default value"`.
-- The content attribute **`bar`** is not set, which will result in the IDL attribute `bar` containing the accessor's default value `"default value"`.
-- The content attribute **`baz`** is also not set *and* the accessor has no initial value, so the `string()` transformer's built-in fallback value `""` gets used.
+- The element initializes with a content attribute **`foo`** already set in HTML. The IDL attribute `foo` will therefore (because it uses the string type via the `string()` transformer) contain `"other value"`. Should the content attribute `foo` get removed, the IDL attribute will contain `"default value"`.
+- The content attribute **`bar`** is not set in HTML, which will result in the IDL attribute `bar` containing the accessor's default value `"default value"`.
+- The content attribute **`baz`** is also not set in HTML *and* the accessor has no initial value, so the `string()` transformer's built-in fallback value `""` gets used.
 
 ### Transformer `string()`
 
@@ -1215,7 +1279,7 @@ initializer throw exceptions.
 ### Transformer `int(options?)`
 
 Implements a bigint attribute. Content attribute values are expressed as plain
-numeric strings without the tailing `n` used in JavaScript bigints.
+numeric strings without the tailing `n` used in JavaScript's BigInt.
 
 ```javascript
 import { define, attr, int } from "@sirpepe/ornament";
@@ -1226,14 +1290,14 @@ class Test extends HTMLElement {
   @attr(int()) accessor foo = 0n;
 
  // With all options set
-  @attr(int({ min: 0n, max: 10n })) accessor bar = 0n;
+  @attr(int({ min: 0n, max: 10n, nullable: false })) accessor bar = 0n;
 }
 ```
 
 The transformer allows `null` and `undefined` (with the latter converting to
-`null`) if the option `nullable` is set to `true`. In all other cases, the IDL#
+`null`) if the option `nullable` is set to `true`. In all other cases, the IDL
 attribute setter throws an exception when its input cannot be converted to
-bigint.
+BigInt.
 
 #### Options for transformer `int()`
 
@@ -1327,7 +1391,7 @@ console.log(el.foo); // > [1, 2, 3]
 
 #### Options for `list(options?)`
 
-- **`separator` (string, optional)**: Seperator string. Defaults to `","`
+- **`separator` (string, optional)**: Separator string. Defaults to `","`
 - **`transform` (Transformer)**: Transformer to use, eg. `string()` for a list of strings, `number()` for numbers etc.
 
 #### Behavior overview for transformer `list()`
@@ -1401,10 +1465,13 @@ with JSON.`stringify()` throws errors. This transformer is really just a wrapper
 around `JSON.parse()` and `JSON.stringify()` without any object validation.
 Equality is checked with `===`.
 
-**Note for TypeScript:** Even though the transformer will accept literally any
-JSON-serializable value at runtime, TS may infer a more restrictive type from
-the accessor's initial values. Decorators can't currently change the type of
-class members they are applied to, so you man need to provide a type annotation.
+<details>
+<summary>Notes for TypeScript</summary>
+Even though the transformer will accept literally any JSON-serializable value at
+runtime, TypeScript may infer a more restrictive type from the accessor's
+initial value. Decorators can't currently change the type of class members they
+are applied to, so you man need to provide a type annotation.
+</details>
 
 #### Options for `json(options?)`
 
@@ -1429,7 +1496,7 @@ class members they are applied to, so you man need to provide a type annotation.
 
 Implements a transformer that does no type checking at all and falls back to
 the global `String` function for serializing to content attributes. Use this if
-you really don't care about types:
+you really don't care about types.
 
 ```javascript
 import { define, prop, any } from "@sirpepe/ornament";
@@ -1445,17 +1512,20 @@ own custom transformer. Just note that transformers are bags of functions and
 *not* classes, so you will need to use `Object.setPrototypeOf()` and friends to
 "extend" transformers.
 
-**Note for TypeScript:** Even though the transformer will accept literally any
-value at runtime, TS may infer a more restrictive type from the accessor's
-initial values. Decorators can't currently change the type of class members they
-are applied to, so you man need to provide an `any` type annotation.
+<details>
+<summary>Notes for TypeScript</summary>
+Even though the transformer will accept literally any value at runtime, TS may
+infer a more restrictive type from the accessor's initial values. Decorators
+can't currently change the type of class members they are applied to, so you may
+need to provide an `any` type annotation.
+</details>
 
 ### Transformer `event()`
 
 Implements old-school inline event handler attributes in the style of
 `onclick="console.log(42)"`. To work properly, this should only be used in
-conjunction with `@attr()` (with reflectivity enabled) and on an accessor that
-has a name starting with `on`:
+conjunction with `@attr()` (with reflectivity enabled) and on a non-private,
+non-static accessor that has a name starting with `on`:
 
 ```javascript
 import { define, attr, eventHandler } from "@sirpepe/ornament";
@@ -1504,21 +1574,24 @@ Ornament runs intra-component communication over an internal event bus. You will
 almost certainly never need to access it directly, but there is is an API just
 in case.
 
-| Event              | Cause                                     | Event type                        | Payload (`args` property on the event object)                        |
-| ------------------ | ------------------------------------------|---------------------------------- |----------------------------------------------------------------------|
-| `init`             | Constructor ran to completion             | OrnamentEvent<"init">             | `[]`                                                                 |
-| `connected`        | `connectedCallback()` fired               | OrnamentEvent<"connected">        | `[]`                                                                 |
-| `disconnected`     | `disconnectedCallback()` fired            | OrnamentEvent<"disconnected">     | `[]`                                                                 |
-| `adopted`          | `adoptedCallback()` fired                 | OrnamentEvent<"adopted">          | `[]`                                                                 |
-| `prop`             | IDL attribute change (`@prop` or `@attr`) | OrnamentEvent<"prop">             | `[Name: string \| symbol, NewValue: any]`                            |
-| `attr`             | Content attribute change (`@attr`)        | OrnamentEvent<"attr">             | `[Name: string, OldValue: string \| null, NewValue: string \| null]` |
-| `formAssociated`   | `formAssociatedCallback()` fired          | OrnamentEvent<"formAssociated">   | `[Owner: HTMLFormElement \| null]                                    |
-| `formReset`        | `formResetCallback()` fired               | OrnamentEvent<"formReset">        | `[]`                                                                 |
-| `formDisabled`     | `formDisabledCallback()` fired            | OrnamentEvent<"formDisabled">     | `[Disabled: boolean]`                                                |
-| `formStateRestore` | `formStateRestoreCallback()` fired        | OrnamentEvent<"formStateRestore"> | `[Reason: "autocomplete" \| "restore"]`                              |
+| Event              | Cause                                     | Event type                          | Payload (`args` property on the event object)                        |
+| ------------------ | ------------------------------------------|------------------------------------ |----------------------------------------------------------------------|
+| `init`             | Constructor ran to completion             | `OrnamentEvent<"init">`             | `[]`                                                                 |
+| `connected`        | `connectedCallback()` fired               | `OrnamentEvent<"connected">`        | `[]`                                                                 |
+| `disconnected`     | `disconnectedCallback()` fired            | `OrnamentEvent<"disconnected">`     | `[]`                                                                 |
+| `adopted`          | `adoptedCallback()` fired                 | `OrnamentEvent<"adopted">`          | `[]`                                                                 |
+| `prop`             | IDL attribute change (`@prop` or `@attr`) | `OrnamentEvent<"prop">`             | `[Name: string \| symbol, NewValue: any]`                            |
+| `attr`             | Content attribute change (`@attr`)        | `OrnamentEvent<"attr">`             | `[Name: string, OldValue: string \| null, NewValue: string \| null]` |
+| `formAssociated`   | `formAssociatedCallback()` fired          | `OrnamentEvent<"formAssociated">`   | `[Owner: HTMLFormElement \| null]                                    |
+| `formReset`        | `formResetCallback()` fired               | `OrnamentEvent<"formReset">`        | `[]`                                                                 |
+| `formDisabled`     | `formDisabledCallback()` fired            | `OrnamentEvent<"formDisabled">`     | `[Disabled: boolean]`                                                |
+| `formStateRestore` | `formStateRestoreCallback()` fired        | `OrnamentEvent<"formStateRestore">` | `[Reason: "autocomplete" \| "restore"]`                              |
 
-**Note for TypeScript:** you can declare additions to the global interface
-`OrnamentEventMap` to extend this list with your own events.
+<details>
+<summary>Notes for TypeScript</summary>
+You can declare additions to the global interface `OrnamentEventMap` to extend
+this list with your own events.
+</details>
 
 ### `trigger(instance, name, ...payload)`
 
@@ -1552,7 +1625,7 @@ import { listen } from "@sirpepe/ornament";
 // Listen for "prop" event on the event bus for "someElement"
 listen(someElement, "prop", (evt) => {
   const [ name, value ] = event.args;
-  window.alert(`IDL attribute ${name} was changed to ${value}!`);
+  window.alert(`Attribute ${name} was changed to ${value}!`);
 });
 ```
 
@@ -1585,7 +1658,9 @@ import { define, prop, reactive, debounce int } from "@sirpepe/ornament";
 export class TestElement extends HTMLElement {
   @prop(int()) accessor value = 0;
 
-  @reactive({ initial: false }) @debounce() #log() {
+  @reactive()
+  @debounce()
+  #log() {
     console.log("Value is now", this.value);
   }
 }
@@ -1597,12 +1672,6 @@ el.value = 2;
 
 // Only logs "Value is now 3"
 ```
-
-The order of the decorators im important here: `@reactive()` *must* be applied
-to a method decorated with `@debounce()` for everything to work properly. The
-initial method call of a `reactive()` method is not debounced and will keep
-happening once the element's constructor runs to completion.
-</details>
 
 ### Rendering shadow DOM with uhtml
 
@@ -1638,39 +1707,36 @@ accordingly - debounced with `@debounce()` for batched updates.
 
 ### Rendering shadow DOM with Preact
 
-If you want to use [Preact](https://preactjs.com/) to render shadow DOM, it
-makes sense of build root component with Preact and use Ornament ony as a
-wrapper to provide attribute data as top-level props:
+You can also use [Preact](https://preactjs.com/) to render shadow DOM:
 
 ```javascript
-import { define, reactive, attr, number } from "@sirpepe/ornament";
-import { render, h, Fragment } from "preact";
-import { useState } from "preact/hooks";
+import { define, attr, number, reactive, connected } from "@sirpepe/ornament";
+import { Fragment, h, render } from "preact";
 
-// Preact root component
-function ShadowDom(props) {
-  const [count, setCount] = useState(0);
-  return (
-    <button onClick={() => setCount(count + 1)}>
-      Value {count ** props.exponent}
-    </button>
-  );
-}
+@define("click-counter")
+class ClickCounter extends HTMLElement {
+  #shadow = this.attachShadow({ mode: "closed" });
 
-// Web component wrapper to translate attributes to props
-@define("my-component")
-export class MyComponent extends HTMLElement {
-  #shadow = this.attachShadow({ mode: "open" });
+  @attr(number({ min: 0 }), { reflective: false }) accessor up = 0;
+  @attr(number({ min: 0 }), { reflective: false }) accessor down = 0;
 
-  @attr(number()) accessor exponent = 1;
-
+  @connected()
   @reactive()
-  #reRender() {
-    return render(<ShadowDom exponent={this.exponent} />, this.#shadow);
+  render() {
+    render(
+      <>
+        <button onClick={() => this.up++}>+1</button>
+        Total: <b>{this.up + this.down}</b>
+        <button onClick={() => this.down--}>-1</button>
+      </>,
+      this.#shadow,
+    );
   }
 }
-
 ```
+
+In the case of Web Components and Ornament, it makes some sense to use class
+members for local state instead of hooks.
 
 ### Read-only property
 
@@ -1683,9 +1749,10 @@ import { define, attr, reactive, string } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
+  // Writable, but private
   @prop(string()) accessor #foo = "Starting value";
 
-  // Provides readonly access to #foo
+  // Provides public readonly access to #foo
   get foo() {
     return this.#foo;
   }
@@ -1696,7 +1763,8 @@ class Test extends HTMLElement {
 
   // Reacts to changes to #foo, which can only be caused by calling the method
   // `change()`
-  @reactive() log() {
+  @reactive()
+  log() {
     console.log(this.#foo);
   }
 }
@@ -1721,12 +1789,12 @@ class Test extends HTMLElement {
   // To provide public IDL attributes, we just write a getter/setter pair with
   // names matching the content attribute
   get foo() {
-    console.log("Custom logic!");
+    console.log("Custom getter logic!");
     return this.#secret; // accesses the getter decorated with @attr()
   }
 
   set foo(value) {
-    console.log("Custom logic!");
+    console.log("Custom seter logic!");
     this.#secret = value; // accesses the setter decorated with @attr()
   }
 }
@@ -1840,27 +1908,30 @@ also want to use event delegation
 
 ### Custom defaults
 
-If you don't like ornament's defaults, remember that decorators and transformers
+If you don't like Ornament's defaults, remember that decorators and transformers
 are just functions. This means that you can use partial application to change
 the default options:
 
 ```javascript
 import { define, attr, reactive as baseReactive, string } from "@sirpepe/ornament";
 
-// @reactive with "initial" always set to false
-const reactive = baseReactive.bind(null, { initial: false });
+// @reactive with "keys" always set to ["foo"]
+const reactive = (options) => baseReactive({ ...options, keys: ["foo"] });
 
 @define("my-test")
 class Test extends HTMLElement {
-  @prop(string()) accessor foo = "A";
+  @prop(string()) accessor foo = "A"; // included in options.keys
+  @prop(string()) accessor bar = "A"; // excluded from options.keys
 
-  @reactive() log() {
-    console.log(this.foo);
+  @reactive()
+  log() {
+    console.log("Hello");
   }
 }
 
 let test = new Test();
-test.foo = "B"; //  only logs "B"
+test.foo = "B"; //  logs "Hello"
+test.bar = "B"; //  does not log anything
 ```
 
 The same approach works when you want to create specialized decorators from
@@ -1903,7 +1974,38 @@ class Test extends HTMLElement {
 }
 ```
 
-Also, remember that transformer functions return plain objects that you can
+You can also compose decorators, since they are just functions over a target and
+a context object:
+
+```javascript
+import { reactive as baseReactive, connected } from "@sirpepe/ornament";
+
+// Combines @reactive() and @connected() into one handy decorator that runs
+// methods when components connect AND when their attributes change
+function reactive() {
+  return function (target, context) {
+    return baseReactive()(connected()(target, context), context);
+  };
+}
+```
+
+And while we are at it, why not compose *and* partially apply decorators:
+
+```javascript
+import { reactive as baseReactive, connected, debounce } from "@sirpepe/ornament";
+
+// Combines @reactive(), @connected() and @debounce():
+// - reacts to attribute updates (only while the component is connected)
+// - and runs its target method at most once per frame
+// - and also when the component connects
+const reactive = () => (target, context) =>
+  baseReactive({ predicate: ({ isConnected }) => isConnected })(
+    connected()(debounce({ fn: debounce.raf() })(target, context), context),
+    context,
+  );
+```
+
+Also remember that transformer functions return plain objects that you can
 modify for one-off custom transformers:
 
 ```javascript
@@ -1928,29 +2030,5 @@ class Test extends HTMLElement {
 }
 ```
 
-### Catching initial attribute reactions using the event bus
-
-If you try to catch initial attribute updates in your element's constructor,
-you will be disappointed:
-
-```javascript
-import { define, attr, string, listen } from "@sirpepe/ornament";
-
-@define("my-test")
-class Test extends HTMLElement {
-  @attr(string()) accessor foo = "a";
-  constructor() {
-    super();
-    // This looks like it should work, but the callback function will never fire
-    listen(this, "prop", () => console.log(this.foo), { once: true });
-  }
-}
-```
-
-This happens because the *initial* attribute reactions are not actually
-dispatched via the event bus. Reactive callbacks are instead listening for the
-`init` event, which in turn is dispatched once the classes' constructors have
-run to completion. This enables you to set up your elements state in the
-constructor without worrying about causing reactive callbacks to run. The
-downside is the minor inconsistency that not *all* attribute reactions can be
-caught with the `prop` event. You can use the `init` event instead.
+Ornament's building blocks are extremely basic and you should hack, combine and
+extend them to get the most out of your components.

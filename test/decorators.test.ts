@@ -18,6 +18,7 @@ import {
   json,
   number,
   string,
+  init,
 } from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 import { signal } from "@preact/signals-core";
@@ -38,14 +39,14 @@ describe("Decorators", () => {
       const fnTest = spy();
       class Base extends HTMLElement {
         @prop(number()) accessor foo = 23;
-        @reactive({ initial: false }) methodBase() {
+        @reactive() methodBase() {
           fnBase();
         }
       }
       @enhance()
       class Test extends Base {
         @prop(string()) accessor bar = "A";
-        @reactive({ initial: false }) methodTest() {
+        @reactive() methodTest() {
           fnTest();
         }
       }
@@ -73,11 +74,9 @@ describe("Decorators", () => {
       }
       window.customElements.define(generateTagName(), Test);
       const instance = new Test();
-      expect(fn.callCount).to.equal(1); // Initial call
-      expect(fn.getCalls()[0].args).to.eql(["A"]); // Initial call
       instance.foo = "B";
-      expect(fn.callCount).to.equal(2);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
     test("content attribute access on the base class of an upgraded subclass", () => {
@@ -98,14 +97,12 @@ describe("Decorators", () => {
       document.body.append(fixture);
       fixture.innerHTML = `<${tagName} foo="bar"></${tagName}>`;
       const instance = fixture.children[0] as Test;
-      expect(fn.callCount).to.equal(1); // Initial call
-      expect(fn.getCalls()[0].args).to.eql(["bar"]); // Initial call
       instance.foo = "baz";
-      expect(fn.callCount).to.equal(2);
-      expect(fn.getCalls()[1].args).to.eql(["baz"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["baz"]);
       instance.setAttribute("foo", "foo");
-      expect(fn.callCount).to.equal(3);
-      expect(fn.getCalls()[2].args).to.eql(["foo"]);
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[1].args).to.eql(["foo"]);
     });
 
     test("upgrade only a base class", () => {
@@ -114,13 +111,13 @@ describe("Decorators", () => {
       @enhance()
       class Base extends HTMLElement {
         @prop(number()) accessor foo = 23;
-        @reactive({ initial: false }) methodBase() {
+        @reactive() methodBase() {
           fnBase();
         }
       }
       class Test extends Base {
         @prop(string()) accessor bar = "A";
-        @reactive({ initial: false }) methodTest() {
+        @reactive() methodTest() {
           fnTest();
         }
       }
@@ -140,7 +137,7 @@ describe("Decorators", () => {
       @enhance()
       class Test extends HTMLElement {
         @prop(number()) accessor test = 23;
-        @reactive({ initial: false }) method() {
+        @reactive() method() {
           fn(); // called *once* if enhance only applies its effect once
         }
       }
@@ -156,14 +153,14 @@ describe("Decorators", () => {
       @enhance()
       class Base extends HTMLElement {
         @prop(number()) accessor foo = 23;
-        @reactive({ initial: false }) methodBase() {
+        @reactive() methodBase() {
           fnBase(); // called *once* if enhance only applies its effect once
         }
       }
       @enhance()
       class Test extends Base {
         @prop(string()) accessor bar = "A";
-        @reactive({ initial: false }) methodTest() {
+        @reactive() methodTest() {
           fnTest(); // called *once* if enhance only applies its effect once
         }
       }
@@ -194,7 +191,7 @@ describe("Decorators", () => {
       class Base extends HTMLElement {
         baseFn = spy();
         @prop(number()) accessor foo = 23;
-        @reactive({ initial: false }) methodBase() {
+        @reactive() methodBase() {
           this.baseFn();
         }
       }
@@ -202,7 +199,7 @@ describe("Decorators", () => {
       class Test extends Base {
         testFn = spy();
         @prop(string()) accessor bar = "A";
-        @reactive({ initial: false }) methodTest() {
+        @reactive() methodTest() {
           this.testFn();
         }
       }
@@ -342,7 +339,7 @@ describe("Decorators", () => {
         attributeChangedCallback(name: string): void {
           userDefinedCallback(this, name);
         }
-        @reactive({ initial: false }) test() {
+        @reactive() test() {
           reactiveCallback(this);
         }
       }
@@ -378,22 +375,6 @@ describe("Decorators", () => {
       const container = document.createElement("div");
       container.innerHTML = `<${tagName} x="B"></${tagName}>`;
       expect((container.children[0] as any).x).to.equal("B");
-    });
-
-    test("initialize attribute value early", async () => {
-      const fn = spy();
-      const tagName = generateTagName();
-      @define(tagName)
-      class Test extends HTMLElement {
-        @attr(string()) accessor x = "A"; // this never appears
-        @reactive()
-        test() {
-          fn(this.x);
-        }
-      }
-      const container = document.createElement("div");
-      container.innerHTML = `<${tagName} x="B"></${tagName}>`;
-      expect(fn.getCalls().map(({ args }) => args)).to.eql([["B"]]);
     });
 
     test("Non-reflective attribute", async () => {
@@ -582,12 +563,8 @@ describe("Decorators", () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         // Using timeout because RAF is unreliable in headless browsers
-        @debounce<Test, [number]>({ fn: debounce.timeout(0) }) test = (
-          x: number,
-        ) => {
+        @debounce({ fn: debounce.timeout(0) }) test = (x: number) =>
           fn(x, this);
-          return x;
-        };
       }
       const el = new Test();
       const func = el.test;
@@ -604,12 +581,8 @@ describe("Decorators", () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         // Using timeout because RAF is unreliable in headless browsers
-        @debounce<Test, [number]>({ fn: debounce.timeout(0) }) #test = (
-          x: number,
-        ) => {
+        @debounce({ fn: debounce.timeout(0) }) #test = (x: number) =>
           fn(x, this);
-          return x;
-        };
         runTest() {
           this.#test(1);
           this.#test(2);
@@ -642,15 +615,40 @@ describe("Decorators", () => {
       expect(fn.getCalls()[0].args).to.eql([3, el]);
     });
 
+    test("debouncing private class methods", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) }) #test(x: number): number {
+          fn(x, this);
+          return x;
+        }
+        test(x: number): void {
+          this.#test(x);
+        }
+      }
+      const el = new Test();
+      el.test(1);
+      el.test(2);
+      el.test(3);
+      await wait(100);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([3, el]);
+    });
+
     test("access to private fields", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         #foo = 42;
         // Using timeout because RAF is unreliable in headless browsers
-        @debounce({ fn: debounce.timeout(0) }) test(x: number): number {
+        @debounce({ fn: debounce.timeout(0) }) #test(x: number): number {
           fn(x, this.#foo, this);
           return x;
+        }
+        test(x: number): void {
+          this.#test(x);
         }
       }
       const el = new Test();
@@ -661,10 +659,45 @@ describe("Decorators", () => {
       expect(fn.callCount).to.equal(1);
       expect(fn.getCalls()[0].args).to.eql([3, 42, el]);
     });
+
+    test("debouncing static class methods", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) })
+        static test(x: number): void {
+          fn(x, this);
+        }
+      }
+      Test.test(1);
+      Test.test(2);
+      Test.test(3);
+      await wait(100);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([3, Test]);
+    });
+
+    test("debouncing static class field functions", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) }) static test = (
+          x: number,
+        ): void => fn(x, this);
+      }
+      Test.test(1);
+      Test.test(2);
+      Test.test(3);
+      await wait(100);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([3, Test]);
+    });
   });
 
   describe("@connected/@disconnected", () => {
-    test("fire on (dis)connect", async () => {
+    test("methods fire on (dis)connect", async () => {
       const connectFn = spy();
       const disconnectFn = spy();
       @define(generateTagName())
@@ -683,6 +716,33 @@ describe("Decorators", () => {
       expect(connectFn.getCalls()[0].args).to.eql([instance]);
       expect(disconnectFn.callCount).to.equal(1);
       expect(disconnectFn.getCalls()[0].args).to.eql([instance]);
+    });
+
+    test("field functions fire on (dis)connect", async () => {
+      const connectFn = spy();
+      const disconnectFn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @connected() connected = () => connectFn(this);
+        @disconnected() disconnected = () => disconnectFn(this);
+      }
+      const instance = new Test();
+      document.body.append(instance);
+      instance.remove();
+      expect(connectFn.callCount).to.equal(1);
+      expect(connectFn.getCalls()[0].args).to.eql([instance]);
+      expect(disconnectFn.callCount).to.equal(1);
+      expect(disconnectFn.getCalls()[0].args).to.eql([instance]);
+    });
+
+    test("fail on non-functions type fields", async () => {
+      expect(() => {
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @connected() connected: any = 42;
+        }
+        new Test();
+      }).to.throw();
     });
 
     test("no duplicate registration from multiple instances", async () => {
@@ -728,16 +788,44 @@ describe("Decorators", () => {
       expect(disconnectFn.callCount).to.equal(1);
       expect(disconnectFn.getCalls()[0].args).to.eql([instance, 42]);
     });
+
+    test("fire private method on connect with access to private fields when already connected", async () => {
+      const connectFn = spy();
+      const tagName = generateTagName();
+      const instance = document.createElement(tagName);
+      document.body.append(instance);
+      @define(tagName)
+      class Test extends HTMLElement {
+        #test = 42;
+        @connected() #connected() {
+          connectFn(this, this.#test);
+        }
+      }
+      expect(connectFn.callCount).to.equal(1);
+      expect(connectFn.getCalls()[0].args).to.eql([instance, 42]);
+    });
   });
 
   describe("@adopted", () => {
-    test("fire on adoption", async () => {
+    test("fire methods on adoption", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @adopted() adopted() {
           fn(this);
         }
+      }
+      const instance = new Test();
+      new Document().adoptNode(instance);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([instance]);
+    });
+
+    test("fire field functions on adoption", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @adopted() adopted = () => fn(this);
       }
       const instance = new Test();
       new Document().adoptNode(instance);
@@ -767,7 +855,7 @@ describe("Decorators", () => {
   });
 
   describe("@formAssociated", () => {
-    test("fire on form association", async () => {
+    test("fire methods on form association", async () => {
       const decoratedSpy = spy();
       const lifecycleCallbackSpy = spy();
       @define(generateTagName())
@@ -795,10 +883,29 @@ describe("Decorators", () => {
         lifecycleCallbackSpy.getCalls().map(({ args }) => args),
       );
     });
+
+    test("fire field functions on form association", async () => {
+      const decoratedSpy = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        static formAssociated = true;
+        @formAssociated() associated = (owner: HTMLFormElement | null) =>
+          decoratedSpy(this, owner);
+      }
+      const instance = new Test();
+      const form = document.createElement("form");
+      new Document().append(form);
+      form.append(instance);
+      expect(decoratedSpy.callCount).to.equal(1);
+      expect(decoratedSpy.getCalls()[0].args).to.eql([instance, form]);
+      instance.remove();
+      expect(decoratedSpy.callCount).to.equal(2);
+      expect(decoratedSpy.getCalls()[1].args).to.eql([instance, null]);
+    });
   });
 
   describe("@formReset", () => {
-    test("fire on form reset", async () => {
+    test("fire methods on form reset", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -817,10 +924,28 @@ describe("Decorators", () => {
       expect(fn.getCalls()[0].args).to.eql([instance]);
       document.body.removeChild(form);
     });
+
+    test("fire field functions on form reset", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        static formAssociated = true;
+        @formReset() reset = () => fn(this);
+      }
+      const instance = new Test();
+      const form = document.createElement("form");
+      document.body.append(form);
+      form.append(instance);
+      form.reset();
+      await wait(); // The reset algorithm is async
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([instance]);
+      document.body.removeChild(form);
+    });
   });
 
   describe("@formDisabled", () => {
-    test("fire on fieldset disable", async () => {
+    test("fire methods on fieldset disable", async () => {
       const decoratedSpy = spy();
       const lifecycleCallbackSpy = spy();
       @define(generateTagName())
@@ -852,26 +977,75 @@ describe("Decorators", () => {
         lifecycleCallbackSpy.getCalls().map(({ args }) => args),
       );
     });
+
+    test("fire class fields on fieldset disable", async () => {
+      const decoratedSpy = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        static formAssociated = true;
+        @formDisabled() disable = (state: boolean) => decoratedSpy(this, state);
+      }
+      const instance = new Test();
+      const form = document.createElement("form");
+      const fieldset = document.createElement("fieldset");
+      new Document().append(form);
+      form.append(fieldset);
+      fieldset.append(instance);
+      expect(decoratedSpy.callCount).to.equal(0);
+      fieldset.disabled = true;
+      expect(decoratedSpy.callCount).to.equal(1);
+      expect(decoratedSpy.getCalls()[0].args).to.eql([instance, true]);
+      fieldset.disabled = false;
+      expect(decoratedSpy.callCount).to.equal(2);
+      expect(decoratedSpy.getCalls()[1].args).to.eql([instance, false]);
+    });
   });
 
+  // Don't know how to properly test this one ¯\_(ツ)_/¯
   describe.skip("@formStateRestore", () => undefined);
 
-  describe("@reactive", () => {
-    test("initial call with reactive property", async () => {
+  describe("@init", () => {
+    test("run method on init", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
-        @reactive() test() {
+        @init() test() {
           fn(this.x);
         }
       }
-      new Test();
+      const el = new Test();
+      el.x = "B";
       expect(fn.callCount).to.equal(1);
       expect(fn.getCalls()[0].args).to.eql(["A"]);
     });
 
-    test("prop change", async () => {
+    test("run field function on init", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @init() test = () => fn(this.x);
+      }
+      const el = new Test();
+      el.x = "B";
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["A"]);
+    });
+
+    test("fail on non-functions type fields", async () => {
+      expect(() => {
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @init() test: any = 42;
+        }
+        new Test();
+      }).to.throw();
+    });
+  });
+
+  describe("@reactive", () => {
+    test("method runs on prop change", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -882,9 +1056,21 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "B";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A"]);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
+    });
+
+    test("class field function runs on prop change", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive() test = () => fn(this.x);
+      }
+      const el = new Test();
+      el.x = "B";
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
     test("prop changes in the constructor cause no reaction", async () => {
@@ -902,9 +1088,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "C";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["B"]);
-      expect(fn.getCalls()[1].args).to.eql(["C"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["C"]);
     });
 
     test("two prop changes", async () => {
@@ -920,10 +1105,9 @@ describe("Decorators", () => {
       const el = new Test();
       el.x = "B";
       el.y = "Y";
-      expect(fn.callCount).to.equal(3); // initial + two updates
-      expect(fn.getCalls()[0].args).to.eql(["A", "Z"]);
-      expect(fn.getCalls()[1].args).to.eql(["B", "Z"]);
-      expect(fn.getCalls()[2].args).to.eql(["B", "Y"]);
+      expect(fn.callCount).to.equal(2);
+      expect(fn.getCalls()[0].args).to.eql(["B", "Z"]);
+      expect(fn.getCalls()[1].args).to.eql(["B", "Y"]);
     });
 
     test("multiple prop changes with the same value only cause one effect to run", async () => {
@@ -939,9 +1123,8 @@ describe("Decorators", () => {
       el.x = "B";
       el.x = "B";
       el.x = "B";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A"]);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
     test("multiple attr changes with the same value only cause one effect to run (primitives)", async () => {
@@ -957,9 +1140,8 @@ describe("Decorators", () => {
       el.x = "B";
       el.x = "B";
       el.x = "B";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A"]);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
     test("attr change causes only one effect to run, not also the attributeChangedCallback (objects)", async () => {
@@ -973,9 +1155,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = [2];
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql([[1]]);
-      expect(fn.getCalls()[1].args).to.eql([[2]]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([[2]]);
     });
 
     test("attr change causes only one effect to run, not also the attributeChangedCallback (two primitive updates)", async () => {
@@ -984,7 +1165,7 @@ describe("Decorators", () => {
       class Test extends HTMLElement {
         @attr(string()) accessor foo = "a";
         @attr(string()) accessor bar = "x";
-        @reactive({ initial: false }) test() {
+        @reactive() test() {
           fn(this.foo, this.bar);
         }
       }
@@ -1002,7 +1183,6 @@ describe("Decorators", () => {
       class Test extends HTMLElement {
         @prop(number()) accessor value = 0;
         @reactive({
-          initial: false,
           predicate: (instance) => instance.value % 2 === 0,
         })
         test() {
@@ -1033,7 +1213,6 @@ describe("Decorators", () => {
           return instance.#value % 2 === 0;
         }
         @reactive({
-          initial: false,
           predicate: (instance) => Test.triggerReactive(instance),
         })
         test() {
@@ -1065,10 +1244,10 @@ describe("Decorators", () => {
       class Test extends HTMLElement {
         @prop(string()) accessor x = "A";
         @prop(string()) accessor y = "Z";
-        @reactive({ keys: ["x"], initial: false }) testX() {
+        @reactive({ keys: ["x"] }) testX() {
           fnX(this.x, this.y);
         }
-        @reactive({ keys: ["y"], initial: false }) testY() {
+        @reactive({ keys: ["y"] }) testY() {
           fnY(this.x, this.y);
         }
       }
@@ -1094,10 +1273,10 @@ describe("Decorators", () => {
         setX(value: string): void {
           this.#x = value;
         }
-        @reactive({ keys: ["#x"], initial: false }) testX() {
+        @reactive({ keys: ["#x"] }) testX() {
           fnX(this.#x, this.y);
         }
-        @reactive({ keys: ["y"], initial: false }) testY() {
+        @reactive({ keys: ["y"] }) testY() {
           fnY(this.#x, this.y);
         }
       }
@@ -1124,9 +1303,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "B";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A"]);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
     test("attributes changes via setAttribute trigger @reactive", async () => {
@@ -1140,46 +1318,7 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.setAttribute("x", "B");
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A"]);
-      expect(fn.getCalls()[1].args).to.eql(["B"]);
-    });
-
-    test("skip initial call with options.initial = false", async () => {
-      const fn = spy();
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        @prop(string()) accessor x = "A";
-        @reactive({ initial: false }) test() {
-          fn(this.x);
-        }
-      }
-      const el = new Test();
-      el.x = "B";
-      expect(fn.callCount).to.equal(1); // one update
-      expect(fn.getCalls()[0].args).to.eql(["B"]);
-    });
-
-    test("skip initial call when options.predicate returns false", async () => {
-      const fn = spy();
-      @define(generateTagName())
-      class Test extends HTMLElement {
-        value = false;
-        @prop(string()) accessor x = "A";
-        @reactive({
-          predicate(instance) {
-            const result = instance.value;
-            instance.value = true;
-            return result;
-          },
-        })
-        test() {
-          fn(this.x);
-        }
-      }
-      const el = new Test();
-      el.x = "B";
-      expect(fn.callCount).to.equal(1); // one update
+      expect(fn.callCount).to.equal(1);
       expect(fn.getCalls()[0].args).to.eql(["B"]);
     });
 
@@ -1195,9 +1334,8 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.x = "B";
-      expect(fn.callCount).to.equal(2); // initial + one update
-      expect(fn.getCalls()[0].args).to.eql(["A", 42]);
-      expect(fn.getCalls()[1].args).to.eql(["B", 42]);
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["B", 42]);
     });
 
     test("on a base class", async () => {
@@ -1213,7 +1351,7 @@ describe("Decorators", () => {
       }
       const el = new Test();
       el.foo = 23;
-      expect(fn.callCount).to.equal(2); // initial + 1 update
+      expect(fn.callCount).to.equal(1);
     });
 
     test("reject on static methods", async () => {
@@ -1230,7 +1368,7 @@ describe("Decorators", () => {
 
   describe("@subscribe", () => {
     describe("@subscribe on signals", () => {
-      test("subscribe to a signal", async () => {
+      test("subscribe a method to a signal", async () => {
         const fn = spy();
         const counter = signal(0);
         @define(generateTagName())
@@ -1251,7 +1389,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[3].args).to.eql([instance, 3]);
       });
 
-      test("subscribe to a signal with a predicate", async () => {
+      test("subscribe a method to a signal with a predicate", async () => {
         const fn = spy();
         const counter = signal(0);
         @define(generateTagName())
@@ -1269,10 +1407,28 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, 0]);
         expect(fn.getCalls()[1].args).to.eql([instance, 2]);
       });
+
+      test("subscribe a field function to a signal", async () => {
+        const fn = spy();
+        const counter = signal(0);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(counter) test = () => fn(this, counter.value);
+        }
+        const instance = new Test();
+        counter.value = 1;
+        counter.value = 2;
+        counter.value = 3;
+        expect(fn.callCount).to.equal(4);
+        expect(fn.getCalls()[0].args).to.eql([instance, 0]);
+        expect(fn.getCalls()[1].args).to.eql([instance, 1]);
+        expect(fn.getCalls()[2].args).to.eql([instance, 2]);
+        expect(fn.getCalls()[3].args).to.eql([instance, 3]);
+      });
     });
 
     describe("@subscribe on event targets", () => {
-      test("subscribe to an event target", async () => {
+      test("subscribe a method to an event target", async () => {
         const fn = spy();
         const target = new EventTarget();
         @define(generateTagName())
@@ -1289,7 +1445,21 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe to multiple events on an event target", async () => {
+      test("subscribe a field function to an event target", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "foo") test = (event: Event) => fn(this, event, event.target); // eslint-disable-line
+        }
+        const instance = new Test();
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
+      });
+
+      test("subscribe a method to multiple events on an event target", async () => {
         const fn = spy();
         const target = new EventTarget();
         @define(generateTagName())
@@ -1312,7 +1482,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[2].args).to.eql([instance, event3, target]);
       });
 
-      test("subscribe to an event target and access private fields", async () => {
+      test("subscribe a method to an event target and access private fields", async () => {
         const fn = spy();
         const target = new EventTarget();
         @define(generateTagName())
@@ -1330,7 +1500,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target, 42]);
       });
 
-      test("subscribe to an event target factory", async () => {
+      test("subscribe a method to an event target factory", async () => {
         const fn = spy();
         const target = new EventTarget();
         @define(generateTagName())
@@ -1347,7 +1517,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe to an element", async () => {
+      test("subscribe a method to an element", async () => {
         const fn = spy();
         const target = document.createElement("div");
         @define(generateTagName())
@@ -1364,7 +1534,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe in capture mode", async () => {
+      test("subscribe a method in capture mode", async () => {
         const fn = spy();
         const parent = document.createElement("div");
         const target = document.createElement("div");
@@ -1383,7 +1553,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe to events on the shadow dom", async () => {
+      test("subscribe a method to events on the shadow dom", async () => {
         const fn = spy();
         const target = document.createElement("div");
         @define(generateTagName())
@@ -1405,7 +1575,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe to events on shadow dom from the constructor", async () => {
+      test("subscribe a method to events on shadow dom from the constructor", async () => {
         const fn = spy();
         const target = document.createElement("div");
         @define(generateTagName())
@@ -1426,7 +1596,7 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
-      test("subscribe with a predicate", async () => {
+      test("subscribe a method with a predicate", async () => {
         const fn = spy();
         const target = new EventTarget();
         class TestEvent extends Event {
@@ -1452,6 +1622,30 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, true]);
         expect(fn.getCalls()[1].args).to.eql([instance, true]);
       });
+
+      test("subscribe a field function with a predicate", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        class TestEvent extends Event {
+          value: boolean;
+          constructor(value: boolean) {
+            super("test");
+            this.value = value;
+          }
+        }
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "test", { predicate: (_, evt) => evt.value }) test = (event: TestEvent) => fn(this, event.value); // eslint-disable-line
+        }
+        const instance = new Test();
+        target.dispatchEvent(new TestEvent(true));
+        target.dispatchEvent(new TestEvent(false));
+        target.dispatchEvent(new TestEvent(true));
+        target.dispatchEvent(new TestEvent(false));
+        expect(fn.callCount).to.equal(2);
+        expect(fn.getCalls()[0].args).to.eql([instance, true]);
+        expect(fn.getCalls()[1].args).to.eql([instance, true]);
+      });
     });
 
     test("reject on static fields", async () => {
@@ -1467,7 +1661,7 @@ describe("Decorators", () => {
   });
 
   describe("@reactive + @debounce", () => {
-    test("debounced @reactive method", async () => {
+    test("debounced reactive method", async () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -1478,6 +1672,71 @@ describe("Decorators", () => {
         test() {
           fn(this.x);
         }
+      }
+      const el = new Test();
+      el.x = "B";
+      el.x = "C";
+      el.x = "D";
+      await wait(25);
+      expect(fn.callCount).to.equal(1); // only one update
+      expect(fn.getCalls()[0].args).to.eql(["D"]);
+    });
+
+    test("debounced reactive class field function", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive()
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) })
+        test = () => fn(this.x); // eslint-disable-line
+      }
+      const el = new Test();
+      el.x = "B";
+      el.x = "C";
+      el.x = "D";
+      await wait(25);
+      expect(fn.callCount).to.equal(1); // only one update
+      expect(fn.getCalls()[0].args).to.eql(["D"]);
+    });
+  });
+
+  describe("@reactive + @init + @debounce", () => {
+    test("debounced reactive init method", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive()
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) })
+        @init()
+        test() {
+          fn(this.x);
+        }
+      }
+      const el = new Test();
+      el.x = "B";
+      el.x = "C";
+      el.x = "D";
+      expect(fn.callCount).to.equal(1); // initial
+      expect(fn.getCalls()[0].args).to.eql(["A"]);
+      await wait(25);
+      expect(fn.callCount).to.equal(2); // initial + one update
+      expect(fn.getCalls()[1].args).to.eql(["D"]);
+    });
+
+    test("debounced reactive init class field function", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @prop(string()) accessor x = "A";
+        @reactive()
+        // Using timeout because RAF is unreliable in headless browsers
+        @debounce({ fn: debounce.timeout(0) })
+        @init()
+        test = () => fn(this.x); // eslint-disable-line
       }
       const el = new Test();
       el.x = "B";
@@ -1498,7 +1757,7 @@ describe("Decorators", () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         // Using timeout because RAF is unreliable in headless browsers
-        @debounce<Test, []>({ fn: debounce.timeout(0) }) #a = () => {};
+        @debounce({ fn: debounce.timeout(0) }) #a = () => {};
         @reactive() #test() {}
       }
       new Test();

@@ -1,4 +1,11 @@
-import { define, attr, string, number, reactive } from "@sirpepe/ornament";
+import {
+  define,
+  attr,
+  string,
+  number,
+  reactive,
+  connected,
+} from "@sirpepe/ornament";
 
 // Register the element with the specified tag name
 @define("my-greeter")
@@ -12,7 +19,9 @@ class MyGreeter extends HTMLElement {
 
   // Mark the method as reactive to have it run every time one of the attributes
   // change
-  @reactive() greet() {
-    this.#shadow.innerHTML = `Hello! My name is ${this.name}, my age is ${this.age}`;
+  @connected()
+  @reactive()
+  greet() {
+    this.#shadow.innerHTML = `Hello! My name is <b>${this.name}</b>, my age is <b>${this.age}`;
   }
 }

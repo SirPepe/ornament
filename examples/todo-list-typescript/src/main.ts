@@ -10,10 +10,29 @@ import {
   number,
   json,
   reactive,
+  connected,
+  debounce,
   subscribe,
 } from "@sirpepe/ornament";
 import { signal, computed } from "@preact/signals-core";
 import { render, html, type Renderable } from "uhtml";
+
+/* eslint-disable */
+
+// Custom rendering decorator composed from @reactive, @connected and @debounce:
+// - reacts to attribute updates (when the component is connected)
+// - and runs its target once per frame
+// - and also when the component connects
+const reRender =
+  <T extends HTMLElement, V extends (this: T) => any>() =>
+    (target: V, context: ClassMethodDecoratorContext<T, V>) =>
+      reactive<T>({ predicate: ({ isConnected }) => isConnected })(
+        connected<T>()(
+          debounce<T, V>({ fn: debounce.raf() })(target, context),
+          context,
+        ),
+        context,
+      );
 
 function fail(): never {
   throw new Error("This should never happen");
@@ -178,7 +197,7 @@ class TodoInput extends BaseComponent {
     }
   }
 
-  @reactive()
+  @reRender()
   update() {
     this.render(
       this.html`
@@ -221,7 +240,7 @@ class TodoItem extends BaseComponent {
     }
   }
 
-  @reactive()
+  @reRender()
   #update() {
     this.render(
       this.html`
@@ -245,7 +264,7 @@ class TodoList extends BaseComponent {
 ul { list-style: none; margin: 0; padding: 0 }`;
   }
 
-  @reactive()
+  @reRender()
   #update() {
     this.render(
       /* eslint-disable */
@@ -267,7 +286,7 @@ ul { list-style: none; margin: 0; padding: 0 }`;
 class TodoStats extends BaseComponent {
   @attr(json()) accessor items: Item[] = [];
 
-  @reactive()
+  @reRender()
   #update() {
     const left =
       this.items.length - this.items.filter((item) => item.done).length;
@@ -319,7 +338,7 @@ class TodoApp extends BaseComponent {
   @prop(json()) accessor allItems: Item[] = [];
   @prop(json()) accessor filteredItems: Item[] = [];
 
-  @reactive()
+  @reRender()
   #update() {
     this.render(this.html`
       <todo-input></todo-input>

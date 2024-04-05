@@ -1,10 +1,8 @@
 import { listen, trigger } from "./bus.js";
-import { BUS_TARGET, EMPTY_OBJ, NO_VALUE } from "./lib.js";
+import { EMPTY_OBJ, NO_VALUE } from "./lib.js";
 import {
   type Transformer,
   type ClassAccessorDecorator,
-  type FunctionFieldOrMethodDecorator,
-  type FunctionFieldOrMethodContext,
   type Method,
   assertContext,
 } from "./types.js";
@@ -245,7 +243,7 @@ export function define<T extends CustomElementConstructor>(
 // event have both run.
 function runContextInitializerOnOrnamentInit<
   T extends HTMLElement,
-  C extends ClassMethodDecoratorContext<T, any>,
+  C extends ClassMethodDecoratorContext<T, any> | ClassFieldDecoratorContext<T, any>, // eslint-disable-line
 >(context: C, initializer: (instance: T) => any): void {
   context.addInitializer(function (this: T) {
     // Init event has already happened, call initializer function ASAP
@@ -258,52 +256,47 @@ function runContextInitializerOnOrnamentInit<
   });
 }
 
+// Method/class fields decorator @init() runs a method or class field function
+// once an instance initializes.
+export function init<T extends HTMLElement>(): LifecycleDecorator<T, OrnamentEventMap["init"]> { // eslint-disable-line
+  return function (_, context): void {
+    assertContext(context, "init", ["method", "field-function"]);
+    runContextInitializerOnOrnamentInit(context, (instance: T): void => {
+      const method = context.access.get(instance);
+      (
+        getMetadata(instance, META_DEBOUNCED_METHODS).get(method) ?? method
+      ).call(instance);
+    });
+  };
+}
+
 type ReactiveOptions<T> = {
-  initial?: boolean;
   keys?: (string | symbol)[];
   excludeKeys?: (string | symbol)[];
   predicate?: (instance: T) => boolean;
 };
 
-type ReactiveDecorator<T extends HTMLElement> = (
-  value: unknown,
-  context: ClassMethodDecoratorContext<T, () => any>,
-) => void;
+type ReactiveDecorator<T extends HTMLElement> = {
+  (_: unknown, context: ClassMethodDecoratorContext<T, (this: T) => any>): void;
+  (_: unknown, context: ClassFieldDecoratorContext<T, (this: T) => any>): void;
+};
 
 export function reactive<T extends HTMLElement>(
   options: ReactiveOptions<T> = EMPTY_OBJ,
 ): ReactiveDecorator<T> {
-  return function (_, context): void {
-    assertContext(context, "reactive", "method");
-    // Register the callback that performs the initial method call and sets up
-    // listeners for subsequent methods calls.
+  return function (_, context) {
+    assertContext(context, "reactive", ["method", "field-function"]);
+    // Start listening only once the element's constructor has run to
+    // completion. This prevents prop set-up in the constructor from triggering
+    // reactive methods.
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
-      // We must NOT access the value outside (that is, before) ornament's init
-      // event has occurred. The method's initializer function runs before
-      // accessors' initializer functions, which may lead to errors with regards
-      // to private fields on the method's initial run (where the instance has
-      // not finished initializing).
-      const value = context.access.get(instance);
-      // Initial method call, if applicable. Uses the non-debounced method if
-      // required and wraps it in predicate logic.
-      if (
-        options.initial !== false &&
-        (!options.predicate || options.predicate(instance))
-      ) {
-        (
-          getMetadata(instance, META_DEBOUNCED_METHODS).get(value) ?? value
-        ).call(instance);
-      }
-      // Start listening only once the element's constructor has run to
-      // completion. This prevents prop set-up in the constructor from
-      // triggering reactive methods.
       listen(instance, "prop", (name) => {
         if (
           (!options.predicate || options.predicate(instance)) &&
           (!options.keys || options.keys.includes(name)) &&
           (!options.excludeKeys || !options.excludeKeys.includes(name))
         ) {
-          value.call(instance);
+          context.access.get(instance).call(instance);
         }
       });
     });
@@ -325,8 +318,8 @@ type SubscribeOptions<T, V> =
   | SignalSubscribeOptions<T, V>;
 
 type EventSubscribeDecorator<T, E extends Event> = (
-  value: Method<T, [E]>,
-  context: ClassMethodDecoratorContext<T>,
+  value: unknown,
+  context: ClassMethodDecoratorContext<T, Method<T, [E]>> | ClassFieldDecoratorContext<T, Method<T, [E]>>, // eslint-disable-line
 ) => void;
 
 type EventTargetFactory<T, E extends EventTarget = EventTarget> = (
@@ -334,8 +327,8 @@ type EventTargetFactory<T, E extends EventTarget = EventTarget> = (
 ) => E;
 
 type SignalSubscribeDecorator<T> = (
-  value: Method<T, []>,
-  context: ClassMethodDecoratorContext<T>,
+  value: unknown,
+  context: ClassMethodDecoratorContext<T> | ClassFieldDecoratorContext<T>,
 ) => void;
 
 type SignalLike<T> = {
@@ -371,8 +364,11 @@ export function subscribe<T extends HTMLElement>(
   eventsOrOptions?: SubscribeOptions<T, any> | string,
   options: SubscribeOptions<T, any> = EMPTY_OBJ,
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
-  return function (_: unknown, context: ClassMethodDecoratorContext<T>): void {
-    assertContext(context, "subscribe", "method");
+  return function (
+    _: unknown,
+    context: ClassMethodDecoratorContext<T, Method<T, [any]>> | ClassFieldDecoratorContext<T, Method<T, [any]>>, // eslint-disable-line
+  ): void {
+    assertContext(context, "subscribe", ["method", "field-function"]);
     // Arguments for subscribing to an event target
     if (
       (typeof targetOrFactory === "function" ||
@@ -420,22 +416,27 @@ export function subscribe<T extends HTMLElement>(
   };
 }
 
-type LifecycleDecorator<T extends HTMLElement, Arguments extends any[]> = (
-  _: Method<T, Arguments>,
-  context: ClassMethodDecoratorContext<T, (this: T, ...args: any) => any>,
-) => void;
+type LifecycleDecorator<T extends HTMLElement, A extends any[]> = {
+  (
+    _: unknown,
+    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => any>,
+  ): void;
+  (
+    _: unknown,
+    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => any>,
+  ): void;
+};
 
 function createLifecycleDecorator<K extends keyof OrnamentEventMap>(
   name: K,
 ): <T extends HTMLElement>() => LifecycleDecorator<T, OrnamentEventMap[K]> {
-  return <T extends HTMLElement>() =>
-    function (
-      _: Method<T, OrnamentEventMap[K]>,
-      context: ClassMethodDecoratorContext<T>,
-    ): void {
-      assertContext(context, name, "method");
+  return <T extends HTMLElement>(): LifecycleDecorator<T, OrnamentEventMap[K]> => // eslint-disable-line
+    function (_, context) {
+      assertContext(context, name, ["method", "field-function"]);
       context.addInitializer(function () {
-        listen(this, name, context.access.get(this));
+        listen(this, name, (...args) =>
+          context.access.get(this).call(this, ...args),
+        );
       });
     };
 }
@@ -636,54 +637,62 @@ export function prop<T extends HTMLElement, V>(
   };
 }
 
-type DebounceOptions<T, A extends any[]> = {
-  fn?: (cb: (this: T, ...args: A) => void) => (this: T, ...args: A) => void;
+// The class field/method decorator @debounce() debounces functions and consists
+// primarily of TypeScript bullshit.
+
+type DebounceOptions<
+  T extends object,
+  F extends (this: T, ...args: any[]) => any,
+> = {
+  fn?: (
+    cb: (this: T, ...args: Parameters<F>) => void,
+  ) => (this: T, ...args: Parameters<F>) => void;
 };
 
-// The class field/method decorator @debounce() debounces functions.
-export function debounce<T extends HTMLElement, A extends unknown[]>(
-  options: DebounceOptions<T, A> = EMPTY_OBJ,
-): FunctionFieldOrMethodDecorator<T, A> {
+type DebounceDecorator<
+  T extends object,
+  F extends (this: T, ...args: any[]) => any,
+> = (
+  value: F | undefined,
+  context: ClassMethodDecoratorContext<T, F> | ClassFieldDecoratorContext<T, F>,
+) => void;
+
+export function debounce<
+  T extends object,
+  F extends (this: T, ...args: any[]) => any,
+>(options: DebounceOptions<T, F> = EMPTY_OBJ): DebounceDecorator<T, F> {
   const fn = options.fn ?? debounce.raf();
-  function decorator(
-    value: Method<T, A>,
-    context: ClassMethodDecoratorContext<T, Method<T, A>>,
-  ): Method<T, A>;
-  function decorator(
-    value: undefined,
-    context: ClassFieldDecoratorContext<T, Method<T, A>>,
-  ): void;
-  function decorator(
-    value: Method<T, A> | undefined,
-    context: FunctionFieldOrMethodContext<T, A>,
-  ): Method<T, A> | void {
-    assertContext(context, "debounce", ["field", "method"], true);
+  return function decorator(
+    value: F | undefined,
+    context: ClassMethodDecoratorContext<T, F> | ClassFieldDecoratorContext<T, F>, // eslint-disable-line
+  ): F | void {
+    assertContext(context, "debounce", ["method", "field-function"], true);
     if (context.kind === "field") {
-      // Field decorator (bound methods)
       return context.addInitializer(function (): void {
         const func = context.access.get(this);
-        if (typeof func !== "function") {
-          throw new TypeError(
-            "@debounce() can only be applied to methods and functions",
-          );
+        const debounced = fn(func).bind(this);
+        if (!context.static) {
+          // The line below only runs when "this" is an instance of HTMLElement,
+          // but TS does not understand that.
+          getMetadata(this as any, META_DEBOUNCED_METHODS).set(debounced, func);
         }
-        // Class field functions can't be reactive atm, so there is no need to
-        // store them in the map of debounced methods.
-        context.access.set(this, fn(func).bind(this));
+        context.access.set(this, debounced as F);
       });
     }
     // if it's not a field decorator, it must be a method decorator (and value
-    // can only be a non-undefined method definition)
-    const debounced = fn(value as Method<T, A>);
-    context.addInitializer(function (this: T): void {
-      getMetadata(this, META_DEBOUNCED_METHODS).set(
-        debounced,
-        value as Method<T, A>,
-      );
-    });
-    return debounced;
-  }
-  return decorator;
+    // can only be a non-undefined method definition, that we can replace with
+    // a debounced equivalent)
+    const func = value as F;
+    const debounced = fn(func);
+    if (!context.static) {
+      context.addInitializer(function (this: T): void {
+        // The line below only runs when "this" is an instance of HTMLElement,
+        // but TS does not understand that.
+        getMetadata(this as any, META_DEBOUNCED_METHODS).set(debounced, func);
+      });
+    }
+    return debounced as F;
+  };
 }
 
 // The following debouncing services for both methods and function class fields.

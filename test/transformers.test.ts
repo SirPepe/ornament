@@ -15,6 +15,7 @@ import {
   list,
   any,
   reactive,
+  init,
 } from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 const test = it;
@@ -417,7 +418,7 @@ describe("Transformers", () => {
       @define(tagName)
       class Test extends HTMLElement {
         @attr(int()) accessor foo: any;
-        @reactive() method() {
+        @init() method() {
           fn(this.foo);
         }
       }
@@ -426,8 +427,8 @@ describe("Transformers", () => {
       fixture.innerHTML = `<${tagName} foo="0"></${tagName}>`;
       const el = fixture.children[0] as Test;
       expect(el.foo).to.equal(0n);
-      expect(fn.callCount).to.equal(1); // initial call
-      expect(fn.getCalls()[0].args).to.eql([0n]); // initial call
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql([0n]);
     });
 
     test("as nullable attribute", async () => {
