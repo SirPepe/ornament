@@ -14,8 +14,8 @@ class ClickCounter extends HTMLElement {
     render(
       <>
         <button onClick={() => this.up++}>+1</button>
-        Total: <b>{this.up + this.down}</b>
-        <button onClick={() => this.down--}>-1</button>
+        Total: <b>{this.up - this.down}</b>
+        <button onClick={() => this.down++}>-1</button>
       </>,
       this.#shadow,
     );

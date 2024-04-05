@@ -9,11 +9,23 @@ import {
   bool,
   number,
   json,
+  connected,
   reactive,
+  debounce,
   subscribe,
 } from "@sirpepe/ornament";
 import { signal, computed } from "@preact/signals-core";
 import { render, html } from "uhtml";
+
+// Custom rendering decorator composed from @reactive, @connected and @debounce:
+// - reacts to attribute updates (when the component is connected)
+// - and runs its target once per frame
+// - and also when the component connects
+const reRender = () => (target, context) =>
+  reactive({ predicate: ({ isConnected }) => isConnected })(
+    connected()(debounce({ fn: debounce.raf() })(target, context), context),
+    context,
+  );
 
 // Custom base class to provide some common functionality, in this case
 // rendering to shadow DOM with uhtml This class could in theory contain even
@@ -136,7 +148,7 @@ class TodoInput extends BaseComponent {
     }
   }
 
-  @reactive()
+  @reRender()
   update() {
     this.render(
       this.html`
@@ -176,7 +188,7 @@ class TodoItem extends BaseComponent {
     }
   }
 
-  @reactive()
+  @reRender()
   #update() {
     this.render(
       this.html`
@@ -200,7 +212,7 @@ class TodoList extends BaseComponent {
 ul { list-style: none; margin: 0; padding: 0 }`;
   }
 
-  @reactive()
+  @reRender()
   #update() {
     this.render(
       /* eslint-disable */
@@ -222,7 +234,7 @@ ul { list-style: none; margin: 0; padding: 0 }`;
 class TodoStats extends BaseComponent {
   @attr(json()) accessor items = [];
 
-  @reactive()
+  @reRender()
   #update() {
     const left =
       this.items.length - this.items.filter((item) => item.done).length;
@@ -267,7 +279,7 @@ class TodoApp extends BaseComponent {
   @prop(json()) accessor allItems = [];
   @prop(json()) accessor filteredItems = [];
 
-  @reactive()
+  @reRender()
   #update() {
     this.render(this.html`
       <todo-input></todo-input>

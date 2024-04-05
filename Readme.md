@@ -1989,6 +1989,22 @@ function reactive() {
 }
 ```
 
+And while we are at it, why not compose *and* partially apply decorators:
+
+```javascript
+import { reactive as baseReactive, connected, debounce } from "@sirpepe/ornament";
+
+// Combines @reactive(), @connected() and @debounce():
+// - reacts to attribute updates (only while the component is connected)
+// - and runs its target method at most once per frame
+// - and also when the component connects
+const reactive = () => (target, context) =>
+  baseReactive({ predicate: ({ isConnected }) => isConnected })(
+    connected()(debounce({ fn: debounce.raf() })(target, context), context),
+    context,
+  );
+```
+
 Also remember that transformer functions return plain objects that you can
 modify for one-off custom transformers:
 
