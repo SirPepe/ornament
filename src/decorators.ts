@@ -476,7 +476,7 @@ export function attr<T extends HTMLElement, V>(
     if (typeof context.name === "symbol" || context.private) {
       if (!options.as) {
         throw new TypeError(
-          "Content attribute names must not be symbols or private fields. Provide the `as` option and a public facade for your accessor or use a regular property name.",
+          "Content attribute names must not be symbols or private. Provide the `as` option and a public facade for your accessor or use a regular property name.",
         );
       }
       contentAttrName = idlAttrName = options.as;

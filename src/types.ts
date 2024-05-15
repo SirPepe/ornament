@@ -126,7 +126,7 @@ export function assertType<K extends keyof Types>(
     )
   ) {
     throw new TypeError(
-      `Expected "${name}" to be ${types.join("/")} got ${typeof value}`,
+      `Expected "${name}" to be ${types.join("/")}, got ${typeof value}`,
     );
   }
 }
@@ -171,7 +171,7 @@ export function assertContext(
       ctx.addInitializer(function (this: any): void {
         if (typeof ctx.access.get(this) !== "function") {
           throw new TypeError(
-            `decorator @${name} used on non-function type field`,
+            `decorator @${name} can't be used on non-function type field`,
           );
         }
       });
