@@ -21,12 +21,9 @@ type Metadata = {
   [META_UNSUBSCRIBE]: { context: any; value: FinalizationRegistry<() => void> };
 };
 
-// Decorator Metadata is not exactly useable as long as this bug is present in
-// babel: https://github.com/babel/babel/issues/16356
-// The workaround is to use a bunch of weak maps and have the API of setMetadata
-// and getMetadata be compatible with both decorator metadata and the current
-// workaround, more or less. All this can be re-rolled back to about
-// 98f4d068b5722608cd1d653edfb66a506545744b once the babel bug is fixed.
+// Decorator Metadata does not work reliably in babel. The workaround is to use
+// a bunch of weak maps and have the API of getMetadata be compatible with both
+// decorator metadata and the current workaround, more or less.
 
 // This should really be split on a class-by-class basis, but the @attr()
 // decorator has no context without decorator metadata. The list of observable
@@ -104,7 +101,7 @@ export function enhance<T extends CustomElementConstructor>(): (
     );
 
     // Installs the mixin class. This kindof changes the type of the input
-    // constructor T, but as TypeScript can as of December 2022 not understand
+    // constructor T, but as TypeScript can as of May 2024 not understand
     // decorators that change their target's types, we don't bother. The changes
     // are extremely small anyway and the only publicly visible changes affect
     // lifecycle callbacks, which are de facto public, but not meant to be
@@ -120,17 +117,14 @@ export function enhance<T extends CustomElementConstructor>(): (
       // is no *real* reason to have any code related to the event targets here,
       // but if TS worked as advertised, the line below would accurately
       // describe the observable effects the program has:
-      // [BUS_TARGET]!: EventTarget; // this is entirely useless
-      // March 2023: a workaround for a plugin ordering issue in babel requires
+      // [EVENT_BUS_TARGET]!: EventTarget; // this is entirely useless
+      // May 2024: a workaround for a plugin ordering issue in babel requires
       // the line above to be commented out. See the entire thread at
       // https://github.com/babel/babel/issues/16373#issuecomment-2017480546
 
       // Indicates that the instance has had its init event triggered at the end
       // of the constructor.
       [IS_INITIALIZED] = false;
-
-      // Indicates that the class has been enhanced
-      static [META_IS_ENHANCED] = true;
 
       constructor(...args: any[]) {
         super(...args);
@@ -671,11 +665,7 @@ export function debounce<
       return context.addInitializer(function (): void {
         const func = context.access.get(this);
         const debounced = fn(func).bind(this);
-        if (!context.static) {
-          // The line below only runs when "this" is an instance of HTMLElement,
-          // but TS does not understand that.
-          getMetadata(this as any, META_DEBOUNCED_METHODS).set(debounced, func);
-        }
+        getMetadata(this as any, META_DEBOUNCED_METHODS).set(debounced, func);
         context.access.set(this, debounced as F);
       });
     }
@@ -685,9 +675,7 @@ export function debounce<
     const func = value as F;
     const debounced = fn(func);
     if (!context.static) {
-      context.addInitializer(function (this: T): void {
-        // The line below only runs when "this" is an instance of HTMLElement,
-        // but TS does not understand that.
+      context.addInitializer(function (): void {
         getMetadata(this as any, META_DEBOUNCED_METHODS).set(debounced, func);
       });
     }
