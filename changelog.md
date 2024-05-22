@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* **Other**: Bump depdencies, play some code golf, tweak error messages
+
 ## v 1.0.0
 
 * **Breaking**: Methods decorated with `@reactive()` can no longer run on init. The `initial` option has been removed. Use `@init()` instead.

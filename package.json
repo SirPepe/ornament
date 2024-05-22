@@ -66,8 +66,8 @@
     "prettier": "^3.0.0",
     "release-it": "^17.0.0",
     "rollup": "^4.2.0",
-    "sinon": "^17.0.0",
+    "sinon": "^18.0.0",
     "typescript": "5.4",
-    "uhtml": "^3.2.2"
+    "uhtml": "^4.5.0"
   }
 }
