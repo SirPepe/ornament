@@ -92,7 +92,7 @@ export function enhance<T extends CustomElementConstructor>(): (
     // directly or via some convoluted OOP mess) the mixin class must NOT be
     // be re-installed. A metadata flag indicates whether the class already has
     // had the mixin applied to it
-    if ((target as any)[META_IS_ENHANCED]) {
+    if (META_IS_ENHANCED in target) {
       return target;
     }
 
@@ -125,6 +125,9 @@ export function enhance<T extends CustomElementConstructor>(): (
       // Indicates that the instance has had its init event triggered at the end
       // of the constructor.
       [IS_INITIALIZED] = false;
+
+      // Indicates that the class has been enhanced
+      static [META_IS_ENHANCED] = true;
 
       constructor(...args: any[]) {
         super(...args);
