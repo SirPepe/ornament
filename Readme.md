@@ -1642,6 +1642,86 @@ Transformers can return a special symbol to indicate that they were unable to
 parse an input. This symbol is exported by Ornament as `NO_VALUE` or available
 under the key `"ORNAMENT_NO_VALUE"` in the global symbol registry.
 
+## Troubleshooting
+
+### TypeError: Cannot read private member from an object whose class did not declare it
+
+This usually happens when methods decorated with `@init()` run at inopportune
+times. Consider the following example:
+
+```javascript
+import { define, init } from "@sirpepe/ornament";
+
+function otherDecorator(target) {
+  return class OtherMixin extends target {
+    #secret = 42;
+    get foo() {
+      return this.#secret; // <- Fails because @init() runs too early
+    }
+  };
+}
+
+@otherDecorator
+@define("foo-bar") // If this was before @otherDecorator it would work
+class Test extends HTMLElement {
+  @init() // Runs after the constructor of Test has run, does not wait for the mixin class
+  method() {
+    console.log(this.foo);
+  }
+}
+
+new Test();
+```
+
+In this scenario, `@define()` sets up to trigger `@init()` once the constructor
+of `Test` has finished. Inside `Test`, the method `method()` accesses the getter
+`foo` which is provided by the decorator `@otherDecorator`. The getter in turn
+tries to accesses the private field `#secret`, but fails with an exception.
+This happens because `@define()` installs logic that triggers the init event on
+the constructor for class `Test`, but the resulting class gets extended in turn
+by `OtherMixin`.
+
+```pseudocode
+OtherMixinConstructor(
+  DefineMixinConstructor(
+    TestConstructor(
+      HTMLElementConstructor()
+    )
+    // <---- init event happens here, after TestConstructor has run
+  )
+  // <---- finishes only after the init event has happened
+)
+```
+
+This results in the event running before the private field `#secret` is fully
+initialized. The simplest way to remedy this situation is to apply
+`@otherDecorator` first. You might also want to consider using `@connected()`
+instead of `@init()`.
+
+This is not a bug in Ornament, but rather a simple effect of how mixin classes
+are subclasses of their targets. Because `@init()` is equivalent to calling the
+decorated method in the constructor, the effect can be reproduced [without involving Ornament at all:](https://babeljs.io/repl#?browsers=defaults&build=&builtIns=false&corejs=3.21&spec=false&loose=false&code_lz=GYVwdgxgLglg9mABAEwKYTgJwIZSwCim0wHNUoBKRAbwChFFNyRMkIAbbAZy8QBF0WXFgCyMAB4wkqcVFRhkvIqXI16DRAGIu6JlEQBeRABYATAG51DMvuCpcLVPip0NGvSyRQAFjC4A6bV1ySzcAX3UwywiGWgABNAwcPExaDm5eAEE1BgwwLihMEGgCFytEPK44dlR_djgSQl8AuwcmClDECIjaMFQAd0RM50sgA&debug=false&forceAllTransforms=false&modules=false&shippedProposals=false&circleciRepo=&evaluate=true&fileSize=false&timeTravel=false&sourceType=module&lineWrap=true&presets=env%2Creact%2Cstage-2&prettier=false&targets=&version=7.24.5&externalPlugins=%40babel%2Fplugin-proposal-decorators%407.23.9&assumptions=%7B%7D)
+
+```javascript
+function decorator(target) {
+  return class DecoratorMixin extends target {
+    #secret = 42;
+    get feature() {
+      return this.#secret;
+    }
+  };
+}
+
+@decorator
+class A {
+  constructor() {
+    console.log(this.feature);
+  }
+}
+
+new A();
+```
+
 ## Cookbook
 
 ### Debounced reactive
@@ -1904,7 +1984,7 @@ const capture = (eventName, selector) =>
 
 Also also note that only composed events propagate through shadow boundaries,
 which may become important if you want to nest components with shadow dom and
-also want to use event delegation
+also want to use event delegation.
 
 ### Custom defaults
 
