@@ -296,18 +296,15 @@ describe("Decorators", () => {
       expect(() => new Test()).to.throw(RangeError);
     });
 
-    // This test (ONLY the _test_) currently fails in Firefox when transpiled by
-    // Babel: https://github.com/babel/babel/issues/16379 (March 2024)
-    // test("reject on static", () => {
-    //   expect(() => {
-    //     @define(generateTagName())
-    //     class Test extends HTMLElement {
-    //       // @ts-expect-error for testing runtime checks
-    //       @prop(string()) static accessor foo = "A";
-    //     }
-    //   }).to.throw(TypeError);
-    // });
-    // TODO: re-enable this test
+    test("reject on static", () => {
+      expect(() => {
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          // @ts-expect-error for testing runtime checks
+          @prop(string()) static accessor foo = "A";
+        }
+      }).to.throw(TypeError);
+    });
   });
 
   describe("@attr", () => {
@@ -544,17 +541,14 @@ describe("Decorators", () => {
       expect(el.x).to.equal("C");
     });
 
-    // This test (ONLY the _test_) currently fails in Firefox when transpiled by
-    // Babel: https://github.com/babel/babel/issues/16379 (March 2024)
-    // test("reject on static fields", async () => {
-    //   expect(() => {
-    //     class Test extends HTMLElement {
-    //       // @ts-expect-error for testing runtime checks
-    //       @attr(string()) static accessor x = "A";
-    //     }
-    //   }).to.throw(TypeError);
-    // });
-    // TODO: re-enable this test
+    test("reject on static fields", async () => {
+      expect(() => {
+        class Test extends HTMLElement {
+          // @ts-expect-error for testing runtime checks
+          @attr(string()) static accessor x = "A";
+        }
+      }).to.throw(TypeError);
+    });
   });
 
   describe("@debounce", () => {
@@ -1041,6 +1035,23 @@ describe("Decorators", () => {
         }
         new Test();
       }).to.throw();
+    });
+
+    test("Attribute values are available when decorated methods run", async () => {
+      const fn = spy();
+      const tagName = generateTagName();
+      @define(tagName)
+      class Test extends HTMLElement {
+        @attr(string()) accessor attr = "";
+        @init() test() {
+          fn(this.attr);
+        }
+      }
+      const fixture = document.createElement("div");
+      document.body.append(fixture);
+      fixture.innerHTML = `<${tagName} attr="aaa"></${tagName}>`;
+      expect(fn.callCount).to.equal(1);
+      expect(fn.getCalls()[0].args).to.eql(["aaa"]);
     });
   });
 
