@@ -7,7 +7,6 @@ import {
   assertContext,
 } from "./types.js";
 
-const META_IS_ENHANCED: unique symbol = Symbol();
 const META_ATTRIBUTES: unique symbol = Symbol();
 const META_DEBOUNCED_METHODS: unique symbol = Symbol();
 const META_UNSUBSCRIBE: unique symbol = Symbol();
@@ -57,10 +56,9 @@ function getMetadata<K extends keyof Metadata>(
   return UNSUBSCRIBE_REGISTRY as any;
 }
 
-// Marks an instance as initialized. This is useful for non-enhanced subclasses
-// of an enhanced class that will miss the actual init event, but can use this
-// value to figure out whether that is indeed the case.
-const IS_INITIALIZED: unique symbol = Symbol();
+//
+const INITIALIZER_KEY: unique symbol = Symbol();
+const INITIALIZED_BY: unique symbol = Symbol();
 
 // Un-clobber an accessor's name if the element upgrades after a property with
 // a matching name has already been set.
@@ -88,13 +86,13 @@ export function enhance<T extends CustomElementConstructor>(): (
   return function (target: T, context: ClassDecoratorContext<T>): T {
     assertContext(context, "define", "class");
 
-    // In case @enhance() gets applied to a class more than once (either
-    // directly or via some convoluted OOP mess) the mixin class must NOT be
-    // be re-installed. A metadata flag indicates whether the class already has
-    // had the mixin applied to it
-    if (META_IS_ENHANCED in target) {
-      return target;
-    }
+    // The key for the mixin class this call of @enhance() creates. The key is
+    // stored as a static field [INITIALIZER_KEY] on the mixin class and is set
+    // as an instance field [INITIALIZED_BY] by the class constructor. When the
+    // constructor emits the "init" event, handlers can compare the instance and
+    // instance.constructor's key to identify the outermost (and therefore
+    // final) class constructor - any by proxy the actual (last) init event.
+    const initializerKey = Symbol();
 
     const originalObservedAttributes = new Set<string>(
       (target as any).observedAttributes ?? [],
@@ -122,17 +120,13 @@ export function enhance<T extends CustomElementConstructor>(): (
       // the line above to be commented out. See the entire thread at
       // https://github.com/babel/babel/issues/16373#issuecomment-2017480546
 
-      // Indicates that the instance has had its init event triggered at the end
-      // of the constructor.
-      [IS_INITIALIZED] = false;
-
-      // Indicates that the class has been enhanced
-      static [META_IS_ENHANCED] = true;
+      static [INITIALIZER_KEY] = initializerKey;
+      [INITIALIZED_BY]: symbol | undefined = undefined;
 
       constructor(...args: any[]) {
         super(...args);
+        this[INITIALIZED_BY] = initializerKey;
         trigger(this, "init");
-        this[IS_INITIALIZED] = true;
       }
 
       static get observedAttributes(): string[] {
@@ -237,19 +231,24 @@ export function define<T extends CustomElementConstructor>(
 }
 
 // Registers function to run when the context initializer and ornament's init
-// event have both run.
+// event (for the last relevant constructor in the stack) have both run.
 function runContextInitializerOnOrnamentInit<
   T extends HTMLElement,
   C extends ClassMethodDecoratorContext<T, any> | ClassFieldDecoratorContext<T, any>, // eslint-disable-line
 >(context: C, initializer: (instance: T) => any): void {
-  context.addInitializer(function (this: T) {
-    // Init event has already happened, call initializer function ASAP
-    if ((this as any)[IS_INITIALIZED] === true) {
-      initializer(this);
-      return;
+  context.addInitializer(function (this: any) {
+    // The (last) init event has already happened, call initializer function
+    // immediately
+    if (this[INITIALIZED_BY] === this.constructor[INITIALIZER_KEY]) {
+      return initializer(this);
     }
-    // Init event has not happened yet, register the initializer for the event
-    listen(this, "init", () => initializer(this), { once: true });
+    // Init event has not happened yet, register the initializer for the (last)
+    // init event
+    listen(this, "init", () => {
+      if (this[INITIALIZED_BY] === this.constructor[INITIALIZER_KEY]) {
+        initializer(this);
+      }
+    });
   });
 }
 
