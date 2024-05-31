@@ -7,6 +7,10 @@ import {
   assertContext,
 } from "./types.js";
 
+// Decorator Metadata does not work reliably in babel. The workaround is to use
+// a bunch of weak maps and have the API of getMetadata be compatible with both
+// decorator metadata and the current workaround, more or less.
+
 const META_ATTRIBUTES: unique symbol = Symbol();
 const META_DEBOUNCED_METHODS: unique symbol = Symbol();
 const META_UNSUBSCRIBE: unique symbol = Symbol();
@@ -19,10 +23,6 @@ type Metadata = {
   };
   [META_UNSUBSCRIBE]: { context: any; value: FinalizationRegistry<() => void> };
 };
-
-// Decorator Metadata does not work reliably in babel. The workaround is to use
-// a bunch of weak maps and have the API of getMetadata be compatible with both
-// decorator metadata and the current workaround, more or less.
 
 // This should really be split on a class-by-class basis, but the @attr()
 // decorator has no context without decorator metadata. The list of observable
@@ -37,7 +37,7 @@ const ALL_DEBOUNCED_METHODS = new WeakMap<any, WeakMap<Method<any, any>, Method<
 // Global, just like the attributes
 const UNSUBSCRIBE_REGISTRY = new FinalizationRegistry<() => void>((f) => f());
 
-// Can be rewritten to support Decorator metadata once that's fixed.
+// Can be rewritten to support decorator metadata once that's fixed.
 function getMetadata<K extends keyof Metadata>(
   context: Metadata[K]["context"],
   key: K,
@@ -56,7 +56,7 @@ function getMetadata<K extends keyof Metadata>(
   return UNSUBSCRIBE_REGISTRY as any;
 }
 
-//
+// Explained in @enhance()
 const INITIALIZER_KEY: unique symbol = Symbol();
 const INITIALIZED_BY: unique symbol = Symbol();
 
@@ -86,7 +86,7 @@ export function enhance<T extends CustomElementConstructor>(): (
   return function (target: T, context: ClassDecoratorContext<T>): T {
     assertContext(context, "define", "class");
 
-    // The key for the mixin class this call of @enhance() creates. The key is
+    // The key for the mixin class this call to @enhance() creates. The key is
     // stored as a static field [INITIALIZER_KEY] on the mixin class and is set
     // as an instance field [INITIALIZED_BY] by the class constructor. When the
     // constructor emits the "init" event, handlers can compare the instance and

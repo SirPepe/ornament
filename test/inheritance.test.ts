@@ -165,7 +165,7 @@ describe("Inheritance chains", () => {
           super();
           x++;
         }
-        @init() // <- Triggert erst, wenn der Constructor der Subklasse fertig ist!
+        @init() // <- triggers when the subclass constructor has finished
         baseMethod() {
           fnBase(x);
         }
@@ -188,6 +188,54 @@ describe("Inheritance chains", () => {
       expect(fnTest.callCount).to.equal(1);
       expect(fnBase.getCalls()[0].args).to.eql([2]);
       expect(fnTest.getCalls()[0].args).to.eql([2]);
+    });
+
+    test("Two enhanced classes with something in between: all @init() methods run after the *last* constructor", () => {
+      let x = 0;
+      const fnA = spy();
+      const fnB = spy();
+      const fnC = spy();
+      @enhance()
+      class A extends HTMLElement {
+        constructor() {
+          super();
+          x++;
+        }
+        @init()
+        methodA() {
+          fnA(x);
+        }
+      }
+      class B extends A {
+        constructor() {
+          super();
+          x++;
+        }
+        @init()
+        methodB() {
+          fnB(x);
+        }
+      }
+      @enhance()
+      class C extends B {
+        constructor() {
+          super();
+          x++;
+        }
+        @init()
+        methodC() {
+          fnC(x);
+        }
+      }
+      window.customElements.define(generateTagName(), C);
+      new C();
+      expect(x).to.equal(3);
+      expect(fnA.callCount).to.equal(1);
+      expect(fnB.callCount).to.equal(1);
+      expect(fnC.callCount).to.equal(1);
+      expect(fnA.getCalls()[0].args).to.eql([3]);
+      expect(fnB.getCalls()[0].args).to.eql([3]);
+      expect(fnC.getCalls()[0].args).to.eql([3]);
     });
   });
 
