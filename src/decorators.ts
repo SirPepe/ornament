@@ -318,9 +318,7 @@ type EventSubscribeDecorator<T, E extends Event> = (
   context: ClassMethodDecoratorContext<T, Method<T, [E]>> | ClassFieldDecoratorContext<T, Method<T, [E]>>, // eslint-disable-line
 ) => void;
 
-type EventTargetFactory<T, E extends EventTarget = EventTarget> = (
-  instance: T,
-) => E;
+type EventTargetFactory<T, E> = (instance: T) => E;
 
 type SignalSubscribeDecorator<T> = (
   value: unknown,
@@ -340,6 +338,21 @@ const isSignalLike = (value: unknown): value is SignalLike<any> =>
   "subscribe" in value &&
   typeof value.subscribe === "function";
 
+function unwrapTarget<T extends object, U>(
+  targetOrFactory: T | Promise<T> | ((context: U) => T),
+  context: U,
+  continuation: (instance: T) => any,
+): void {
+  if (typeof targetOrFactory === "function") {
+    return unwrapTarget(targetOrFactory(context), context, continuation);
+  }
+  if ("then" in targetOrFactory) {
+    targetOrFactory.then((x: any) => unwrapTarget(x, context, continuation));
+    return;
+  }
+  continuation(targetOrFactory);
+}
+
 export function subscribe<T extends HTMLElement, S extends SignalLike<any>>(
   target: S,
   options?: SignalSubscribeOptions<T, SignalType<S>>,
@@ -350,13 +363,13 @@ export function subscribe<
   E extends Event,
 >(
   this: unknown,
-  target: U | EventTargetFactory<U>,
+  target: U | EventTargetFactory<T, U> | Promise<U> | EventTargetFactory<T, Promise<U>>, // eslint-disable-line
   events: string,
   options?: EventSubscribeOptions<T, E>,
 ): EventSubscribeDecorator<T, E>;
 export function subscribe<T extends HTMLElement>(
   this: unknown,
-  targetOrFactory: EventTarget | EventTargetFactory<any> | SignalLike<any>,
+  targetOrFactory: EventTarget | EventTargetFactory<any, any> | SignalLike<any>,
   eventsOrOptions?: SubscribeOptions<T, any> | string,
   options: SubscribeOptions<T, any> = EMPTY_OBJ,
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
@@ -365,10 +378,12 @@ export function subscribe<T extends HTMLElement>(
     context: ClassMethodDecoratorContext<T, Method<T, [any]>> | ClassFieldDecoratorContext<T, Method<T, [any]>>, // eslint-disable-line
   ): void {
     assertContext(context, "subscribe", ["method", "field-function"]);
+
     // Arguments for subscribing to an event target
     if (
       (typeof targetOrFactory === "function" ||
-        targetOrFactory instanceof EventTarget) &&
+        targetOrFactory instanceof EventTarget ||
+        "then" in targetOrFactory) &&
       typeof eventsOrOptions === "string"
     ) {
       return runContextInitializerOnOrnamentInit(context, (instance: T) => {
@@ -377,16 +392,18 @@ export function subscribe<T extends HTMLElement>(
             context.access.get(instance).call(instance, evt);
           }
         };
-        const target =
-          typeof targetOrFactory === "function"
-            ? targetOrFactory(instance)
-            : targetOrFactory;
-        for (const eventName of eventsOrOptions.trim().split(/\s+/)) {
-          getMetadata(context, META_UNSUBSCRIBE).register(instance, () =>
-            target.removeEventListener(eventName, callback, options as any),
-          );
-          target.addEventListener(eventName, callback, options as any);
-        }
+        unwrapTarget(
+          targetOrFactory as any,
+          instance,
+          (target: EventTarget) => {
+            for (const eventName of eventsOrOptions.trim().split(/\s+/)) {
+              getMetadata(context, META_UNSUBSCRIBE).register(instance, () =>
+                target.removeEventListener(eventName, callback, options as any),
+              );
+              target.addEventListener(eventName, callback, options as any);
+            }
+          },
+        );
       });
     }
     // Arguments for subscribing to a signal
@@ -396,16 +413,18 @@ export function subscribe<T extends HTMLElement>(
         typeof eventsOrOptions === "undefined")
     ) {
       return runContextInitializerOnOrnamentInit(context, (instance: T) => {
-        const value = context.access.get(instance);
-        const cancel = targetOrFactory.subscribe(() => {
-          if (
-            !eventsOrOptions?.predicate ||
-            eventsOrOptions.predicate(instance, targetOrFactory.value)
-          ) {
-            value.call(instance, targetOrFactory);
-          }
+        unwrapTarget(targetOrFactory, instance, (target) => {
+          const value = context.access.get(instance);
+          const cancel = target.subscribe(() => {
+            if (
+              !eventsOrOptions?.predicate ||
+              eventsOrOptions.predicate(instance, target.value)
+            ) {
+              value.call(instance, target);
+            }
+          });
+          getMetadata(context, META_UNSUBSCRIBE).register(instance, cancel);
         });
-        getMetadata(context, META_UNSUBSCRIBE).register(instance, cancel);
       });
     }
     throw new Error("Invalid arguments to @subscribe");

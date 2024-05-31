@@ -921,7 +921,8 @@ source and their shadow DOM content stays in sync.
 To subscribe to multiple events, pass a single string with the event names
 separated by whitespace.
 
-You can also provide a target-producing factory in place of the target itself:
+You can also provide a target-producing factory or promise in place of the
+target itself:
 
 ```javascript
 import { define, subscribe } from "@sirpepe/ornament";
@@ -931,17 +932,25 @@ class Test extends HTMLElement {
   // "window" is a perfectly valid event target
   @subscribe(window, "update") #a() {} // same effect as below
   @subscribe(() => window, "update") #b() {} // same effect as above
+  @subscribe(Promise.resolve(window), "update") #c() {} // same effect as above
 }
 ```
 
-The target-producing factory can be used to access targets that depend on the
-element instance, such as the element's shadow root. The factory function gets
-called each time an element initializes, with its first argument set to the
+<details>
+<summary>Notes for TypeScript</summary>
+An event target can actually be delivered by an *arbitrarily* long chain of
+nested functions and promises. This is annoying to handle on the type level,
+you'll just have to `any` your way around that.
+</details>
+
+The target-producing factory function can be used to access targets that depend
+on the element instance, such as the element's shadow root. The factory function
+gets called each time an element initializes, with its first argument set to the
 instance.
 
 ##### Options for `@subscribe()` for EventTarget
 
-- **`targetOrTargetFactory` (EventTarget | (instance: T) => EventTarget)**: The event target (or event-target-returning function) to subscribe to
+- **`targetOrTargetFactory` (EventTarget | Promise\<EventTarget\> | (instance: T) => EventTarget)**: The event target (or event-target-returning function/promise) to subscribe to
 - **`eventNames` (string)**: The event(s) to listen to. To subscribe to multiple events, pass a single string with the event names separated by whitespace
 - **`options` (object, optional)**: Event handling options, consisting of...
   - **predicate (function `(instance: T, event: Event) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the element instance and the event object, and must return a boolean

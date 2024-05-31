@@ -1357,6 +1357,63 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
+      test("subscribe a method to an event target delivered by a promise", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        const promise = wait(100, target);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(promise, "foo")
+          test(event: Event) {
+            fn(this, event, event.target);
+          }
+        }
+        const instance = new Test();
+        await promise;
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
+      });
+
+      test("subscribe a method to an event target delivered by a promise-returning function", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        const promise = wait(100, target);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(() => promise, "foo")
+          test(event: Event) {
+            fn(this, event, event.target);
+          }
+        }
+        const instance = new Test();
+        await promise;
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
+      });
+
+      test("subscribe a method to a long chain of nested factories and promises", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        const input = () => wait(100, () => () => wait(100, target));
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(input as any, "foo")
+          test(event: Event) {
+            fn(this, event, event.target);
+          }
+        }
+        const instance = new Test();
+        await wait(250); // should be enough
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
+      });
+
       test("subscribe a method to an element", async () => {
         const fn = spy();
         const target = document.createElement("div");
