@@ -357,6 +357,11 @@ class TodoApp extends BaseComponent {
 // the entire application.
 @define("todo-applet")
 class TodoApplet extends BaseComponent {
+  // June 2024: for reasons beyond comprehension, this (and ONLY this) does not
+  // work when the method is private. The code compiles, but at runtime
+  // complains "decorator must be a function" This is probably a babel bug, but
+  // I am unable to reduce this to a kindof minimal test case. So this method
+  // stays public for now :)
   @capture<TodoApplet, any, NewItemEvent>("todonew")
   handleNew(evt: NewItemEvent): void {
     allItems.value = [
