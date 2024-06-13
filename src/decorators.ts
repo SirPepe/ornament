@@ -378,7 +378,6 @@ export function subscribe<T extends HTMLElement>(
     context: ClassMethodDecoratorContext<T, Method<T, [any]>> | ClassFieldDecoratorContext<T, Method<T, [any]>>, // eslint-disable-line
   ): void {
     assertContext(context, "subscribe", ["method", "field-function"]);
-
     // Arguments for subscribing to an event target
     if (
       (typeof targetOrFactory === "function" ||
