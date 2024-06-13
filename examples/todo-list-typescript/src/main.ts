@@ -15,7 +15,7 @@ import {
   subscribe,
 } from "@sirpepe/ornament";
 import { signal, computed } from "@preact/signals-core";
-import { render, html, type Renderable } from "uhtml";
+import { render, html } from "uhtml";
 
 /* eslint-disable */
 
@@ -60,7 +60,7 @@ class BaseComponent extends HTMLElement {
 
   // Essentially wraps uhtml's render() function. If the class has a `css`
   // property, its contents is added in a style tag next to the actual content.
-  render(content: Renderable) {
+  render(content: any) {
     const root = shadowRoots.get(this) ?? fail();
     if ("css" in this) {
       return render(root, this.html`${content}<style>${this.css}</style>`);
@@ -358,7 +358,7 @@ class TodoApp extends BaseComponent {
 @define("todo-applet")
 class TodoApplet extends BaseComponent {
   @capture<TodoApplet, any, NewItemEvent>("todonew")
-  #handleNew(evt: NewItemEvent): void {
+  handleNew(evt: NewItemEvent): void {
     allItems.value = [
       ...allItems.value,
       { id: id++, text: evt.text, done: false },
