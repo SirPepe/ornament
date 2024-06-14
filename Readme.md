@@ -1,13 +1,15 @@
-# Ornament
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/logo_dark.png">
+    <img alt="Ornament" src="./assets/logo.png">
+  </picture>
+</h1>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/logo_dark.png">
-  <img alt="" src="./assets/logo.png">
-</picture>
+📢 **What's new in 1.1.0?** [Check out the Changelog!](./changelog.md)
 
-Mid-level, pareto-optimal, tiny (< 4k) anti-framework for building vanilla web
-component infrastructure. Makes dealing with attributes, updates and lifecycle
-callbacks declarative and simple...
+Mid-level, pareto-optimal, tiny (< 4k) TypeScript-positive anti-framework for
+building vanilla web component infrastructure. Makes dealing with attributes,
+updates and lifecycle callbacks declarative, simple and type-safe...
 
 ```javascript
 import { define, attr, string, number, connected, reactive } from "@sirpepe/ornament";
@@ -20,7 +22,8 @@ class MyGreeter extends HTMLElement {
   #shadow = this.attachShadow({ mode: "open" });
 
   // Define content attributes alongside corresponding getter/setter pairs
-  // for a JS api and attribute change handling and type checking.
+  // for a JS api and attribute change handling and type checking. If you use
+  // TypeScript, the type checks will work at compile time *and* at run time
   @attr(string()) accessor name = "Anonymous";
   @attr(number({ min: 0 })) accessor age = 0;
 
@@ -137,18 +140,6 @@ class MyGreeter extends HTMLElement {
 // Finally remember to register the element
 window.customElements.define("my-greeter", MyGreeter);
 ```
-
-Both snippets perform the same function:
-
-- register the class `MyGreeter` with the tag name `my-greeter`
-- implement two content attributes named `name` and `age`, which includes
-  - initial values initialized from HTML (when possible)
-  - content attribute change handling (via `setAttribute()` and the like)
-  - DOM attribute change handling via a JavaScript getter/setter pair, with type checking/coercion included (`name` is always a string, `age` is always a number >= 0)
-  - safeguarding against shadowed prototype properties in case of delayed upgrades
-- implement a `greet()` method that...
-  - automatically executes when any of the attributes decorated with `@attr()` change
-  - automatically executes when the element instance connects to the DOM
 
 Ornament makes *only the most tedious bits* of building vanilla web components
 (attribute handling and lifecycle reactions) easy by adding some primitives that
@@ -412,6 +403,8 @@ class MyTest extends HTMLElement {}
 console.log(document.createElement("my-test")); // instance of MyTest
 ```
 
+It is possible to register base class and subclasses with separate tag names.
+
 <details>
 <summary>Notes for TypeScript</summary>
 
@@ -434,8 +427,6 @@ let test = document.createElement("my-test");
 console.log(test.foo); // only type checks with the above interface declaration
 ```
 </details>
-
-It is possible to register base class and subclasses with separate tag names.
 
 ### `@enhance()`
 
@@ -921,7 +912,8 @@ source and their shadow DOM content stays in sync.
 To subscribe to multiple events, pass a single string with the event names
 separated by whitespace.
 
-You can also provide a target-producing factory in place of the target itself:
+You can also provide a target-producing factory or promise in place of the
+target itself:
 
 ```javascript
 import { define, subscribe } from "@sirpepe/ornament";
@@ -931,17 +923,25 @@ class Test extends HTMLElement {
   // "window" is a perfectly valid event target
   @subscribe(window, "update") #a() {} // same effect as below
   @subscribe(() => window, "update") #b() {} // same effect as above
+  @subscribe(Promise.resolve(window), "update") #c() {} // same effect as above
 }
 ```
 
-The target-producing factory can be used to access targets that depend on the
-element instance, such as the element's shadow root. The factory function gets
-called each time an element initializes, with its first argument set to the
+The target-producing factory function can be used to access targets that depend
+on the element instance, such as the element's shadow root. The factory function
+gets called each time an element initializes, with its first argument set to the
 instance.
+
+<details>
+<summary>Notes for TypeScript</summary>
+An event target can actually be delivered by an *arbitrarily* long chain of
+nested functions and promises. This is annoying to handle on the type level,
+you'll just have to `any` your way around that.
+</details>
 
 ##### Options for `@subscribe()` for EventTarget
 
-- **`targetOrTargetFactory` (EventTarget | (instance: T) => EventTarget)**: The event target (or event-target-returning function) to subscribe to
+- **`targetOrTargetFactory` (EventTarget | Promise\<EventTarget\> | (instance: T) => EventTarget | Promise\<EventTarget\>)**: The event target (or event-target-returning function/promise) to subscribe to
 - **`eventNames` (string)**: The event(s) to listen to. To subscribe to multiple events, pass a single string with the event names separated by whitespace
 - **`options` (object, optional)**: Event handling options, consisting of...
   - **predicate (function `(instance: T, event: Event) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the element instance and the event object, and must return a boolean
@@ -1031,12 +1031,14 @@ functions.
 
 <details>
 <summary>Notes for TypeScript</summary>
+
 Debouncing a method or class field function makes it impossible for the method
 or function to return anything but `undefined`. TypeScript does currently not
 allow decorators to modify its target's type, so `@debounce()` can't do that. If
 you apply `@debounce()` to a method `(x: number) => number`, TypeScript will
 keep using this signature, even though the decorated method will no longer be
 able to return anything but `undefined`.
+
 </details>
 
 #### Options for `@debounce()`
@@ -1589,8 +1591,10 @@ in case.
 
 <details>
 <summary>Notes for TypeScript</summary>
+
 You can declare additions to the global interface `OrnamentEventMap` to extend
 this list with your own events.
+
 </details>
 
 ### `trigger(instance, name, ...payload)`
