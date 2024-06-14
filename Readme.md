@@ -932,11 +932,25 @@ on the element instance, such as the element's shadow root. The factory function
 gets called each time an element initializes, with its first argument set to the
 instance.
 
+`@subscribe` can subscribe a method or function to more than one event at a time
+by accepting a whitespace-separated list of event names:
+
+```javascript
+import { define, subscribe } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @subscribe(window, "foo bar") #a() {} // subscribed to both "foo" and "bar"
+}
+```
+
 <details>
 <summary>Notes for TypeScript</summary>
+
 An event target can actually be delivered by an *arbitrarily* long chain of
 nested functions and promises. This is annoying to handle on the type level,
 you'll just have to `any` your way around that.
+
 </details>
 
 ##### Options for `@subscribe()` for EventTarget

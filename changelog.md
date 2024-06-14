@@ -1,5 +1,9 @@
 # Changelog
 
+## UNRELEASED
+
+* **Docs**: Mention the fact that `@subscribe()` can listen to more than one event
+
 ## v 1.1.0
 
 * **Feature**: `@subscribe()` can now also take promises for event targets and promise-returning factories as its first argument
