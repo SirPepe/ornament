@@ -161,24 +161,26 @@ describe("Inheritance chains", () => {
       const fnTest = spy();
       @enhance()
       class Base extends HTMLElement {
+        #y = "y"; // <- can be accessed by the decorated method
         constructor() {
           super();
           x++;
         }
         @init() // <- triggers when the subclass constructor has finished
         baseMethod() {
-          fnBase(x);
+          fnBase(x, this.#y);
         }
       }
       @enhance()
       class Test extends Base {
+        #z = "z"; // <- can be accessed by the decorated method
         constructor() {
           super();
           x++;
         }
         @init()
         extensionMethod() {
-          fnTest(x);
+          fnTest(x, this.#z);
         }
       }
       window.customElements.define(generateTagName(), Test);
@@ -186,8 +188,8 @@ describe("Inheritance chains", () => {
       expect(x).to.equal(2);
       expect(fnBase.callCount).to.equal(1);
       expect(fnTest.callCount).to.equal(1);
-      expect(fnBase.getCalls()[0].args).to.eql([2]);
-      expect(fnTest.getCalls()[0].args).to.eql([2]);
+      expect(fnBase.getCalls()[0].args).to.eql([2, "y"]);
+      expect(fnTest.getCalls()[0].args).to.eql([2, "z"]);
     });
 
     test("Two enhanced classes with something in between: all @init() methods run after the *last* constructor", () => {

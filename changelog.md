@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased
+## v 1.1.0
 
 * **Feature**: `@subscribe()` can now also take promises for event targets and promise-returning factories as its first argument
-* **Bugfix**: Ensure that *all* methods decorated with `@init()` in *all* classes in an inheritance chain only fire when the *last* enhanced constructor finishes.
+* **Bugfix**: Ensure that *all* methods decorated with `@init()` in *all* classes in an inheritance chain only fire when the *last* enhanced constructor finishes. Previously, methods decorated with `@init()` fired when their specific constructor finished, or not at all if the class was not decorated.
 * **Other**: Bump dependencies, play some code golf, tweak error messages
 
 ## v 1.0.0
