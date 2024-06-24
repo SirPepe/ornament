@@ -151,34 +151,54 @@ export function assertTransformer<T extends HTMLElement, V>(
   }
 }
 
-type Kind = DecoratorContext["kind"] | "field-function";
-
 export function assertContext(
   ctx: any,
   name: string,
-  kinds: Kind | Kind[],
+  kind: DecoratorContext["kind"] | "method/function",
   allowStatic = false,
 ): void {
-  kinds = isArray(kinds) ? kinds : [kinds];
   if (ctx.static && !allowStatic) {
     throw new TypeError(`@${name} can't be used on static members`);
   }
-  for (const kind of kinds) {
-    if (kind === ctx.kind) {
-      return;
-    }
-    if (kind === "field-function" && ctx.kind === "field") {
-      ctx.addInitializer(function (this: any): void {
-        if (typeof ctx.access.get(this) !== "function") {
-          throw new TypeError(
-            `decorator @${name} can't be used on non-function type field`,
-          );
-        }
-      });
-      return;
-    }
+  if (kind.startsWith(ctx.kind)) {
+    return;
   }
-  throw new TypeError(
-    `${kinds.join("/")} decorator @${name} used on ${ctx.kind}`,
-  );
+  if (kind === "method/function" && ctx.kind === "field") {
+    ctx.addInitializer(function (this: any): void {
+      if (typeof ctx.access.get(this) !== "function") {
+        throw new TypeError(
+          `decorator @${name} can't be used on non-function type field`,
+        );
+      }
+    });
+    return;
+  }
+  throw new TypeError(`${kind} decorator @${name} used on ${ctx.kind}`);
 }
+
+type TrimLeft<T extends string> = T extends ` ${infer Rest}`
+  ? TrimLeft<Rest>
+  : T;
+
+type TrimRight<T extends string> = T extends `${infer Rest} `
+  ? TrimRight<Rest>
+  : T;
+
+type Trim<T extends string> = TrimLeft<TrimRight<T>>;
+
+type Split<Str extends string, Last = never> =
+  Trim<Str> extends `${infer First} ${infer Rest}`
+    ? First extends " "
+      ? Split<Trim<Rest>, Last>
+      : Split<Trim<Rest>, First | Last>
+    : Trim<Str> | Last;
+
+type MapNames<Names extends string, BaseType, Source> = {
+  [Name in Split<Names>]: Name extends keyof Source ? Source[Name] : BaseType;
+}[Split<Names>];
+
+export type EventOf<Names extends string, Map> = Map extends never
+  ? Event
+  : MapNames<Names, Event, Map> extends Event
+    ? MapNames<Names, Event, Map>
+    : Event;

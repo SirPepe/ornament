@@ -5,11 +5,12 @@
   </picture>
 </h1>
 
-📢 **What's new in 1.1.0?** [Check out the Changelog!](./changelog.md)
+📢 **What's new in 1.2.0?** [Check out the Changelog!](./changelog.md)
 
-Mid-level, pareto-optimal, tiny (< 4k) TypeScript-positive anti-framework for
-building vanilla web component infrastructure. Makes dealing with attributes,
-updates and lifecycle callbacks declarative, simple and type-safe...
+**Build your own frontend framework** with Ornament, a mid-level,
+pareto-optimal, treeshakable and tiny (< 4k) TypeScript-positive toolkit for web
+component infrastructure! Ornament makes dealing with attributes, updates and
+lifecycle callbacks declarative, simple and type-safe...
 
 ```javascript
 import { define, attr, string, number, connected, reactive } from "@sirpepe/ornament";
@@ -949,7 +950,61 @@ class Test extends HTMLElement {
 
 An event target can actually be delivered by an *arbitrarily* long chain of
 nested functions and promises. This is annoying to handle on the type level,
-you'll just have to `any` your way around that.
+you'll just have to `any` your way around that or provide this capability in
+a type-safe wrapper.
+
+Making the `@subscribe()` decorator type-safe for use with events is a gnarly
+operation. Given an event target and an event name, the decorator can't know
+what type of event the method must expect. Therefore the following is possible
+by default:
+
+```typescript
+import { define, subscribe } from "@sirpepe/ornament";
+
+let target = document.createElement("div");
+
+@define("my-test")
+class Test extends HTMLElement {
+  @subscribe(target, "click")
+  #handleClicks(evt: MouseEvent) {} // This type checks, as it should
+
+  @subscribe(target, "click")
+  #handleAnimations(evt: AnimationEvent) {} // This type checks too!
+}
+```
+
+A mapping between event names and corresponding event types (such as `"click"`
+→ `MouseEvent`) exists for specific cases. For example `HTMLElementEventMap`
+contains the mappings for events emitted by HTML elements. But because
+`@subscribe()` can work with *any event target*, the existence of such a mapping
+can't be assumed. The only way around this is to provide the following type
+parameters to `@subscribe()`:
+
+- `T extends HTMLElement`: Type of the element instance
+- `U extends EventTarget`: Event target type
+- `N extends string`: Event name(s)
+- `M`: Mapping object (something like `HTMLElementEventMap`)
+
+This could then look like this:
+
+```typescript
+import { define, subscribe } from "@sirpepe/ornament";
+
+let target = document.createElement("div");
+
+@define("my-test")
+class Test extends HTMLElement {
+  @subscribe<Test, HTMLElement, "click", HTMLElementEventMap>(target, "click")
+  #handleClicks(evt: MouseEvent) {} // This still type checks
+
+  @subscribe<Test, HTMLElement, "click", HTMLElementEventMap>(target, "click")
+  #handleAnimations(evt: AnimationEvent) {} // This does no longer type check!
+}
+```
+
+Passing this many type parameters is quite unacceptable from a DX perspective,
+but can be solved if you build new decorators on top of `@subscribe()` that are
+specific to certain event targets and their mappings.
 
 </details>
 
@@ -959,6 +1014,8 @@ you'll just have to `any` your way around that.
 - **`eventNames` (string)**: The event(s) to listen to. To subscribe to multiple events, pass a single string with the event names separated by whitespace
 - **`options` (object, optional)**: Event handling options, consisting of...
   - **predicate (function `(instance: T, event: Event) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the element instance and the event object, and must return a boolean
+  - **activateOn (Array\<string\>, optional):** Ornament event on which to activate the subscription (that is, when to actually start listening on the EventTarget). Defaults to `["init", "connected"]`.
+  - **deactivateOn (Array\<string\>, optional):** Ornament event on which to deactivate the subscription (when to call `removeEventListener()` on the EventTarget). Defaults to `["disconnected"]`.
   - **capture (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
   - **once (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
   - **passive (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
@@ -1008,6 +1065,8 @@ to throw events around.
 - **`signal` (Signal)**: The signal to subscribe to
 - **`options` (object, optional)**: Update handling options, consisting of...
   - **predicate (function `(instance: T, value) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given signal update. Gets passed the element instance and the signal's value, and must return a boolean
+  - **activateOn (Array\<string\>, optional):** Ornament event on which to activate the subscription (that is, when to actually subscribe to the Signal). Defaults to `["init", "connected"]`.
+  - **deactivateOn (Array\<string\>, optional):** Ornament event on which to unsubscribe from the signal. Defaults to `["disconnected"]`.
 
 ### `@debounce(options?)`
 
