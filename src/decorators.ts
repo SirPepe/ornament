@@ -5,55 +5,40 @@ import {
   type ClassAccessorDecorator,
   type Method,
   assertContext,
+  EventOf,
 } from "./types.js";
 
-// Decorator Metadata does not work reliably in babel. The workaround is to use
-// a bunch of weak maps and have the API of getMetadata be compatible with both
-// decorator metadata and the current workaround, more or less.
+// Decorator Metadata does as of June 2024 not work reliably in Babel. Therefore
+// metadata in this module is a bunch of manually managed WeakMaps until Babel's
+// issues are fixed. The first bit of metadata maps debounced methods to their
+// originals, scoped by component instance. This is required to make @init()
+// calls run synchronously, even if @debounce() was applied to the method in
+// question.
+const ALL_DEBOUNCED_METHODS = new WeakMap<object, WeakMap<Method<any, any>, Method<any, any>>>(); // eslint-disable-line
 
-const META_ATTRIBUTES: unique symbol = Symbol();
-const META_DEBOUNCED_METHODS: unique symbol = Symbol();
-const META_UNSUBSCRIBE: unique symbol = Symbol();
-
-type Metadata = {
-  [META_ATTRIBUTES]: { context: any; value: Set<string> };
-  [META_DEBOUNCED_METHODS]: {
-    context: HTMLElement;
-    value: WeakMap<Method<any, any>, Method<any, any>>;
-  };
-  [META_UNSUBSCRIBE]: { context: any; value: FinalizationRegistry<() => void> };
-};
-
-// This should really be split on a class-by-class basis, but the @attr()
-// decorator has no context without decorator metadata. The list of observable
-// attributes must be available before the accessor initializers run, so the
-// only way forward is to observe every attribute defined by @attr() on all
-// classes.
+// This should really be scoped on a class-by-class basis, but the @attr()
+// decorator has no context without decorator metadata (which, again, is too
+// unreliable in Babel as of June 2024). The list of observable attributes must
+// be available before the accessor initializers run, so the only way forward is
+// to observe every attribute defined by @attr() on all classes.
 const ALL_ATTRIBUTES = new Set<string>();
 
-// Scoped by component instance
-const ALL_DEBOUNCED_METHODS = new WeakMap<any, WeakMap<Method<any, any>, Method<any, any>>>(); // eslint-disable-line
-
-// Global, just like the attributes
-const UNSUBSCRIBE_REGISTRY = new FinalizationRegistry<() => void>((f) => f());
-
 // Can be rewritten to support decorator metadata once that's fixed.
-function getMetadata<K extends keyof Metadata>(
-  context: Metadata[K]["context"],
-  key: K,
-): Metadata[K]["value"] {
-  if (key === META_ATTRIBUTES) {
-    return ALL_ATTRIBUTES as any;
+function getMetadata(key: "attributes"): Set<string>;
+function getMetadata(
+  key: "methods",
+  context: object,
+): WeakMap<Method<any, any>, Method<any, any>>;
+function getMetadata(key: "attributes" | "methods", context?: any): any {
+  if (key === "attributes") {
+    return ALL_ATTRIBUTES;
   }
-  if (key === META_DEBOUNCED_METHODS) {
-    let methodMap = ALL_DEBOUNCED_METHODS.get(context);
-    if (!methodMap) {
-      methodMap = new WeakMap();
-      ALL_DEBOUNCED_METHODS.set(context, methodMap);
-    }
-    return methodMap as any;
+  let methodMap = ALL_DEBOUNCED_METHODS.get(context);
+  if (!methodMap) {
+    methodMap = new WeakMap();
+    ALL_DEBOUNCED_METHODS.set(context, methodMap);
   }
-  return UNSUBSCRIBE_REGISTRY as any;
+  return methodMap;
 }
 
 // Explained in @enhance()
@@ -86,12 +71,13 @@ export function enhance<T extends CustomElementConstructor>(): (
   return function (target: T, context: ClassDecoratorContext<T>): T {
     assertContext(context, "define", "class");
 
-    // The key for the mixin class this call to @enhance() creates. The key is
-    // stored as a static field [INITIALIZER_KEY] on the mixin class and is set
-    // as an instance field [INITIALIZED_BY] by the class constructor. When the
-    // constructor emits the "init" event, handlers can compare the instance and
-    // instance.constructor's key to identify the outermost (and therefore
-    // final) class constructor - any by proxy the actual (last) init event.
+    // "initializerKey" is the key for the mixin class this call to @enhance()
+    // creates. The key is stored as a static field [INITIALIZER_KEY] on the
+    // mixin class and is set as an instance field [INITIALIZED_BY] by the class
+    // constructor. When the constructor emits the "init" event, handlers can
+    // compare the instance and instance.constructor's key to identify the
+    // outermost (and therefore final) class constructor - any by proxy the
+    // actual (last) init event.
     const initializerKey = Symbol();
 
     const originalObservedAttributes = new Set<string>(
@@ -130,10 +116,7 @@ export function enhance<T extends CustomElementConstructor>(): (
       }
 
       static get observedAttributes(): string[] {
-        return [
-          ...originalObservedAttributes,
-          ...getMetadata(context, META_ATTRIBUTES),
-        ];
+        return [...originalObservedAttributes, ...getMetadata("attributes")];
       }
 
       connectedCallback(): void {
@@ -230,7 +213,7 @@ export function define<T extends CustomElementConstructor>(
   };
 }
 
-// Registers function to run when the context initializer and ornament's init
+// Registers function to run when the context initializer AND ornament's init
 // event (for the last relevant constructor in the stack) have both run.
 function runContextInitializerOnOrnamentInit<
   T extends HTMLElement,
@@ -253,15 +236,13 @@ function runContextInitializerOnOrnamentInit<
 }
 
 // Method/class fields decorator @init() runs a method or class field function
-// once an instance initializes.
+// once an instance initializes (= the outermost constructor finishes).
 export function init<T extends HTMLElement>(): LifecycleDecorator<T, OrnamentEventMap["init"]> { // eslint-disable-line
   return function (_, context): void {
-    assertContext(context, "init", ["method", "field-function"]);
+    assertContext(context, "init", "method/function");
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
       const method = context.access.get(instance);
-      (
-        getMetadata(instance, META_DEBOUNCED_METHODS).get(method) ?? method
-      ).call(instance);
+      (getMetadata("methods", instance).get(method) ?? method).call(instance);
     });
   };
 }
@@ -281,7 +262,7 @@ export function reactive<T extends HTMLElement>(
   options: ReactiveOptions<T> = EMPTY_OBJ,
 ): ReactiveDecorator<T> {
   return function (_, context) {
-    assertContext(context, "reactive", ["method", "field-function"]);
+    assertContext(context, "reactive", "method/function");
     // Start listening only once the element's constructor has run to
     // completion. This prevents prop set-up in the constructor from triggering
     // reactive methods.
@@ -299,26 +280,23 @@ export function reactive<T extends HTMLElement>(
   };
 }
 
-type SubscribePredicate<T, V> = (instance: T, value: V) => boolean;
-
-type EventSubscribeOptions<T, V> = AddEventListenerOptions & {
-  predicate?: SubscribePredicate<T, V>;
+type SubscribeBaseOptions = {
+  activateOn?: (keyof OrnamentEventMap)[]; // defaults to ["init", "connected"]
+  deactivateOn?: (keyof OrnamentEventMap)[]; // defaults to ["disconnected"]
 };
 
-type SignalSubscribeOptions<T, V> = {
-  predicate?: SubscribePredicate<T, V>;
-};
-
-type SubscribeOptions<T, V> =
-  | EventSubscribeOptions<T, V>
-  | SignalSubscribeOptions<T, V>;
+type EventSubscribeOptions<T, V extends Event> = AddEventListenerOptions & SubscribeBaseOptions & { predicate?: (instance: T, event: V) => boolean; }; // eslint-disable-line
+type SignalSubscribeOptions<T, V> = SubscribeBaseOptions & { predicate?: (instance: T, value: V) => boolean; }; // eslint-disable-line
 
 type EventSubscribeDecorator<T, E extends Event> = (
   value: unknown,
   context: ClassMethodDecoratorContext<T, Method<T, [E]>> | ClassFieldDecoratorContext<T, Method<T, [E]>>, // eslint-disable-line
 ) => void;
 
-type EventTargetFactory<T, E> = (instance: T) => E;
+type EventTargetOrFactory<T, U extends EventTarget> =
+  | U
+  | ((instance: T) => EventTargetOrFactory<T, U>)
+  | Promise<EventTargetOrFactory<T, U>>;
 
 type SignalSubscribeDecorator<T> = (
   value: unknown,
@@ -338,19 +316,81 @@ const isSignalLike = (value: unknown): value is SignalLike<any> =>
   "subscribe" in value &&
   typeof value.subscribe === "function";
 
-function unwrapTarget<T extends object, U>(
-  targetOrFactory: T | Promise<T> | ((context: U) => T),
-  context: U,
-  continuation: (instance: T) => any,
+function unwrapTarget<T extends HTMLElement, U extends EventTarget>(
+  targetOrFactory: EventTargetOrFactory<T, U>,
+  context: T,
+  continuation: (target: EventTarget) => void,
 ): void {
   if (typeof targetOrFactory === "function") {
     return unwrapTarget(targetOrFactory(context), context, continuation);
   }
   if ("then" in targetOrFactory) {
-    targetOrFactory.then((x: any) => unwrapTarget(x, context, continuation));
+    targetOrFactory.then((x) => unwrapTarget(x, context, continuation));
     return;
   }
   continuation(targetOrFactory);
+}
+
+function subscribeToEventTarget<T extends HTMLElement, U extends EventTarget, V extends Event>( // eslint-disable-line
+  context: ClassMethodDecoratorContext<T, Method<T, [V]>> | ClassFieldDecoratorContext<T, Method<T, [V]>>, // eslint-disable-line
+  targetOrFactory: EventTargetOrFactory<T, U>,
+  eventNames: string,
+  options: EventSubscribeOptions<T, V>,
+): void {
+  return runContextInitializerOnOrnamentInit(context, (instance: T) => {
+    const callback = (evt: V) => {
+      if (!options.predicate || options.predicate(instance, evt)) {
+        context.access.get(instance).call(instance, evt);
+      }
+    };
+    unwrapTarget(targetOrFactory, instance, (target) => {
+      function on() {
+        for (const eventName of eventNames.trim().split(/\s+/)) {
+          target.addEventListener(eventName, callback as any, options);
+        }
+      }
+      function off() {
+        for (const eventName of eventNames.trim().split(/\s+/)) {
+          target.removeEventListener(eventName, callback as any, options);
+        }
+      }
+      if (options.activateOn?.includes("init")) {
+        on();
+      }
+      options.activateOn?.forEach((oEvent) => listen(instance, oEvent, on));
+      options.deactivateOn?.forEach((oEvent) => listen(instance, oEvent, off));
+    });
+  });
+}
+
+function subscribeToSignal<T extends HTMLElement, S extends SignalLike<any>>( // eslint-disable-line
+  context: ClassMethodDecoratorContext<T, Method<T, [SignalType<S>]>> | ClassFieldDecoratorContext<T, Method<T, [SignalType<S>]>>, // eslint-disable-line
+  target: S,
+  options: SignalSubscribeOptions<T, SignalType<S>>,
+): void {
+  return runContextInitializerOnOrnamentInit(context, (instance: T) => {
+    const callback = (value: SignalType<S>) => {
+      if (!options.predicate || options.predicate(instance, value)) {
+        context.access.get(instance).call(instance, value);
+      }
+    };
+    let cancel: null | (() => void) = null;
+    function on() {
+      if (!cancel) {
+        cancel = target.subscribe(() => callback(target.value));
+      }
+    }
+    function off() {
+      if (cancel) {
+        cancel = (cancel(), null);
+      }
+    }
+    if (options.activateOn?.includes("init")) {
+      on();
+    }
+    options.activateOn?.forEach((oEvent) => listen(instance, oEvent, on));
+    options.deactivateOn?.forEach((oEvent) => listen(instance, oEvent, off));
+  });
 }
 
 export function subscribe<T extends HTMLElement, S extends SignalLike<any>>(
@@ -360,71 +400,49 @@ export function subscribe<T extends HTMLElement, S extends SignalLike<any>>(
 export function subscribe<
   T extends HTMLElement,
   U extends EventTarget,
-  E extends Event,
+  N extends string,
+  M = never,
 >(
-  this: unknown,
-  target: U | EventTargetFactory<T, U> | Promise<U> | EventTargetFactory<T, Promise<U>>, // eslint-disable-line
-  events: string,
-  options?: EventSubscribeOptions<T, E>,
-): EventSubscribeDecorator<T, E>;
+  targetOrFactory: EventTargetOrFactory<T, U>,
+  names: N,
+  options?: EventSubscribeOptions<T, EventOf<N, M>>,
+): EventSubscribeDecorator<T, EventOf<N, M>>;
 export function subscribe<T extends HTMLElement>(
-  this: unknown,
-  targetOrFactory: EventTarget | EventTargetFactory<any, any> | SignalLike<any>,
-  eventsOrOptions?: SubscribeOptions<T, any> | string,
-  options: SubscribeOptions<T, any> = EMPTY_OBJ,
+  targetOrFactory: EventTargetOrFactory<T, any> | SignalLike<any>,
+  namesOrOptions?: EventSubscribeOptions<T, any> | SignalSubscribeOptions<T, any> | string, // eslint-disable-line
+  options: EventSubscribeOptions<T, any> | SignalSubscribeOptions<T, any> = EMPTY_OBJ, // eslint-disable-line
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
   return function (
     _: unknown,
     context: ClassMethodDecoratorContext<T, Method<T, [any]>> | ClassFieldDecoratorContext<T, Method<T, [any]>>, // eslint-disable-line
   ): void {
-    assertContext(context, "subscribe", ["method", "field-function"]);
+    assertContext(context, "subscribe", "method/function");
     // Arguments for subscribing to an event target
     if (
       (typeof targetOrFactory === "function" ||
         targetOrFactory instanceof EventTarget ||
         "then" in targetOrFactory) &&
-      typeof eventsOrOptions === "string"
+      typeof namesOrOptions === "string"
     ) {
-      return runContextInitializerOnOrnamentInit(context, (instance: T) => {
-        const callback = (evt: any) => {
-          if (!options.predicate || options.predicate(instance, evt)) {
-            context.access.get(instance).call(instance, evt);
-          }
-        };
-        unwrapTarget(
-          targetOrFactory as any,
-          instance,
-          (target: EventTarget) => {
-            for (const eventName of eventsOrOptions.trim().split(/\s+/)) {
-              getMetadata(context, META_UNSUBSCRIBE).register(instance, () =>
-                target.removeEventListener(eventName, callback, options as any),
-              );
-              target.addEventListener(eventName, callback, options as any);
-            }
-          },
-        );
-      });
+      options.activateOn ??= ["init", "connected"];
+      options.deactivateOn ??= ["disconnected"];
+      return subscribeToEventTarget(
+        context,
+        targetOrFactory,
+        namesOrOptions,
+        options,
+      );
     }
     // Arguments for subscribing to a signal
     if (
       isSignalLike(targetOrFactory) &&
-      (typeof eventsOrOptions === "object" ||
-        typeof eventsOrOptions === "undefined")
+      (typeof namesOrOptions === "object" ||
+        typeof namesOrOptions === "undefined")
     ) {
-      return runContextInitializerOnOrnamentInit(context, (instance: T) => {
-        unwrapTarget(targetOrFactory, instance, (target) => {
-          const value = context.access.get(instance);
-          const cancel = target.subscribe(() => {
-            if (
-              !eventsOrOptions?.predicate ||
-              eventsOrOptions.predicate(instance, target.value)
-            ) {
-              value.call(instance, target);
-            }
-          });
-          getMetadata(context, META_UNSUBSCRIBE).register(instance, cancel);
-        });
-      });
+      namesOrOptions ??= {};
+      namesOrOptions.activateOn ??= ["init", "connected"];
+      namesOrOptions.deactivateOn ??= ["disconnected"];
+      return subscribeToSignal(context, targetOrFactory, namesOrOptions);
     }
     throw new Error("Invalid arguments to @subscribe");
   };
@@ -446,7 +464,7 @@ function createLifecycleDecorator<K extends keyof OrnamentEventMap>(
 ): <T extends HTMLElement>() => LifecycleDecorator<T, OrnamentEventMap[K]> {
   return <T extends HTMLElement>(): LifecycleDecorator<T, OrnamentEventMap[K]> => // eslint-disable-line
     function (_, context) {
-      assertContext(context, name, ["method", "field-function"]);
+      assertContext(context, name, "method/function");
       context.addInitializer(function () {
         listen(this, name, (...args) =>
           context.access.get(this).call(this, ...args),
@@ -500,9 +518,9 @@ export function attr<T extends HTMLElement, V>(
     }
 
     // Add the name to the set of all observed attributes, even if "reflective"
-    // if false. The content attribute must in all cases be observed to enable
-    // the message bus to emit events.+
-    getMetadata(context, META_ATTRIBUTES).add(contentAttrName);
+    // is false. The content attribute must in all cases be observed to enable
+    // the message bus to emit events.
+    getMetadata("attributes").add(contentAttrName);
 
     // If the attribute needs to be observed and the accessor initializes,
     // register the attribute handler callback with the current element
@@ -550,8 +568,9 @@ export function attr<T extends HTMLElement, V>(
 
     return {
       init(input) {
-        // Final sanity check: does a public api for this attribute exist? This
-        // needs to be added manually for private or symbol accessors.
+        // Final sanity check: does a public API for this attribute exist? This
+        // public API needs to be added manually for private or symbol accessors
+        // and might have been forgotten.
         if (!(idlAttrName in this)) {
           throw new TypeError(
             `Content attribute '${contentAttrName}' is missing its public API`,
@@ -570,7 +589,6 @@ export function attr<T extends HTMLElement, V>(
         // attribute does not exist or its value can't be parsed, fall back to
         // the default value from the initialization step.
         if (this.hasAttribute(contentAttrName)) {
-          // Having a content attribute
           const attrValue = transformer.parse.call(
             this,
             this.getAttribute(contentAttrName),
@@ -595,7 +613,7 @@ export function attr<T extends HTMLElement, V>(
           const updateAttr = transformer.updateContentAttr(oldValue, newValue);
           // If an attribute update is about to happen, the next
           // attributeChangedCallback must be skipped to prevent double calls of
-          // @reactive methods
+          // @reactive() methods
           skipNextReaction.set(this, updateAttr !== false);
           // Perform content attribute updates
           if (updateAttr === null) {
@@ -680,12 +698,12 @@ export function debounce<
     value: F | undefined,
     context: ClassMethodDecoratorContext<T, F> | ClassFieldDecoratorContext<T, F>, // eslint-disable-line
   ): F | void {
-    assertContext(context, "debounce", ["method", "field-function"], true);
+    assertContext(context, "debounce", "method/function", true);
     if (context.kind === "field") {
       return context.addInitializer(function (): void {
         const func = context.access.get(this);
         const debounced = fn(func).bind(this);
-        getMetadata(this as any, META_DEBOUNCED_METHODS).set(debounced, func);
+        getMetadata("methods", this).set(debounced, func);
         context.access.set(this, debounced as F);
       });
     }
@@ -696,7 +714,7 @@ export function debounce<
     const debounced = fn(func);
     if (!context.static) {
       context.addInitializer(function (): void {
-        getMetadata(this as any, META_DEBOUNCED_METHODS).set(debounced, func);
+        getMetadata("methods", this).set(debounced, func);
       });
     }
     return debounced as F;

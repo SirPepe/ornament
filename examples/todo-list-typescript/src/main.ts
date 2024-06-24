@@ -73,11 +73,11 @@ class BaseComponent extends HTMLElement {
 // event delegation in shadow roots. To make this palatable, the following
 // decorator (which is just a wrapper around @subscribe) has been cribbed from
 // the readme.
-const capture = <T extends HTMLElement, U extends HTMLElement, E extends Event>(
+const capture = <T extends HTMLElement, E extends Event>(
   eventName: string,
   selector = "*",
 ) =>
-  subscribe<T, U, E>((el: U) => shadowRoots.get(el) ?? fail(), eventName, {
+  subscribe<T, ShadowRoot, E>((el: T) => shadowRoots.get(el) ?? fail(), eventName, {
     predicate: (_: unknown, evt: Event) =>
       evt.target instanceof HTMLElement && evt.target.matches(selector),
   });

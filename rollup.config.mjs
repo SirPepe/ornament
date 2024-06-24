@@ -17,12 +17,23 @@ const commonConfig = {
   ],
 };
 
+const plugins = [
+  terser({
+    compress: {
+      passes: 3,
+      unsafe_arrows: true,
+      booleans_as_integers: true,
+    },
+  }),
+];
+
 export default [
   {
     input: "src/index.ts",
     output: {
       file: "dist/esm/index.js",
       format: "esm",
+      plugins,
     },
     ...commonConfig,
   },
@@ -32,15 +43,7 @@ export default [
       file: "dist/min/index.min.js",
       format: "umd",
       name: "Ornament",
-      plugins: [
-        terser({
-          compress: {
-            passes: 3,
-            unsafe_arrows: true,
-            booleans_as_integers: true,
-          },
-        }),
-      ],
+      plugins,
     },
     ...commonConfig,
   },
