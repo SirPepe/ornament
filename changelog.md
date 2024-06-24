@@ -1,6 +1,6 @@
 # Changelog
 
-## UNRELEASED
+## v 1.2.0
 
 * **Feature**: `@subscribe()` now lets you decide when/if a component should subscribe and unsubscribe from an event target or signal. It defaults to the internal `"init"` and `"connected"` events for subscribing and to `disconnected` for unsubscribing, but this can be changed in the options when calling `@subscribe()`.
 * **Feature**: TypeScript can now verify whether methods that get subscribed to EventTargets via `@subscribe()` expect the right type of event. This only works if a mapping between event names and event object types for the event target exists (such as `HTMLElementEventMap`) and if that mapping, along with several more types, gets passed to `@subscribe()` as type parameters. This is by itself very inconvenient, but can be made bearable by building abstractions on top.
