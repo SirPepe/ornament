@@ -41,6 +41,9 @@ class MyGreeter extends HTMLElement {
 ... when compared to the equivalent boilerplate monstrosity that one would have
 to write by hand otherwise:
 
+<details>
+<summary>😱 Unveil the horror 😱</summary>
+
 ```javascript
 class MyGreeter extends HTMLElement {
   #shadow = this.attachShadow({ mode: "open" });
@@ -142,12 +145,26 @@ class MyGreeter extends HTMLElement {
 window.customElements.define("my-greeter", MyGreeter);
 ```
 
+</details>
+
 Ornament makes *only the most tedious bits* of building vanilla web components
 (attribute handling and lifecycle reactions) easy by adding some primitives that
 really should be part of the standard, but aren't. Ornament is not a framework,
 but something that you might want to build your own framework on top of.
 
 ## Guide
+
+### Installation
+
+Install [@sirpepe/ornament](https://www.npmjs.com/package/@sirpepe/ornament)
+with your favorite package manager. To get the decorator syntax working in 2024,
+you will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
+(with option `version` set to `"2023-11"`) or
+[TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
+(with the option `experimentalDecorators` turned *off*).
+
+Apart from that, Ornament is just a bunch of functions. No further setup
+required, no extra concepts to learn.
 
 ### General philosophy
 
@@ -178,18 +195,6 @@ following:
 You can (and probably have to) therefore pick or write your own solutions for
 the above features. Check out the `examples` folder for inspiration!
 
-### Installation
-
-Install [@sirpepe/ornament](https://www.npmjs.com/package/@sirpepe/ornament)
-with your favorite package manager. To get the decorator syntax working in 2024,
-you will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
-(with option `version` set to `"2023-11"`) or
-[TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
-(with the option `experimentalDecorators` turned *off*).
-
-Apart from that, Ornament is just a bunch of functions. No further setup
-required, no extra concepts to learn.
-
 ### Exit strategy
 
 Every good library should come with an exit strategy as well as install
@@ -217,20 +222,54 @@ In general, migrating away should not be too problematic. The components that
 you will build with Ornament will naturally tend to be self-contained and
 universal, and will therefore more or less always keep chugging along.
 
-### Component registration
+## Decorators
 
-Using [`customElements.define()`](https://developer.mozilla.org/en-US/docs/Web/API/CustomElementRegistry/define)
-is no too bad, but setting a custom element's tag name should really be part of
-the class declaration. The `@define()` decorator provides just that:
+### API overview
+
+| Decorator             | Class element     | `static` | `#private` | Symbols | Summary                                                                                                                           |
+| --------------------- | ----------------- | -------- | ---------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `@define()`           | Class             | -        | -          | -       | Register a custom element class with a tag name and set it up for use with Ornament's other decorators                            |
+| `@enhance()`          | Class             | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do *not* register it with a tag name                  |
+| `@prop()`             | Accessor          | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                                             |
+| `@attr()`             | Accessor          | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type                             |
+| `@reactive()`         | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions) |
+| `@init()`             | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function after the class constructor finishes                                                         |
+| `@connected()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element connects to the DOM                                                         |
+| `@disconnected()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element disconnects from the DOM                                                    |
+| `@adopted()`          | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is adopted by a new document                                                |
+| `@formAssociated()`   | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is associated with a form element                                           |
+| `@formReset()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's form owner resets                                                         |
+| `@formDisabled()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                                             |
+| `@formStateRestore()` | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                                          |
+| `@subscribe()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function to react to changes to a signal or to events on an EventTarget                               |
+| `@debounce()`         | Method, Field[^2] | ✓        | ✓          | ✓       | Debounce a method or class field function, (including `static`)                                                                   |
+
+[^1]: Can be `#private` or a symbol *if* a non-private non-symbol getter/setter
+      pair for the attribute name exists and a content attribute name has been
+      set using the `as` option.
+[^2]: Class field values must be of type `function`
+
+### `@define(tagName: string, options: ElementDefinitionOptions = {})`
+
+**Class decorator** to register a class as a custom element, basically an
+alternative syntax for [`customElements.define()`](https://developer.mozilla.org/en-US/docs/Web/API/CustomElementRegistry/define);
 
 ```javascript
 import { define } from "@sirpepe/ornament";
 
 @define("my-test")
 class MyTest extends HTMLElement {}
+
+console.log(document.createElement("my-test")); // instance of MyTest
 ```
 
-### Safe upgrades
+`@define()` also sets up attribute observation for use with the
+[@attr()](#attrtransformer-options) decorator, prepares the hooks for
+lifecycle decorators like `@connected()` and ensures that property upgrades for
+previously undefined elements happen in a predictable fashion.
+
+<details>
+<summary>What are safe upgrades?</summary>
 
 HTML tags can be used even if the browser does not (yet) know about them, and
 this also works with web components - the browser can upgrade custom elements
@@ -268,143 +307,7 @@ Ornament ensures safe upgrades, always making sure that no prototype accessors
 for attributes are ever shadowed by properties defined before an element was
 properly upgraded.
 
-### Lifecycle callbacks
-
-By centralizing event handling to lifecycle callbacks, native web component APIs
-force you to scatter function calls across multiple methods:
-
-```javascript
-class MyComponent extends HTMLElement {
-  thisNeedsToRunWhenTheElementConnectsOrDisconnects() {
-    console.log(this.isConnected);
-  }
-
-  connectedCallback() {
-    this.thisNeedsToRunWhenTheElementConnectsOrDisconnects();
-  }
-
-  disconnectedCallback() {
-    this.thisNeedsToRunWhenTheElementConnectsOrDisconnects();
-  }
-}
-```
-
-Ornaments lifecycle decorators enable you to declare what events a method should
-react to on the method itself:
-
-```javascript
-import { define, connected, disconnected } from "@sirpepe/ornament";
-
-@define("my-test")
-class MyComponent extends HTMLElement {
-  @connected()
-  @disconnected()
-  thisNeedsToRunWhenTheElementConnectsOrDisconnects() {
-    console.log(this.isConnected);
-  }
-}
-```
-
-### Attribute handling
-
-Getting attribute handling on Web Components right is *hard*, because many
-different APIs and states need to interact in just the right way and the related
-code tends to end up scattered across various class members. Attributes on HTML
-elements have two faces: the *content attribute* and the *IDL attribute*.
-Content attributes are always strings and are defined either via HTML or via DOM
-methods like `setAttribute()`. IDL attributes can be accessed via object
-properties such as `someElement.foo` and may be of any type. Both faces of
-attributes need to be implemented and properly synced up for an element to be
-truly compatible with any software out there - a JS frontend framework may work
-primarily with IDL attributes, while HTML authors or server-side rendering
-software will work with content attributes.
-
-Keeping content and IDL attributes in sync can entail any or all of the
-following tasks:
-
-- Updating the content attribute when the IDL attribute gets changed (eg. update the HTML attribute `id` when running `element.id = "foo"` in JS)
-- Updating the IDL attribute when the content attribute gets changed (eg. `element.id` should return `"bar"` after `element.setAttribute("id", "bar")`)
-- Converting types while updating content and/or IDL attributes (an attribute may be a `number` as an IDL attribute, but content attributes are by definition always strings)
-- Rejecting invalid types on the IDL setter (as opposed to converting types from content to IDL attributes which, like all of HTML, never throws an error)
-- Connecting IDL and content attributes with different names (like how the content attribute `class` maps to the IDL attribute `className`)
-- Fine-tuning the synchronization behavior depending on circumstances (see the interaction between the `value` content and IDL attributes on `<input>`)
-- Remembering to execute side effects (like updating Shadow DOM) when any IDL and/or content attribute changes
-
-This is all *very* annoying to write by hand, but because the above behavior is
-more or less the same for all attributes, it is possible to to simplify the
-syntax quite a bit:
-
-```javascript
-import { attr, define number } from "@sirpepe/ornament";
-
-@define("my-test")
-class MyTest extends HTMLElement {
-  @attr(number({ min: -100, max: 100 })) accessor value = 0;
-
-  @reactive()
-  log() {
-    console.log(this.value);
-  }
-}
-```
-
-The line starting with with `@attr` gets you a content and a matching IDL
-attribute named `value`, which...
-
-- Always reflects a number between `-100` and `100`
-- Initializes from the content attribute and falls back to the initializer value `0` if the attribute is missing or can't be interpreted as a number
-- Automatically updates the content attribute with the stringified value of the IDL attribute when the IDL attribute is updated
-- Automatically updates the IDL attribute when the content attribute is updated (it parses the attribute value into a number and clamps it to the specified range)
-- Implements getters and setters for the IDL attributes, with the getter always returning a number and the setter rejecting invalid values (non-numbers or numbers outside the specified range of `[-100, 100]`)
-- Causes the method marked `@reactive()` to run on update
-
-You can use `@prop()` for standalone IDL attribute (that is, DOM properties
-without an associated content attributes), swap out the `number()` transformer
-for something else, or combine any of the above with hand-written logic.
-
-## Decorators
-
-### API overview
-
-| Decorator             | Class element     | `static` | `#private` | Symbols | Summary                                                                                                                           |
-| --------------------- | ----------------- | -------- | ---------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `@define()`           | Class             | -        | -          | -       | Register a custom element class with a tag name and set it up for use with Ornament's other decorators                            |
-| `@enhance()`          | Class             | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do *not* register it with a tag name                  |
-| `@prop()`             | Accessor          | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                                             |
-| `@attr()`             | Accessor          | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type                             |
-| `@reactive()`         | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions) |
-| `@init()`             | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function after the class constructor finishes                                                         |
-| `@connected()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element connects to the DOM                                                         |
-| `@disconnected()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element disconnects from the DOM                                                    |
-| `@adopted()`          | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is adopted by a new document                                                |
-| `@formAssociated()`   | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is associated with a form element                                           |
-| `@formReset()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's form owner resets                                                         |
-| `@formDisabled()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                                             |
-| `@formStateRestore()` | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                                          |
-| `@subscribe()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function to react to changes to a signal or to events on an EventTarget                               |
-| `@debounce()`         | Method, Field[^2] | ✓        | ✓          | ✓       | Debounce a method or class field function, (including `static`)                                                                   |
-
-[^1]: Can be `#private` or a symbol *if* a non-private non-symbol getter/setter
-      pair for the attribute name exists and a content attribute name has been
-      set using the `as` option.
-[^2]: Class field values must be of type `function`
-
-### `@define(tagName: string, options: ElementDefinitionOptions = {})`
-
-**Class decorator** to register a class as a custom element. This also sets up
-attribute observation for use with the [@attr()](#attrtransformer-options)
-decorator and prepares the hooks for lifecycle decorators like `@connected()`.
-
-```javascript
-import { define } from "@sirpepe/ornament";
-
-@define("my-test")
-class MyTest extends HTMLElement {}
-
-console.log(document.createElement("my-test")); // instance of MyTest
-```
-
-It is possible to register base class and subclasses with separate tag names.
+</details>
 
 <details>
 <summary>Notes for TypeScript</summary>
@@ -427,6 +330,7 @@ declare global {
 let test = document.createElement("my-test");
 console.log(test.foo); // only type checks with the above interface declaration
 ```
+
 </details>
 
 ### `@enhance()`
@@ -529,7 +433,67 @@ attribute on the custom element class. This results in something very similar to
 accessors decorated with `@prop()`, but with the following additional features:
 
 - Its value can be initialized from a content attribute, if the attribute is present
-- Changes to the content attribute's value update the value of the IDL attribute to match (depending on the options and the transformer)
+- Changes to the content attribute's value (eg. via `setAttribute()`) update the value of the IDL attribute to match (depending on the options and the transformer)
+
+<details>
+<summary>What's the deal with content attributes?</summary>
+
+Getting attribute handling on Web Components right is *hard*, because many
+different APIs and states need to interact in just the right way and the related
+code tends to end up scattered across various class members. Attributes on HTML
+elements have two faces: the *content attribute* and the *IDL attribute*.
+Content attributes are always strings and are defined either via HTML or via DOM
+methods like `setAttribute()`. IDL attributes can be accessed via object
+properties such as `someElement.foo` and may be of any type. Both faces of
+attributes need to be implemented and properly synced up for an element to be
+truly compatible with any software out there - a JS frontend framework may work
+primarily with IDL attributes, while HTML authors or server-side rendering
+software will work with content attributes.
+
+Keeping content and IDL attributes in sync can entail any or all of the
+following tasks:
+
+- Updating the content attribute when the IDL attribute gets changed (eg. update the HTML attribute `id` when running `element.id = "foo"` in JS)
+- Updating the IDL attribute when the content attribute gets changed (eg. `element.id` should return `"bar"` after `element.setAttribute("id", "bar")`)
+- Converting types while updating content and/or IDL attributes (an attribute may be a `number` as an IDL attribute, but content attributes are by definition always strings)
+- Rejecting invalid types on the IDL setter (as opposed to converting types from content to IDL attributes which, like all of HTML, never throws an error)
+- Connecting IDL and content attributes with different names (like how the content attribute `class` maps to the IDL attribute `className`)
+- Fine-tuning the synchronization behavior depending on circumstances (see the interaction between the `value` content and IDL attributes on `<input>`)
+- Remembering to execute side effects (like updating Shadow DOM) when any IDL and/or content attribute changes
+
+This is all *very* annoying to write by hand, but because the above behavior is
+more or less the same for all attributes, it is possible to to simplify the
+syntax quite a bit:
+
+```javascript
+import { attr, define number } from "@sirpepe/ornament";
+
+@define("my-test")
+class MyTest extends HTMLElement {
+  @attr(number({ min: -100, max: 100 })) accessor value = 0;
+
+  @reactive()
+  log() {
+    console.log(this.value);
+  }
+}
+```
+
+The line starting with with `@attr` gets you a content and a matching IDL
+attribute named `value`, which...
+
+- Always reflects a number between `-100` and `100`
+- Initializes from the content attribute and falls back to the initializer value `0` if the attribute is missing or can't be interpreted as a number
+- Automatically updates the content attribute with the stringified value of the IDL attribute when the IDL attribute is updated
+- Automatically updates the IDL attribute when the content attribute is updated (it parses the attribute value into a number and clamps it to the specified range)
+- Implements getters and setters for the IDL attributes, with the getter always returning a number and the setter rejecting invalid values (non-numbers or numbers outside the specified range of `[-100, 100]`)
+- Causes the method marked `@reactive()` to run on update
+
+You can use `@prop()` for standalone IDL attribute (that is, DOM properties
+without an associated content attributes), swap out the `number()` transformer
+for something else, or combine any of the above with hand-written logic.
+
+</details>
 
 ```javascript
 import { define, attr, number } from "@sirpepe/ornament";
@@ -838,12 +802,10 @@ not work in Chrome-based browsers as of November 2023.
 
 ### `@subscribe(...args)`
 
-**Method decorator** that causes decorated class methods to subscribe to either
+**Method or class field decorator** that causes decorated class methods or class
+field functions to subscribe to either
 [Event Targets](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget) or
-[signals](https://github.com/preactjs/signals), depending on the arguments. The
-subscriptions activate when an element's constructor completes and the all
-listeners automatically unsubscribe when the subscribed element gets garbage
-collected.
+[signals](https://github.com/preactjs/signals), depending on the arguments.
 
 #### Subscribe to EventTargets: `@subscribe(targetOrTargetFactory, eventNames, options?)`
 
@@ -1229,7 +1191,7 @@ their initial value and most transformers contain reasonable default values
 #### For use with `@attr()`
 
 A content attribute's IDL attribute value can be unset to the accessor's initial
-value by removing a previously set the content attribute.
+value by removing a previously set content attribute:
 
 As an example:
 
