@@ -8,7 +8,7 @@
 📢 **What's new in 1.2.0?** [Check out the Changelog!](./changelog.md)
 
 **Build your own frontend framework** with Ornament, a mid-level,
-pareto-optimal, treeshakable and tiny (< 4k) TypeScript-positive toolkit for web
+pareto-optimal, treeshakable and tiny (< 5k) TypeScript-positive toolkit for web
 component infrastructure! Ornament makes dealing with attributes, updates and
 lifecycle callbacks declarative, simple and type-safe...
 
