@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Other**: Bump dependencies, use an eslint/prettier setup that matches the current century, add some more hype to the readme
+
 ## v 1.2.0
 
 - **Feature**: `@subscribe()` now lets you decide when/if a component should subscribe and unsubscribe from an event target or signal. It defaults to the internal `"init"` and `"connected"` events for subscribing and to `disconnected` for unsubscribing, but this can be changed in the options when calling `@subscribe()`.

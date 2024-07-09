@@ -9,8 +9,9 @@
 
 **Build your own frontend framework** with Ornament, a mid-level,
 pareto-optimal, treeshakable and tiny (< 5k) TypeScript-positive toolkit for web
-component infrastructure! Ornament makes dealing with attributes, updates and
-lifecycle callbacks declarative, simple and type-safe...
+component infrastructure! Escape from heavyweight frameworks, constant rewrites
+and the all-encompassing frontend FOMO with a declarative, simple, and type-safe
+API for web components:
 
 ```javascript
 import {
@@ -45,8 +46,8 @@ class MyGreeter extends HTMLElement {
 }
 ```
 
-... when compared to the equivalent boilerplate monstrosity that one would have
-to write by hand otherwise:
+Ornament makes web components fun and easy when compared to the equivalent
+boilerplate monstrosity that one would have to write by hand otherwise:
 
 <details>
 <summary>😱 Unveil the horror 😱</summary>
@@ -185,7 +186,7 @@ The native APIs are also missing a few important primitives. Ornament's goal is
 to provide the missing primitives and to streamline the developer experience.
 Ornament is **not a framework** but instead aims to be:
 
-- **as stable as possible** by remaining dependency-free and keeping its own code to an absolute minimum
+- **as stable as possible** by remaining dependency-free, keeping its own code to an absolute minimum, and relying on iron-clad web standards where possible
 - **fast and lean** by being nothing more than just a bag of relatively small and simple functions
 - **malleable** by being easy to extend, easy to customize (through partial application) and easy to get rid of
 - **universal** by adhering to (the spirit of) web standards, thereby staying compatible with vanilla web component code as well as all sorts of web frameworks
