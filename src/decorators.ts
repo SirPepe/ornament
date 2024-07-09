@@ -126,19 +126,23 @@ export function enhance<T extends CustomElementConstructor>(): (
         // The base class may or may not have its own connectedCallback, but the
         // type CustomElementConstructor does not reflect that. TS won't allow
         // us to access the property speculatively, so we need to tell it to
-        // shut up. The same holds true for all the other lifecycle callbacks.
+        // shut up (and tell eslint to shut up about about @ts-ignore). The same
+        // holds true for all the other lifecycle callbacks.
+        // eslint-disable-next-line
         // @ts-ignore
         super.connectedCallback?.call(this);
         trigger(this, "connected");
       }
 
       disconnectedCallback(): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.disconnectedCallback?.call(this);
         trigger(this, "disconnected");
       }
 
       adoptedCallback(): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.adoptedCallback?.call(this);
         trigger(this, "adopted");
@@ -151,6 +155,7 @@ export function enhance<T extends CustomElementConstructor>(): (
         newValue: string | null,
       ): void {
         if (originalObservedAttributes.has(name)) {
+          // eslint-disable-next-line
           // @ts-ignore
           super.attributeChangedCallback?.call(this, name, oldValue, newValue);
         }
@@ -158,18 +163,21 @@ export function enhance<T extends CustomElementConstructor>(): (
       }
 
       formAssociatedCallback(owner: HTMLFormElement | null): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.formAssociatedCallback?.call(this, owner);
         trigger(this, "formAssociated", owner);
       }
 
       formResetCallback(): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.formResetCallback?.call(this);
         trigger(this, "formReset");
       }
 
       formDisabledCallback(disabled: boolean): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.formDisabledCallback?.call(this, disabled);
         trigger(this, "formDisabled", disabled);
@@ -179,6 +187,7 @@ export function enhance<T extends CustomElementConstructor>(): (
         state: string | File | FormData | null,
         reason: "autocomplete" | "restore",
       ): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.formStateRestoreCallback?.call(this, state, reason);
         trigger(this, "formStateRestore", state, reason);
