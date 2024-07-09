@@ -1332,7 +1332,8 @@ describe("Decorators", () => {
         const target = new EventTarget();
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(target, "foo") test = (event: Event) => fn(this, event, event.target); // eslint-disable-line
+          @subscribe(target, "foo") test = (event: Event) =>
+            fn(this, event, event.target);
         }
         const instance = new Test();
         const event = new Event("foo");
@@ -1597,7 +1598,10 @@ describe("Decorators", () => {
         }
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(target, "test", { predicate: (_, evt: TestEvent) => evt.value }) test = (event: TestEvent) => fn(this, event.value); // eslint-disable-line
+          @subscribe(target, "test", {
+            predicate: (_, evt: TestEvent) => evt.value,
+          })
+          test = (event: TestEvent) => fn(this, event.value);
         }
         const instance = new Test();
         target.dispatchEvent(new TestEvent(true));
@@ -1630,11 +1634,23 @@ describe("Decorators", () => {
           )
           test4(evt: MouseEvent | FocusEvent) {}
           // @ts-expect-error wrong event type
-            @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(t1, "foo") test5(evt: MouseEvent) {} // eslint-disable-line
+          @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
+            t1,
+            "foo",
+          )
+          test5(evt: MouseEvent) {}
           // @ts-expect-error wrong event type
-            @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(t1, "focus") test6(evt: MouseEvent) {} // eslint-disable-line
+          @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
+            t1,
+            "focus",
+          )
+          test6(evt: MouseEvent) {}
           // @ts-expect-error wrong event type
-            @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(t1, "focus click") test7(evt: DragEvent) {} // eslint-disable-line
+          @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
+            t1,
+            "focus click",
+          )
+          test7(evt: DragEvent) {}
           // Accept anything in the absence of generics
           @subscribe(t1, "whatever") test8(evt: DragEvent) {} // Yolo
         }
@@ -1683,7 +1699,7 @@ describe("Decorators", () => {
         @reactive()
         // Using timeout because RAF is unreliable in headless browsers
         @debounce({ fn: debounce.timeout(0) })
-        test = () => fn(this.x); // eslint-disable-line
+        test = () => fn(this.x);
       }
       const el = new Test();
       el.x = "B";
@@ -1729,7 +1745,7 @@ describe("Decorators", () => {
         // Using timeout because RAF is unreliable in headless browsers
         @debounce({ fn: debounce.timeout(0) })
         @init()
-        test = () => fn(this.x); // eslint-disable-line
+        test = () => fn(this.x);
       }
       const el = new Test();
       el.x = "B";

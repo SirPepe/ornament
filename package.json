@@ -13,7 +13,7 @@
     }
   },
   "scripts": {
-    "lint": "eslint --ext .ts src",
+    "lint": "npx prettier . --check && eslint",
     "test": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve --playwright --browsers chromium firefox",
     "test-dev": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve",
     "build": "npm run lint && rollup -c rollup.config.mjs && npm run size",
@@ -46,6 +46,7 @@
     "@babel/plugin-transform-react-jsx": "^7.23.4",
     "@babel/preset-env": "^7.22.4",
     "@babel/preset-typescript": "^7.21.5",
+    "@eslint/js": "^9.5.0",
     "@esm-bundle/chai": "^4.3.4-fix.0",
     "@preact/signals-core": "^1.4.0",
     "@rollup/plugin-alias": "^5.0.0",
@@ -54,20 +55,21 @@
     "@rollup/plugin-terser": "^0.4.3",
     "@types/mocha": "^10.0.3",
     "@types/sinon": "^17.0.0",
-    "@typescript-eslint/eslint-plugin": "^7.1.0",
-    "@typescript-eslint/parser": "^7.1.0",
+    "@typescript-eslint/eslint-plugin": "^7.6.0",
+    "@typescript-eslint/parser": "^7.6.0",
     "@web/dev-server-rollup": "^0.6.0",
     "@web/test-runner": "^0.18.0",
     "@web/test-runner-playwright": "^0.11.0",
     "eslint": "^8.41.0",
-    "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-prettier": "^5.0.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.8.0",
     "preact": "^10.20.1",
     "prettier": "^3.0.0",
     "release-it": "^17.0.0",
     "rollup": "^4.2.0",
     "sinon": "^18.0.0",
     "typescript": "5.5",
+    "typescript-eslint": "^7.14.1",
     "uhtml": "^4.5.0"
   }
 }

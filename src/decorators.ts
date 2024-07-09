@@ -14,7 +14,10 @@ import {
 // originals, scoped by component instance. This is required to make @init()
 // calls run synchronously, even if @debounce() was applied to the method in
 // question.
-const ALL_DEBOUNCED_METHODS = new WeakMap<object, WeakMap<Method<any, any>, Method<any, any>>>(); // eslint-disable-line
+const ALL_DEBOUNCED_METHODS = new WeakMap<
+  object,
+  WeakMap<Method<any, any>, Method<any, any>>
+>();
 
 // This should really be scoped on a class-by-class basis, but the @attr()
 // decorator has no context without decorator metadata (which, again, is too
@@ -123,23 +126,19 @@ export function enhance<T extends CustomElementConstructor>(): (
         // The base class may or may not have its own connectedCallback, but the
         // type CustomElementConstructor does not reflect that. TS won't allow
         // us to access the property speculatively, so we need to tell it to
-        // shut up... and then tell ESLint to shut up about us telling TS to
-        // shut up. The same happens for all the other lifecycle callbacks.
-        // eslint-disable-next-line
+        // shut up. The same holds true for all the other lifecycle callbacks.
         // @ts-ignore
         super.connectedCallback?.call(this);
         trigger(this, "connected");
       }
 
       disconnectedCallback(): void {
-        // eslint-disable-next-line
         // @ts-ignore
         super.disconnectedCallback?.call(this);
         trigger(this, "disconnected");
       }
 
       adoptedCallback(): void {
-        // eslint-disable-next-line
         // @ts-ignore
         super.adoptedCallback?.call(this);
         trigger(this, "adopted");
@@ -152,7 +151,6 @@ export function enhance<T extends CustomElementConstructor>(): (
         newValue: string | null,
       ): void {
         if (originalObservedAttributes.has(name)) {
-          // eslint-disable-next-line
           // @ts-ignore
           super.attributeChangedCallback?.call(this, name, oldValue, newValue);
         }
@@ -160,21 +158,18 @@ export function enhance<T extends CustomElementConstructor>(): (
       }
 
       formAssociatedCallback(owner: HTMLFormElement | null): void {
-        // eslint-disable-next-line
         // @ts-ignore
         super.formAssociatedCallback?.call(this, owner);
         trigger(this, "formAssociated", owner);
       }
 
       formResetCallback(): void {
-        // eslint-disable-next-line
         // @ts-ignore
         super.formResetCallback?.call(this);
         trigger(this, "formReset");
       }
 
       formDisabledCallback(disabled: boolean): void {
-        // eslint-disable-next-line
         // @ts-ignore
         super.formDisabledCallback?.call(this, disabled);
         trigger(this, "formDisabled", disabled);
@@ -184,7 +179,6 @@ export function enhance<T extends CustomElementConstructor>(): (
         state: string | File | FormData | null,
         reason: "autocomplete" | "restore",
       ): void {
-        // eslint-disable-next-line
         // @ts-ignore
         super.formStateRestoreCallback?.call(this, state, reason);
         trigger(this, "formStateRestore", state, reason);
@@ -217,7 +211,9 @@ export function define<T extends CustomElementConstructor>(
 // event (for the last relevant constructor in the stack) have both run.
 function runContextInitializerOnOrnamentInit<
   T extends HTMLElement,
-  C extends ClassMethodDecoratorContext<T, any> | ClassFieldDecoratorContext<T, any>, // eslint-disable-line
+  C extends
+    | ClassMethodDecoratorContext<T, any>
+    | ClassFieldDecoratorContext<T, any>,
 >(context: C, initializer: (instance: T) => any): void {
   context.addInitializer(function (this: any) {
     // The (last) init event has already happened, call initializer function
@@ -237,7 +233,10 @@ function runContextInitializerOnOrnamentInit<
 
 // Method/class fields decorator @init() runs a method or class field function
 // once an instance initializes (= the outermost constructor finishes).
-export function init<T extends HTMLElement>(): LifecycleDecorator<T, OrnamentEventMap["init"]> { // eslint-disable-line
+export function init<T extends HTMLElement>(): LifecycleDecorator<
+  T,
+  OrnamentEventMap["init"]
+> {
   return function (_, context): void {
     assertContext(context, "init", "method/function");
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
@@ -285,12 +284,17 @@ type SubscribeBaseOptions = {
   deactivateOn?: (keyof OrnamentEventMap)[]; // defaults to ["disconnected"]
 };
 
-type EventSubscribeOptions<T, V extends Event> = AddEventListenerOptions & SubscribeBaseOptions & { predicate?: (instance: T, event: V) => boolean; }; // eslint-disable-line
-type SignalSubscribeOptions<T, V> = SubscribeBaseOptions & { predicate?: (instance: T, value: V) => boolean; }; // eslint-disable-line
+type EventSubscribeOptions<T, V extends Event> = AddEventListenerOptions &
+  SubscribeBaseOptions & { predicate?: (instance: T, event: V) => boolean };
+type SignalSubscribeOptions<T, V> = SubscribeBaseOptions & {
+  predicate?: (instance: T, value: V) => boolean;
+};
 
 type EventSubscribeDecorator<T, E extends Event> = (
   value: unknown,
-  context: ClassMethodDecoratorContext<T, Method<T, [E]>> | ClassFieldDecoratorContext<T, Method<T, [E]>>, // eslint-disable-line
+  context:
+    | ClassMethodDecoratorContext<T, Method<T, [E]>>
+    | ClassFieldDecoratorContext<T, Method<T, [E]>>,
 ) => void;
 
 type EventTargetOrFactory<T, U extends EventTarget> =
@@ -331,8 +335,14 @@ function unwrapTarget<T extends HTMLElement, U extends EventTarget>(
   continuation(targetOrFactory);
 }
 
-function subscribeToEventTarget<T extends HTMLElement, U extends EventTarget, V extends Event>( // eslint-disable-line
-  context: ClassMethodDecoratorContext<T, Method<T, [V]>> | ClassFieldDecoratorContext<T, Method<T, [V]>>, // eslint-disable-line
+function subscribeToEventTarget<
+  T extends HTMLElement,
+  U extends EventTarget,
+  V extends Event,
+>(
+  context:
+    | ClassMethodDecoratorContext<T, Method<T, [V]>>
+    | ClassFieldDecoratorContext<T, Method<T, [V]>>,
   targetOrFactory: EventTargetOrFactory<T, U>,
   eventNames: string,
   options: EventSubscribeOptions<T, V>,
@@ -363,8 +373,10 @@ function subscribeToEventTarget<T extends HTMLElement, U extends EventTarget, V 
   });
 }
 
-function subscribeToSignal<T extends HTMLElement, S extends SignalLike<any>>( // eslint-disable-line
-  context: ClassMethodDecoratorContext<T, Method<T, [SignalType<S>]>> | ClassFieldDecoratorContext<T, Method<T, [SignalType<S>]>>, // eslint-disable-line
+function subscribeToSignal<T extends HTMLElement, S extends SignalLike<any>>(
+  context:
+    | ClassMethodDecoratorContext<T, Method<T, [SignalType<S>]>>
+    | ClassFieldDecoratorContext<T, Method<T, [SignalType<S>]>>,
   target: S,
   options: SignalSubscribeOptions<T, SignalType<S>>,
 ): void {
@@ -409,12 +421,19 @@ export function subscribe<
 ): EventSubscribeDecorator<T, EventOf<N, M>>;
 export function subscribe<T extends HTMLElement>(
   targetOrFactory: EventTargetOrFactory<T, any> | SignalLike<any>,
-  namesOrOptions?: EventSubscribeOptions<T, any> | SignalSubscribeOptions<T, any> | string, // eslint-disable-line
-  options: EventSubscribeOptions<T, any> | SignalSubscribeOptions<T, any> = EMPTY_OBJ, // eslint-disable-line
+  namesOrOptions?:
+    | EventSubscribeOptions<T, any>
+    | SignalSubscribeOptions<T, any>
+    | string,
+  options:
+    | EventSubscribeOptions<T, any>
+    | SignalSubscribeOptions<T, any> = EMPTY_OBJ,
 ): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
   return function (
     _: unknown,
-    context: ClassMethodDecoratorContext<T, Method<T, [any]>> | ClassFieldDecoratorContext<T, Method<T, [any]>>, // eslint-disable-line
+    context:
+      | ClassMethodDecoratorContext<T, Method<T, [any]>>
+      | ClassFieldDecoratorContext<T, Method<T, [any]>>,
   ): void {
     assertContext(context, "subscribe", "method/function");
     // Arguments for subscribing to an event target
@@ -462,7 +481,10 @@ type LifecycleDecorator<T extends HTMLElement, A extends any[]> = {
 function createLifecycleDecorator<K extends keyof OrnamentEventMap>(
   name: K,
 ): <T extends HTMLElement>() => LifecycleDecorator<T, OrnamentEventMap[K]> {
-  return <T extends HTMLElement>(): LifecycleDecorator<T, OrnamentEventMap[K]> => // eslint-disable-line
+  return <T extends HTMLElement>(): LifecycleDecorator<
+    T,
+    OrnamentEventMap[K]
+  > =>
     function (_, context) {
       assertContext(context, name, "method/function");
       context.addInitializer(function () {
@@ -696,7 +718,9 @@ export function debounce<
   const fn = options.fn ?? debounce.raf();
   return function decorator(
     value: F | undefined,
-    context: ClassMethodDecoratorContext<T, F> | ClassFieldDecoratorContext<T, F>, // eslint-disable-line
+    context:
+      | ClassMethodDecoratorContext<T, F>
+      | ClassFieldDecoratorContext<T, F>,
   ): F | void {
     assertContext(context, "debounce", "method/function", true);
     if (context.kind === "field") {

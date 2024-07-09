@@ -215,7 +215,6 @@ ul { list-style: none; margin: 0; padding: 0 }`;
   @reRender()
   #update() {
     this.render(
-      /* eslint-disable */
       this.html`<ul>
         ${this.items.map(
           ({ id, text, done }) => this.html`
@@ -225,7 +224,6 @@ ul { list-style: none; margin: 0; padding: 0 }`;
           `,
         )}
       </ul>`,
-      /* eslint-enable */
     );
   }
 }

@@ -82,10 +82,17 @@ export type Transformer<
   ) => boolean | null;
 };
 
-/* eslint-disable */
-export type ClassAccessorDecorator<T extends HTMLElement, V, R extends ClassAccessorDecoratorResult<unknown, unknown> | void = ClassAccessorDecoratorResult<T, V>>
-  = (target: ClassAccessorDecoratorTarget<T, V>, context: ClassAccessorDecoratorContext<T, V>) => R;
-/* eslint-enable */
+export type ClassAccessorDecorator<
+  T extends HTMLElement,
+  V,
+  R extends ClassAccessorDecoratorResult<
+    unknown,
+    unknown
+  > | void = ClassAccessorDecoratorResult<T, V>,
+> = (
+  target: ClassAccessorDecoratorTarget<T, V>,
+  context: ClassAccessorDecoratorContext<T, V>,
+) => R;
 
 export type Method<T, A extends unknown[] = []> = (this: T, ...args: A) => any;
 

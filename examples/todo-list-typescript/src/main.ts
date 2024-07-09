@@ -17,22 +17,20 @@ import {
 import { signal, computed } from "@preact/signals-core";
 import { render, html } from "uhtml";
 
-/* eslint-disable */
-
 // Custom rendering decorator composed from @reactive, @connected and @debounce:
 // - reacts to attribute updates (when the component is connected)
 // - and runs its target once per frame
 // - and also when the component connects
 const reRender =
   <T extends HTMLElement, V extends (this: T) => any>() =>
-    (target: V, context: ClassMethodDecoratorContext<T, V>) =>
-      reactive<T>({ predicate: ({ isConnected }) => isConnected })(
-        connected<T>()(
-          debounce<T, V>({ fn: debounce.raf() })(target, context),
-          context,
-        ),
+  (target: V, context: ClassMethodDecoratorContext<T, V>) =>
+    reactive<T>({ predicate: ({ isConnected }) => isConnected })(
+      connected<T>()(
+        debounce<T, V>({ fn: debounce.raf() })(target, context),
         context,
-      );
+      ),
+      context,
+    );
 
 function fail(): never {
   throw new Error("This should never happen");
@@ -77,10 +75,14 @@ const capture = <T extends HTMLElement, E extends Event>(
   eventName: string,
   selector = "*",
 ) =>
-  subscribe<T, ShadowRoot, E>((el: T) => shadowRoots.get(el) ?? fail(), eventName, {
-    predicate: (_: unknown, evt: Event) =>
-      evt.target instanceof HTMLElement && evt.target.matches(selector),
-  });
+  subscribe<T, ShadowRoot, E>(
+    (el: T) => shadowRoots.get(el) ?? fail(),
+    eventName,
+    {
+      predicate: (_: unknown, evt: Event) =>
+        evt.target instanceof HTMLElement && evt.target.matches(selector),
+    },
+  );
 
 // We need a whole lot of new events for this application, and they will all
 // have to bubble and be composed. So...
@@ -267,7 +269,6 @@ ul { list-style: none; margin: 0; padding: 0 }`;
   @reRender()
   #update() {
     this.render(
-      /* eslint-disable */
       this.html`<ul>
         ${this.items.map(
           ({ id, text, done }) => this.html`
@@ -277,7 +278,6 @@ ul { list-style: none; margin: 0; padding: 0 }`;
           `,
         )}
       </ul>`,
-      /* eslint-enable */
     );
   }
 }

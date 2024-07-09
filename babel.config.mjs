@@ -1,5 +1,3 @@
-/* eslint-env node */
-
 const config = {
   presets: [
     ["@babel/preset-env", {}],

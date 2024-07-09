@@ -462,13 +462,13 @@ export function list<T extends HTMLElement, V>(
   });
 }
 
-/* eslint-disable */
-type Handler<T, E extends Event> = ((this: T, evt: E) => boolean | undefined | void) | null;
+type Handler<T, E extends Event> =
+  | ((this: T, evt: E) => boolean | undefined | void)
+  | null;
 type HandlerTransform<T extends HTMLElement, E extends Event> = Transformer<
   T,
   Handler<T, E>
 >;
-/* eslint-enable */
 
 export function event<
   T extends HTMLElement,

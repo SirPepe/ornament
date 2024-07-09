@@ -8,11 +8,6 @@
     "outDir": "dist",
     "strict": true
   },
-  "include": [
-    "**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["**/*"],
+  "exclude": ["node_modules", "dist"]
 }

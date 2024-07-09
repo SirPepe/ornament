@@ -13,7 +13,14 @@ component infrastructure! Ornament makes dealing with attributes, updates and
 lifecycle callbacks declarative, simple and type-safe...
 
 ```javascript
-import { define, attr, string, number, connected, reactive } from "@sirpepe/ornament";
+import {
+  define,
+  attr,
+  string,
+  number,
+  connected,
+  reactive,
+} from "@sirpepe/ornament";
 
 // Register the element with the specified tag name
 @define("my-greeter")
@@ -58,7 +65,8 @@ class MyGreeter extends HTMLElement {
   constructor() {
     super(); // mandatory boilerplate
     let age = Number(this.getAttribute("age"));
-    if (Number.isNaN(age)) { // Remember to keep NaN in check
+    if (Number.isNaN(age)) {
+      // Remember to keep NaN in check
       age = 0;
     }
     this.#age = 0;
@@ -100,7 +108,8 @@ class MyGreeter extends HTMLElement {
   // attribute updates, required to make JS operations like `el.age = 42` work.
   set age(value) {
     value = Number(value); // Remember to convert/check the type!
-    if (Number.isNaN(value) || value < 0) { // Remember to keep NaN in check
+    if (Number.isNaN(value) || value < 0) {
+      // Remember to keep NaN in check
       value = 0;
     }
     this.#age = value;
@@ -127,7 +136,8 @@ class MyGreeter extends HTMLElement {
     // the min value of 0...
     if (name === "age") {
       const value = Number(value); // Remember to convert/check the type!
-      if (Number.isNaN(value) || value < 0) { // Remember to keep NaN in check
+      if (Number.isNaN(value) || value < 0) {
+        // Remember to keep NaN in check
         value = 0;
       }
       this.#age = value;
@@ -147,7 +157,7 @@ window.customElements.define("my-greeter", MyGreeter);
 
 </details>
 
-Ornament makes *only the most tedious bits* of building vanilla web components
+Ornament makes _only the most tedious bits_ of building vanilla web components
 (attribute handling and lifecycle reactions) easy by adding some primitives that
 really should be part of the standard, but aren't. Ornament is not a framework,
 but something that you might want to build your own framework on top of.
@@ -161,7 +171,7 @@ with your favorite package manager. To get the decorator syntax working in 2024,
 you will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
 (with option `version` set to `"2023-11"`) or
 [TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
-(with the option `experimentalDecorators` turned *off*).
+(with the option `experimentalDecorators` turned _off_).
 
 Apart from that, Ornament is just a bunch of functions. No further setup
 required, no extra concepts to learn.
@@ -181,9 +191,9 @@ Ornament is **not a framework** but instead aims to be:
 - **universal** by adhering to (the spirit of) web standards, thereby staying compatible with vanilla web component code as well as all sorts of web frameworks
 - equipped with **useful type definitions** (and work within the constraints of TypeScript)
 
-Ornament is *infrastructure for web components* and not a framework itself. It
+Ornament is _infrastructure for web components_ and not a framework itself. It
 makes dealing with the native APIs bearable and leaves building something
-actually sophisticated up to you. Ornament does not come with *any* of the
+actually sophisticated up to you. Ornament does not come with _any_ of the
 following:
 
 - state management (even though it is simple to connect components to signals or event targets)
@@ -210,7 +220,7 @@ away:
 - If you want to replace Ornament with hand-written logic for web components,
   you can **replace all attribute and update handling piecemeal.** Ornament's
   decorators co-exist with native `attributeChangedCallback()` and friends just
-  fine. Ornament *extends* what you can do with custom elements, it does not
+  fine. Ornament _extends_ what you can do with custom elements, it does not
   abstract anything away.
 - Much of your migration will depend on **how you build on top of Ornament.**
   You should keep reusable components and app-specific state containers
@@ -229,7 +239,7 @@ universal, and will therefore more or less always keep chugging along.
 | Decorator             | Class element     | `static` | `#private` | Symbols | Summary                                                                                                                           |
 | --------------------- | ----------------- | -------- | ---------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `@define()`           | Class             | -        | -          | -       | Register a custom element class with a tag name and set it up for use with Ornament's other decorators                            |
-| `@enhance()`          | Class             | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do *not* register it with a tag name                  |
+| `@enhance()`          | Class             | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do _not_ register it with a tag name                  |
 | `@prop()`             | Accessor          | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                                             |
 | `@attr()`             | Accessor          | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type                             |
 | `@reactive()`         | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions) |
@@ -244,9 +254,11 @@ universal, and will therefore more or less always keep chugging along.
 | `@subscribe()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function to react to changes to a signal or to events on an EventTarget                               |
 | `@debounce()`         | Method, Field[^2] | ✓        | ✓          | ✓       | Debounce a method or class field function, (including `static`)                                                                   |
 
-[^1]: Can be `#private` or a symbol *if* a non-private non-symbol getter/setter
-      pair for the attribute name exists and a content attribute name has been
-      set using the `as` option.
+[^1]:
+    Can be `#private` or a symbol _if_ a non-private non-symbol getter/setter
+    pair for the attribute name exists and a content attribute name has been
+    set using the `as` option.
+
 [^2]: Class field values must be of type `function`
 
 ### `@define(tagName: string, options: ElementDefinitionOptions = {})`
@@ -336,7 +348,7 @@ console.log(test.foo); // only type checks with the above interface declaration
 ### `@enhance()`
 
 **Class decorator** to set up attribute observation and lifecycle hooks
-*without* registering the class as a custom element.
+_without_ registering the class as a custom element.
 
 ```javascript
 import { enhance } from "@sirpepe/ornament";
@@ -386,7 +398,7 @@ class MyTest3 extends Base3 {}
 ### `@prop(transformer: Transformer)`
 
 **Accessor decorator** to define an IDL property on the custom element class
-*without* an associated content attribute. Such a property is more or less a
+_without_ an associated content attribute. Such a property is more or less a
 regular accessor with two additional features:
 
 - it uses [transformers](#transformers) for type checking and validation
@@ -417,7 +429,7 @@ console.log(testEl.foo); // logs 42
 testEl.foo = "asdf"; // throw exception (thanks to the number transformer)
 ```
 
-Accessors defined with `@prop()` work as a *JavaScript-only API*. Values can
+Accessors defined with `@prop()` work as a _JavaScript-only API_. Values can
 only be accessed through the accessor's getter, invalid values are rejected by
 the setter with exceptions. `@prop()` can be used on private accessors or
 symbols without problem.
@@ -438,10 +450,10 @@ accessors decorated with `@prop()`, but with the following additional features:
 <details>
 <summary>What's the deal with content attributes?</summary>
 
-Getting attribute handling on Web Components right is *hard*, because many
+Getting attribute handling on Web Components right is _hard_, because many
 different APIs and states need to interact in just the right way and the related
 code tends to end up scattered across various class members. Attributes on HTML
-elements have two faces: the *content attribute* and the *IDL attribute*.
+elements have two faces: the _content attribute_ and the _IDL attribute_.
 Content attributes are always strings and are defined either via HTML or via DOM
 methods like `setAttribute()`. IDL attributes can be accessed via object
 properties such as `someElement.foo` and may be of any type. Both faces of
@@ -461,7 +473,7 @@ following tasks:
 - Fine-tuning the synchronization behavior depending on circumstances (see the interaction between the `value` content and IDL attributes on `<input>`)
 - Remembering to execute side effects (like updating Shadow DOM) when any IDL and/or content attribute changes
 
-This is all *very* annoying to write by hand, but because the above behavior is
+This is all _very_ annoying to write by hand, but because the above behavior is
 more or less the same for all attributes, it is possible to to simplify the
 syntax quite a bit:
 
@@ -519,7 +531,7 @@ testEl.foo = 1337; // logs "Foo changed to 1337"
 console.log(testEl.foo); // logs 1337
 console.log(testEl.getAttribute("foo")); // logs "1337"
 testEl.foo = "asdf"; // throw exception (thanks to the number transformer)
-testEl.setAttribute("foo", "asdf") // works, content attributes can be any string
+testEl.setAttribute("foo", "asdf"); // works, content attributes can be any string
 console.log(testEl.foo); // logs 23 (fallback value)
 ```
 
@@ -527,14 +539,14 @@ Accessors defined with `@attr()` work like all other supported attributes on
 built-in elements. Content attribute values (which are always strings) get
 parsed by the transformer, which also deals with invalid values in a graceful
 way (ie without throwing exceptions). Values can also be accessed through the
-IDL property's accessor, where invalid values *are* rejected with exceptions by
+IDL property's accessor, where invalid values _are_ rejected with exceptions by
 the setter.
 
 `@attr()` can only be used on private accessors or symbols only if the following
 holds true:
 
-1. The option `as` *must* be set
-2. A non-private, non-symbol getter/setter pair for the attribute name defined in the option `as` *must* exist on the custom element class
+1. The option `as` _must_ be set
+2. A non-private, non-symbol getter/setter pair for the attribute name defined in the option `as` _must_ exist on the custom element class
 
 Content attributes always have public IDL attribute APIs, and ornament enforces
 this. A private/symbol attribute accessor with a manually-provided public facade
@@ -600,7 +612,7 @@ run, the following needs to be true:
 
 - **`keys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) to monitor. Can include private names and symbols. Defaults to monitoring all content and IDL attributes defined by `@prop()` or `@attr()`.
 - **`excludeKeys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) not to monitor. Can include private names and symbols. Defaults to an empty array.
-- **`predicate` (Function `(instance: T) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change. Note that this function is not part of the class declaration itself and can therefore *not* access private fields on `instance`.
+- **`predicate` (Function `(instance: T) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change. Note that this function is not part of the class declaration itself and can therefore _not_ access private fields on `instance`.
 
 ### `@init()`
 
@@ -631,7 +643,7 @@ let testEl = document.createElement("my-test");
 This decorator is particularly useful if you need to run `@reactive()` methods
 once on component initialization.
 
-Decorated members are run with no arguments and *always* right after the
+Decorated members are run with no arguments and _always_ right after the
 constructor finishes, even methods and class field functions decorated with
 `@debounce()`.
 
@@ -810,7 +822,7 @@ field functions to subscribe to either
 #### Subscribe to EventTargets: `@subscribe(targetOrTargetFactory, eventNames, options?)`
 
 Subscribe to one or more events an EventTarget. `EventTarget` is an interface
-that objects such as HTMLElement, Window, Document and *many* more objects
+that objects such as HTMLElement, Window, Document and _many_ more objects
 implement. You can also create a vanilla event target by calling
 `new EventTarget()`...
 
@@ -910,7 +922,7 @@ class Test extends HTMLElement {
 <details>
 <summary>Notes for TypeScript</summary>
 
-An event target can actually be delivered by an *arbitrarily* long chain of
+An event target can actually be delivered by an _arbitrarily_ long chain of
 nested functions and promises. This is annoying to handle on the type level,
 you'll just have to `any` your way around that or provide this capability in
 a type-safe wrapper.
@@ -938,7 +950,7 @@ class Test extends HTMLElement {
 A mapping between event names and corresponding event types (such as `"click"`
 → `MouseEvent`) exists for specific cases. For example `HTMLElementEventMap`
 contains the mappings for events emitted by HTML elements. But because
-`@subscribe()` can work with *any event target*, the existence of such a mapping
+`@subscribe()` can work with _any event target_, the existence of such a mapping
 can't be assumed. The only way around this is to provide the following type
 parameters to `@subscribe()`:
 
@@ -1092,18 +1104,18 @@ running side effects.
 
 ### Transformers overview
 
-| Transformer       | Type                                           | Options                              |
-| ------------------| -----------------------------------------------|--------------------------------------|
-| `string()`        | `string`                                       |                                      |
-| `href()`          | `string` (URL)                                 |                                      |
-| `bool()`          | `boolean`                                      |                                      |
-| `number()`        | `number`                                       | `min`, `max`, `allowNaN`, `nullable` |
-| `int()`           | `bigint`                                       | `min`, `max`, `nullable`             |
-| `json()`          | Any (JSON serializable for use with `@attr()`) | `reviver`, `replacer`                |
-| `list()`          | Array                                          | `separator`, `transform`             |
-| `literal()`       | Any                                            | `values`, `transform`                |
-| `any()`           | `any`                                          |                                      |
-| `event()`         | `function \| null`                             |                                      |
+| Transformer | Type                                           | Options                              |
+| ----------- | ---------------------------------------------- | ------------------------------------ |
+| `string()`  | `string`                                       |                                      |
+| `href()`    | `string` (URL)                                 |                                      |
+| `bool()`    | `boolean`                                      |                                      |
+| `number()`  | `number`                                       | `min`, `max`, `allowNaN`, `nullable` |
+| `int()`     | `bigint`                                       | `min`, `max`, `nullable`             |
+| `json()`    | Any (JSON serializable for use with `@attr()`) | `reviver`, `replacer`                |
+| `list()`    | Array                                          | `separator`, `transform`             |
+| `literal()` | Any                                            | `values`, `transform`                |
+| `any()`     | `any`                                          |                                      |
+| `event()`   | `function \| null`                             |                                      |
 
 A transformer is just a bag of functions with the following type signature:
 
@@ -1205,14 +1217,14 @@ class Test extends HTMLElement {
   @attr(string()) accessor baz;
 }
 
-document.body.innerHTML += `<my-test foo="other value"></my-test>`
+document.body.innerHTML += `<my-test foo="other value"></my-test>`;
 ```
 
 The attributes `foo`, `bar` and `baz` behave as follows:
 
 - The element initializes with a content attribute **`foo`** already set in HTML. The IDL attribute `foo` will therefore (because it uses the string type via the `string()` transformer) contain `"other value"`. Should the content attribute `foo` get removed, the IDL attribute will contain `"default value"`.
 - The content attribute **`bar`** is not set in HTML, which will result in the IDL attribute `bar` containing the accessor's default value `"default value"`.
-- The content attribute **`baz`** is also not set in HTML *and* the accessor has no initial value, so the `string()` transformer's built-in fallback value `""` gets used.
+- The content attribute **`baz`** is also not set in HTML _and_ the accessor has no initial value, so the `string()` transformer's built-in fallback value `""` gets used.
 
 ### Transformer `string()`
 
@@ -1231,11 +1243,11 @@ class Test extends HTMLElement {
 
 #### Behavior overview for transformer `string()`
 
-| Operation                        | IDL attribute value      | Content attribute (when used with `@attr()`) |
-| ---------------------------------| -------------------------|----------------------------------------------|
-| Set IDL attribute to `x`         | `String(x)`              | IDL attribute value                          |
-| Set content attribute            | Content attribute value  | As set (equal to IDL attribute value)        |
-| Remove content attribute         | Initial value or `""`    | Removed                                      |
+| Operation                | IDL attribute value     | Content attribute (when used with `@attr()`) |
+| ------------------------ | ----------------------- | -------------------------------------------- |
+| Set IDL attribute to `x` | `String(x)`             | IDL attribute value                          |
+| Set content attribute    | Content attribute value | As set (equal to IDL attribute value)        |
+| Remove content attribute | Initial value or `""`   | Removed                                      |
 
 ### Transformer `href()`
 
@@ -1255,16 +1267,16 @@ let testEl = new Test();
 
 // Assuming that the page is served from localhost:
 console.log(testEl.foo); // > ""
-testEl.foo = "asdf"
+testEl.foo = "asdf";
 console.log(testEl.foo); // > "http://localhost/asdf"
-testEl.foo = "https://example.com/foo/bar/"
+testEl.foo = "https://example.com/foo/bar/";
 console.log(testEl.foo); // > "https://example.com/foo/bar/"
 ```
 
 #### Behavior overview for transformer `href()`
 
 | Operation                                      | IDL attribute value         | Content attribute (when used with `@attr()`) |
-| -----------------------------------------------| ----------------------------|----------------------------------------------|
+| ---------------------------------------------- | --------------------------- | -------------------------------------------- |
 | Set IDL attribute to absolute URL (string)     | Absolute URL                | IDL attribute value                          |
 | Set IDL attribute to any other value `x`       | Relative URL to `String(x)` | IDL attribute value                          |
 | Set content attribute to absolute URL (string) | Absolute URL                | As set                                       |
@@ -1283,7 +1295,7 @@ class Test extends HTMLElement {
   // With default options (see below)
   @attr(number()) accessor foo = 0;
 
- // With all options set
+  // With all options set
   @attr(number({ min: 0, max: 10 })) accessor bar = 0;
 }
 ```
@@ -1304,7 +1316,7 @@ initializer throw exceptions.
 #### Behavior overview for transformer `number()`
 
 | Operation                                   | IDL attribute value                                          | Content attribute (when used with `@attr()`)                         |
-| --------------------------------------------| -------------------------------------------------------------|----------------------------------------------------------------------|
+| ------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------- |
 | Set IDL attribute to value `x`              | `minmax(opts.min, opts.max, toNumber(x, allowNaN))`          | String(IDL attribute value)                                          |
 | Set IDL attribute to out-of-range value     | RangeError                                                   | String(IDL attribute value)                                          |
 | Set IDL attribute to `null` or `undefined`  | `null` is `nullable` is true, otherwise `0`                  | Removed if `nullable` is true, otherwise String(IDL attribute value) |
@@ -1326,7 +1338,7 @@ class Test extends HTMLElement {
   // With default options (see below)
   @attr(int()) accessor foo = 0n;
 
- // With all options set
+  // With all options set
   @attr(int({ min: 0n, max: 10n, nullable: false })) accessor bar = 0n;
 }
 ```
@@ -1345,7 +1357,7 @@ BigInt.
 #### Behavior overview for transformer `int()`
 
 | Operation                                  | IDL attribute value                                          | Content attribute (when used with `@attr()`)                         |
-| -------------------------------------------| -------------------------------------------------------------|----------------------------------------------------------------------|
+| ------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------- |
 | Set IDL attribute to value `x`             | `minmax(ops.min, opts.max, BigInt(x))`                       | String(IDL attribute value)                                          |
 | Set IDL attribute to out-of-range value    | RangeError                                                   | String(IDL attribute value)                                          |
 | Set IDL attribute to `null` or `undefined` | `null` is `nullable` is true, otherwise `0n`                 | Removed if `nullable` is true, otherwise String(IDL attribute value) |
@@ -1357,7 +1369,7 @@ BigInt.
 ### Transformer `bool()`
 
 Implements a boolean attribute. Modeled after built-in boolean attributes such
-as `disabled`. Changes to the IDL attribute values *toggle* the content
+as `disabled`. Changes to the IDL attribute values _toggle_ the content
 attribute and do not just change the content attribute's value.
 
 ```javascript
@@ -1381,7 +1393,7 @@ you can use the `literal()` transformer with the strings `"true"` and `"false"`.
 #### Behavior overview for transformer `bool()`
 
 | Operation                      | IDL attribute value | Content attribute (when used with `@attr()`)                         |
-| -------------------------------| --------------------|----------------------------------------------------------------------|
+| ------------------------------ | ------------------- | -------------------------------------------------------------------- |
 | Set IDL attribute to value `x` | `Boolean(x)`        | Removed when IDL attribute is `false`, otherwise set to empty string |
 | Set content attribute to `x`   | `true`              | As set                                                               |
 | Remove content attribute       | `false`             | Removed                                                              |
@@ -1434,7 +1446,7 @@ console.log(el.foo); // > [1, 2, 3]
 #### Behavior overview for transformer `list()`
 
 | Operation                | IDL attribute value                                                                                                         | Content attribute (when used with `@attr()`)         |
-| -------------------------|-----------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | Set IDL attribute        | Exception is not an array, otherwise array with content guarded by `options.transformer.validate`                           | IDL attribute values joined with `options.separator` |
 | Set content attribute    | Attribute value is split on the separator, then trimmed, then non-empty strings are passed into `options.transformer.parse` | As set                                               |
 | Remove content attribute | Initial value or empty array                                                                                                | Removed                                              |
@@ -1452,7 +1464,8 @@ import { define, attr, literal, string } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
-  @attr(literal({ values: ["A", "B"], transform: string() })) accessor foo = "A";
+  @attr(literal({ values: ["A", "B"], transform: string() })) accessor foo =
+    "A";
 }
 ```
 
@@ -1472,7 +1485,7 @@ the accessor has no initial value, the first element in `values`.
 #### Behavior overview for transformer `literal()`
 
 | Operation                      | IDL attribute value                                                                                      | Content attribute (when used with `@attr()`) |
-| -------------------------------| ---------------------------------------------------------------------------------------------------------|----------------------------------------------|
+| ------------------------------ | -------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | Set IDL attribute value to `x` | Exception if not in `options.values`, otherwise defined by `options.transformer.validate`                | Defined by `options.transformer.stringify`   |
 | Set content attribute to `x`   | Parsed by `options.transformer.parse`. If the result is in `options.values`, result, otherwise no change | As set                                       |
 | Remove attribute               | Initial value or first element in `options.values`                                                       | Removed                                      |
@@ -1518,7 +1531,7 @@ are applied to, so you man need to provide a type annotation.
 #### Behavior overview for transformer `json()` (when used with `@attr()`)
 
 | Operation                      | IDL attribute value                                                    | Content attribute                                 |
-| -------------------------------| -----------------------------------------------------------------------|---------------------------------------------------|
+| ------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------- |
 | Set IDL attribute value to `x` | `JSON.parse(JSON.stringify(x))`                                        | `JSON.stringify(idlValue, null, options.reviver)` |
 | Set content attribute to `x`   | No change if invalid JSON, otherwise `JSON.parse(x, options.receiver)` | As set                                            |
 | Remove content attribute       | Initial value or `undefined`                                           | Removed                                           |
@@ -1526,7 +1539,7 @@ are applied to, so you man need to provide a type annotation.
 #### Behavior overview for transformer `json()` (when used with `@prop()`)
 
 | Operation                      | IDL attribute value | Content attribute |
-| -------------------------------| --------------------|-------------------|
+| ------------------------------ | ------------------- | ----------------- |
 | Set IDL attribute value to `x` | `x`                 | -                 |
 
 ### Transformer `any()`
@@ -1546,7 +1559,7 @@ class Test extends HTMLElement {
 
 Transformers returned from calling `any()` make for great prototypes for your
 own custom transformer. Just note that transformers are bags of functions and
-*not* classes, so you will need to use `Object.setPrototypeOf()` and friends to
+_not_ classes, so you will need to use `Object.setPrototypeOf()` and friends to
 "extend" transformers.
 
 <details>
@@ -1595,7 +1608,7 @@ testEl.dispatchEvent(new Event("foo"));
 Regular "proper" `addEventListener()` is obviously also always available.
 
 It should be noted that for built-in events that bubble, inline event handlers
-can be added to *any* element in order to facilitate event delegation. These
+can be added to _any_ element in order to facilitate event delegation. These
 event handlers are considered global event handlers, and all custom inline event
 handlers are obviously not global - they can only be used on the components that
 explicitly implement them.
@@ -1612,7 +1625,7 @@ almost certainly never need to access it directly, but there is is an API just
 in case.
 
 | Event              | Cause                                     | Event type                          | Payload (`args` property on the event object)                        |
-| ------------------ | ------------------------------------------|------------------------------------ |----------------------------------------------------------------------|
+| ------------------ | ----------------------------------------- | ----------------------------------- | -------------------------------------------------------------------- |
 | `init`             | Constructor ran to completion             | `OrnamentEvent<"init">`             | `[]`                                                                 |
 | `connected`        | `connectedCallback()` fired               | `OrnamentEvent<"connected">`        | `[]`                                                                 |
 | `disconnected`     | `disconnectedCallback()` fired            | `OrnamentEvent<"disconnected">`     | `[]`                                                                 |
@@ -1663,7 +1676,7 @@ import { listen } from "@sirpepe/ornament";
 
 // Listen for "prop" event on the event bus for "someElement"
 listen(someElement, "prop", (evt) => {
-  const [ name, value ] = event.args;
+  const [name, value] = event.args;
   window.alert(`Attribute ${name} was changed to ${value}!`);
 });
 ```
@@ -1765,7 +1778,7 @@ new A();
 
 ### Debounced reactive
 
-`@reactive()` causes its decorated method to get called for once for *every*
+`@reactive()` causes its decorated method to get called for once for _every_
 attribute and property change. This is sometimes useful, but sometimes you will
 want to batch method calls for increased efficiency. This is easy if you combine
 `@reactive()` with `@debounce()`:
@@ -1921,7 +1934,7 @@ class Test extends HTMLElement {
 
 Notes for `@attr()`:
 
-1. The option `as` is *mandatory* when you use `@attr()` on a private or symbol accessor
+1. The option `as` is _mandatory_ when you use `@attr()` on a private or symbol accessor
 1. Ornament throws exceptions if the class does not implement a public API for a content attribute defined with `@attr()` on a private or symbol accessor
 
 ### Event delegation
@@ -1934,13 +1947,9 @@ import { define, subscribe } from "@sirpepe/ornament";
 
 @define("my-test")
 class Test extends HTMLElement {
-  @subscribe(
-    document.documentElement,
-    "input",
-    {
-      predicate: (evt) => evt.target.matches("input[type-number]")
-    },
-  )
+  @subscribe(document.documentElement, "input", {
+    predicate: (evt) => evt.target.matches("input[type-number]"),
+  })
   log(evt) {
     console.log(evt); // "input" events
   }
@@ -1956,13 +1965,9 @@ import { define, subscribe } from "@sirpepe/ornament";
 @define("my-test")
 class Test extends HTMLElement {
   root = this.attachShadow({ mode: "open" });
-  @subscribe(
-    (instance) => this.root,
-    "input",
-    {
-      predicate: (evt) => evt.target.matches("input[type-number]")
-    },
-  )
+  @subscribe((instance) => this.root, "input", {
+    predicate: (evt) => evt.target.matches("input[type-number]"),
+  })
   log(evt) {
     console.log(evt); // "input" events
   }
@@ -1979,13 +1984,9 @@ custom decorator for event delegation based on `@subscribe`:
 import { define, subscribe } from "@sirpepe/ornament";
 
 const handle = (eventName, selector) =>
-  subscribe(
-    (instance) => this.root,
-    eventName,
-    {
-      predicate: (evt) => evt.target.matches(selector)
-    },
-  );
+  subscribe((instance) => this.root, eventName, {
+    predicate: (evt) => evt.target.matches(selector),
+  });
 
 @define("my-test")
 class Test extends HTMLElement {
@@ -1998,7 +1999,7 @@ class Test extends HTMLElement {
 }
 ```
 
-Note that the function that `@subscribe` takes to access event targets can *not*
+Note that the function that `@subscribe` takes to access event targets can _not_
 access a classes private fields. The shadow root has to be publicly accessible
 (unless you want to mess around with WeakMaps storing ShadowRoots indexed by
 element instances or something similar).
@@ -2011,14 +2012,10 @@ import { define, subscribe } from "@sirpepe/ornament";
 
 // This can now handle all events from the shadow root
 const capture = (eventName, selector) =>
-  subscribe(
-    (instance) => this.root,
-    eventName,
-    {
-      predicate: (evt) => evt.target.matches(selector),
-      capture: true,
-    }
-  );
+  subscribe((instance) => this.root, eventName, {
+    predicate: (evt) => evt.target.matches(selector),
+    capture: true,
+  });
 ```
 
 Also also note that only composed events propagate through shadow boundaries,
@@ -2032,7 +2029,12 @@ are just functions. This means that you can use partial application to change
 the default options:
 
 ```javascript
-import { define, attr, reactive as baseReactive, string } from "@sirpepe/ornament";
+import {
+  define,
+  attr,
+  reactive as baseReactive,
+  string,
+} from "@sirpepe/ornament";
 
 // @reactive with "keys" always set to ["foo"]
 const reactive = (options) => baseReactive({ ...options, keys: ["foo"] });
@@ -2061,11 +2063,9 @@ import { define, subscribe } from "@sirpepe/ornament";
 
 // A more convenient decorator for event delegation
 function listen(event, selector = "*") {
-  return subscribe(
-    document.documentElement,
-    "input",
-    (evt) => evt.target.matches(selector)
-  )
+  return subscribe(document.documentElement, "input", (evt) =>
+    evt.target.matches(selector),
+  );
 }
 
 @define("my-test")
@@ -2108,10 +2108,14 @@ function reactive() {
 }
 ```
 
-And while we are at it, why not compose *and* partially apply decorators:
+And while we are at it, why not compose _and_ partially apply decorators:
 
 ```javascript
-import { reactive as baseReactive, connected, debounce } from "@sirpepe/ornament";
+import {
+  reactive as baseReactive,
+  connected,
+  debounce,
+} from "@sirpepe/ornament";
 
 // Combines @reactive(), @connected() and @debounce():
 // - reacts to attribute updates (only while the component is connected)
