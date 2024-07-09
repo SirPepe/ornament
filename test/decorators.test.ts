@@ -1633,15 +1633,15 @@ describe("Decorators", () => {
             "focus click",
           )
           test4(evt: MouseEvent | FocusEvent) {}
-          // @ts-expect-error wrong event type
           @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
             t1,
+            // @ts-expect-error wrong event type
             "foo",
           )
           test5(evt: MouseEvent) {}
-          // @ts-expect-error wrong event type
           @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
             t1,
+            // @ts-expect-error wrong event type
             "focus",
           )
           test6(evt: MouseEvent) {}
