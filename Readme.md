@@ -253,6 +253,7 @@ universal, and will therefore more or less always keep chugging along.
 | `@formDisabled()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                                             |
 | `@formStateRestore()` | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                                          |
 | `@subscribe()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function to react to changes to a signal or to events on an EventTarget                               |
+| `@observe()`          | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function as a callback for an IntersectionObserver, MutationObserver, or ResizeObserver               |
 | `@debounce()`         | Method, Field[^2] | ✓        | ✓          | ✓       | Debounce a method or class field function, (including `static`)                                                                   |
 
 [^1]:
@@ -1095,6 +1096,39 @@ able to return anything but `undefined`.
   - `debounce.raf()`: uses `requestAnimationFrame()`
   - `debounce.timeout(ms: number)`: uses `setTimeout()`
   - `debounce.asap()`: runs the function after the next microtask
+
+### `@observe(ObserverConstructor, options?)`
+
+**Method and class field decorator** that sets up a [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver), or [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) with the element instance as the target and the decorated method as the callback. This enables the element to observe itself:
+
+```javascript
+import { define, observe } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  // Pass the observer constructor and relevant options
+  @observe(MutationObserver, { childList: true })
+  reactToChanges(mutations, observer) {
+    // "mutations" = array of MutationRecord objects
+    // "observer" = the observer instance
+    console.log(mutations);
+  }
+}
+
+const el = new Test();
+el.innerText = "Test"; // cause mutation
+
+// Test.reactToChanges() gets called asynchronously by the observer
+```
+
+`@observe()` always observes the element that the decorated method belongs to and its reactions are always observably (heh) asynchronous. The decorator does little more than create an observer object with the options provided and the decorated method as the callback function. In theory this should work with every kind of DOM-related observer but has only been tested with MutationObserver, ResizeObserver and IntersectionObserver so far.
+
+#### Options for `@observe()`
+
+- **`Ctor` (function)**: The observer constructor function (probably `MutationObserver`, `ResizeObserver`, or `IntersectionObserver`)
+- **`options` (object, optional)**: The options for the observer (see MDN for options for [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver/observe#options), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/IntersectionObserver/IntersectionObserver#options), [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver/observe#options))
+- **activateOn (Array\<string\>, optional):** Ornament event on which to start observing the element. Defaults to `["init", "connected"]`.
+- **deactivateOn (Array\<string\>, optional):** Ornament event on which to stop observing the element. Defaults to `["disconnected"]`.
 
 ## Transformers
 

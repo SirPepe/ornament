@@ -14,6 +14,7 @@ export default [
   eslintConfigPrettier,
   {
     rules: {
+      "no-unused-private-class-members": "off",
       "no-constant-condition": [
         "warn",
         {
@@ -21,6 +22,7 @@ export default [
         },
       ],
       "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
     },
   },
 ];

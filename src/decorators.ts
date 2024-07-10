@@ -126,19 +126,23 @@ export function enhance<T extends CustomElementConstructor>(): (
         // The base class may or may not have its own connectedCallback, but the
         // type CustomElementConstructor does not reflect that. TS won't allow
         // us to access the property speculatively, so we need to tell it to
-        // shut up. The same holds true for all the other lifecycle callbacks.
+        // shut up (and tell eslint to shut up about about @ts-ignore). The same
+        // holds true for all the other lifecycle callbacks.
+        // eslint-disable-next-line
         // @ts-ignore
         super.connectedCallback?.call(this);
         trigger(this, "connected");
       }
 
       disconnectedCallback(): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.disconnectedCallback?.call(this);
         trigger(this, "disconnected");
       }
 
       adoptedCallback(): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.adoptedCallback?.call(this);
         trigger(this, "adopted");
@@ -151,6 +155,7 @@ export function enhance<T extends CustomElementConstructor>(): (
         newValue: string | null,
       ): void {
         if (originalObservedAttributes.has(name)) {
+          // eslint-disable-next-line
           // @ts-ignore
           super.attributeChangedCallback?.call(this, name, oldValue, newValue);
         }
@@ -158,18 +163,21 @@ export function enhance<T extends CustomElementConstructor>(): (
       }
 
       formAssociatedCallback(owner: HTMLFormElement | null): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.formAssociatedCallback?.call(this, owner);
         trigger(this, "formAssociated", owner);
       }
 
       formResetCallback(): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.formResetCallback?.call(this);
         trigger(this, "formReset");
       }
 
       formDisabledCallback(disabled: boolean): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.formDisabledCallback?.call(this, disabled);
         trigger(this, "formDisabled", disabled);
@@ -179,6 +187,7 @@ export function enhance<T extends CustomElementConstructor>(): (
         state: string | File | FormData | null,
         reason: "autocomplete" | "restore",
       ): void {
+        // eslint-disable-next-line
         // @ts-ignore
         super.formStateRestoreCallback?.call(this, state, reason);
         trigger(this, "formStateRestore", state, reason);
@@ -214,7 +223,7 @@ function runContextInitializerOnOrnamentInit<
   C extends
     | ClassMethodDecoratorContext<T, any>
     | ClassFieldDecoratorContext<T, any>,
->(context: C, initializer: (instance: T) => any): void {
+>(context: C, initializer: (instance: T) => void): void {
   context.addInitializer(function (this: any) {
     // The (last) init event has already happened, call initializer function
     // immediately
@@ -253,8 +262,11 @@ type ReactiveOptions<T> = {
 };
 
 type ReactiveDecorator<T extends HTMLElement> = {
-  (_: unknown, context: ClassMethodDecoratorContext<T, (this: T) => any>): void;
-  (_: unknown, context: ClassFieldDecoratorContext<T, (this: T) => any>): void;
+  (
+    _: unknown,
+    context: ClassMethodDecoratorContext<T, (this: T) => void>,
+  ): void;
+  (_: unknown, context: ClassFieldDecoratorContext<T, (this: T) => void>): void;
 };
 
 export function reactive<T extends HTMLElement>(
@@ -467,14 +479,86 @@ export function subscribe<T extends HTMLElement>(
   };
 }
 
-type LifecycleDecorator<T extends HTMLElement, A extends any[]> = {
+type ObserveBaseOptions = {
+  activateOn?: (keyof OrnamentEventMap)[]; // defaults to ["init", "connected"]
+  deactivateOn?: (keyof OrnamentEventMap)[]; // defaults to ["disconnected"]
+};
+
+// IntersectionObserver, ResizeObserver
+type ObserverCtor1 = new (
+  callback: (...args: unknown[]) => void,
+  options: any,
+) => {
+  observe: (target: HTMLElement) => void;
+  disconnect: () => void;
+};
+
+// MutationObserver
+type ObserverCtor2 = new (callback: (...args: unknown[]) => void) => {
+  observe: (target: HTMLElement, options: any) => void;
+  disconnect: () => void;
+};
+
+type ObserveDecorator<
+  T extends HTMLElement,
+  O extends ObserverCtor1 | ObserverCtor2,
+  A extends unknown[] = Parameters<ConstructorParameters<O>[0]>,
+> = {
   (
     _: unknown,
-    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => any>,
+    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => void>,
   ): void;
   (
     _: unknown,
-    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => any>,
+    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => void>,
+  ): void;
+};
+
+export function observe<T extends HTMLElement, O extends ObserverCtor1>(
+  Ctor: O,
+  options?: ObserveBaseOptions & ConstructorParameters<O>[1],
+): ObserveDecorator<T, O>;
+export function observe<T extends HTMLElement, O extends ObserverCtor2>(
+  Ctor: O,
+  options?: ObserveBaseOptions & Parameters<InstanceType<O>["observe"]>[1],
+): ObserveDecorator<T, O>;
+export function observe<
+  T extends HTMLElement,
+  O extends ObserverCtor1 | ObserverCtor2,
+>(
+  Ctor: O,
+  options: ObserveBaseOptions = {},
+): ObserveDecorator<T, O, unknown[]> {
+  options.activateOn ??= ["init", "connected"];
+  options.deactivateOn ??= ["disconnected"];
+  return function (_, context) {
+    assertContext(context, "observe", "method/function");
+    return runContextInitializerOnOrnamentInit(context, (instance: T) => {
+      const observer = new Ctor(
+        (...args) => context.access.get(instance).call(instance, ...args),
+        options,
+      );
+      if (options.activateOn?.includes("init")) {
+        observer.observe(instance, options);
+      }
+      options.activateOn?.forEach((oEvent) =>
+        listen(instance, oEvent, () => observer.observe(instance, options)),
+      );
+      options.deactivateOn?.forEach((oEvent) =>
+        listen(instance, oEvent, () => observer.disconnect()),
+      );
+    });
+  };
+}
+
+type LifecycleDecorator<T extends HTMLElement, A extends unknown[]> = {
+  (
+    _: unknown,
+    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => void>,
+  ): void;
+  (
+    _: unknown,
+    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => void>,
   ): void;
 };
 
@@ -696,7 +780,7 @@ export function prop<T extends HTMLElement, V>(
 
 type DebounceOptions<
   T extends object,
-  F extends (this: T, ...args: any[]) => any,
+  F extends (this: T, ...args: any[]) => void,
 > = {
   fn?: (
     cb: (this: T, ...args: Parameters<F>) => void,
@@ -705,7 +789,7 @@ type DebounceOptions<
 
 type DebounceDecorator<
   T extends object,
-  F extends (this: T, ...args: any[]) => any,
+  F extends (this: T, ...args: any[]) => void,
 > = (
   value: F | undefined,
   context: ClassMethodDecoratorContext<T, F> | ClassFieldDecoratorContext<T, F>,
@@ -713,7 +797,7 @@ type DebounceDecorator<
 
 export function debounce<
   T extends object,
-  F extends (this: T, ...args: any[]) => any,
+  F extends (this: T, ...args: any[]) => void,
 >(options: DebounceOptions<T, F> = EMPTY_OBJ): DebounceDecorator<T, F> {
   const fn = options.fn ?? debounce.raf();
   return function decorator(
@@ -751,7 +835,7 @@ export function debounce<
 // function object) this is just right.
 const KEY_TO_USE_WHEN_THIS_IS_UNDEFINED = Symbol(); // for bound functions
 
-debounce.asap = function <T extends object, A extends any[]>(): (
+debounce.asap = function <T extends object, A extends unknown[]>(): (
   original: (this: T, ...args: A) => void,
 ) => (this: T, ...args: A) => void {
   return function (
@@ -771,7 +855,7 @@ debounce.asap = function <T extends object, A extends any[]>(): (
   };
 };
 
-debounce.raf = function <T extends object, A extends any[]>(): (
+debounce.raf = function <T extends object, A extends unknown[]>(): (
   original: (this: T, ...args: A) => void,
 ) => (this: T, ...args: A) => void {
   return function (
@@ -792,7 +876,7 @@ debounce.raf = function <T extends object, A extends any[]>(): (
   };
 };
 
-debounce.timeout = function <T extends object, A extends any[]>(
+debounce.timeout = function <T extends object, A extends unknown[]>(
   value: number,
 ): (original: (this: T, ...args: A) => void) => (this: T, ...args: A) => void {
   return function (
