@@ -1099,7 +1099,7 @@ able to return anything but `undefined`.
 
 ### `@observe(ObserverConstructor, options?)`
 
-**Method and class field decorator** that sets up a [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver), or [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) with the element instance as the target and the decorated method as the callback:
+**Method and class field decorator** that sets up a [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver), or [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) with the element instance as the target and the decorated method as the callback. This enables the element to observe itself:
 
 ```javascript
 import { define, observe } from "@sirpepe/ornament";
