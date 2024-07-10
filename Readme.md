@@ -5,7 +5,7 @@
   </picture>
 </h1>
 
-📢 **What's new in 1.2.0?** [Check out the Changelog!](./changelog.md)
+📢 **What's new in 1.3.0?** [Check out the Changelog!](./changelog.md)
 
 **Build your own frontend framework** with Ornament, a mid-level,
 pareto-optimal, treeshakable and tiny (< 5k) TypeScript-positive toolkit for web
