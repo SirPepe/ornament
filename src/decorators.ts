@@ -476,6 +476,75 @@ export function subscribe<T extends HTMLElement>(
   };
 }
 
+type ObserveBaseOptions = {
+  activateOn?: (keyof OrnamentEventMap)[]; // defaults to ["init", "connected"]
+  deactivateOn?: (keyof OrnamentEventMap)[]; // defaults to ["disconnected"]
+};
+
+// IntersectionObserver, ResizeObserver
+type ObserverCtor1 = new (
+  callback: (...args: any) => void,
+  options: any,
+) => {
+  observe: (target: any) => any;
+  disconnect: () => void;
+};
+
+// MutationObserver
+type ObserverCtor2 = new (callback: (...args: any) => void) => {
+  observe: (target: any, options: any) => any;
+  disconnect: () => void;
+};
+
+type ObserveDecorator<
+  T extends HTMLElement,
+  O extends ObserverCtor1 | ObserverCtor2,
+  A extends any[] = Parameters<ConstructorParameters<O>[0]>,
+> = {
+  (
+    _: unknown,
+    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => any>,
+  ): void;
+  (
+    _: unknown,
+    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => any>,
+  ): void;
+};
+
+export function observe<T extends HTMLElement, O extends ObserverCtor1>(
+  Ctor: O,
+  options?: ObserveBaseOptions & ConstructorParameters<O>[1],
+): ObserveDecorator<T, O>;
+export function observe<T extends HTMLElement, O extends ObserverCtor2>(
+  Ctor: O,
+  options?: ObserveBaseOptions & Parameters<InstanceType<O>["observe"]>[1],
+): ObserveDecorator<T, O>;
+export function observe<
+  T extends HTMLElement,
+  O extends ObserverCtor1 | ObserverCtor2,
+>(Ctor: O, options: ObserveBaseOptions = {}): ObserveDecorator<T, O> {
+  options.activateOn ??= ["init", "connected"];
+  options.deactivateOn ??= ["disconnected"];
+  return function (_, context) {
+    assertContext(context, "observe", "method/function");
+    return runContextInitializerOnOrnamentInit(context, (instance: T) => {
+      const observer = new Ctor(
+        (...args: any) => context.access.get(instance).call(instance, ...args),
+        options,
+      );
+      if (options.activateOn?.includes("init")) {
+        observer.observe(instance, options);
+      }
+      options.activateOn?.forEach((oEvent) =>
+        listen(instance, oEvent, () => observer.observe(instance, options)),
+      );
+      options.deactivateOn?.forEach((oEvent) =>
+        listen(instance, oEvent, () => observer.disconnect()),
+      );
+    });
+  };
+}
+
 type LifecycleDecorator<T extends HTMLElement, A extends any[]> = {
   (
     _: unknown,
