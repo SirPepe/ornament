@@ -71,18 +71,11 @@ class BaseComponent extends HTMLElement {
 // event delegation in shadow roots. To make this palatable, the following
 // decorator (which is just a wrapper around @subscribe) has been cribbed from
 // the readme.
-const capture = <T extends HTMLElement, E extends Event>(
-  eventName: string,
-  selector = "*",
-) =>
-  subscribe<T, ShadowRoot, E>(
-    (el: T) => shadowRoots.get(el) ?? fail(),
-    eventName,
-    {
-      predicate: (_: unknown, evt: Event) =>
-        evt.target instanceof HTMLElement && evt.target.matches(selector),
-    },
-  );
+const capture = <T extends HTMLElement>(eventName: string, selector = "*") =>
+  subscribe((el: T) => shadowRoots.get(el) ?? fail(), eventName, {
+    predicate: (_: unknown, evt: Event) =>
+      evt.target instanceof HTMLElement && evt.target.matches(selector),
+  });
 
 // We need a whole lot of new events for this application, and they will all
 // have to bubble and be composed. So...
@@ -357,20 +350,15 @@ class TodoApp extends BaseComponent {
 // the entire application.
 @define("todo-applet")
 class TodoApplet extends BaseComponent {
-  // June 2024: for reasons beyond comprehension, this (and ONLY this) does not
-  // work when the method is private. The code compiles, but at runtime
-  // complains "decorator must be a function" This is probably a babel bug, but
-  // I am unable to reduce this to a kindof minimal test case. So this method
-  // stays public for now :)
-  @capture<TodoApplet, any, NewItemEvent>("todonew")
-  handleNew(evt: NewItemEvent): void {
+  @capture("todonew")
+  #handleNew(evt: NewItemEvent): void {
     allItems.value = [
       ...allItems.value,
       { id: id++, text: evt.text, done: false },
     ];
   }
 
-  @capture<TodoApplet, any, DoneItemEvent>("tododone")
+  @capture("tododone")
   #handleDone(evt: DoneItemEvent): void {
     allItems.value = allItems.value.map((item) => {
       if (item.id === evt.id) {
@@ -380,7 +368,7 @@ class TodoApplet extends BaseComponent {
     });
   }
 
-  @capture<TodoApplet, any, DeleteItemEvent>("tododelete")
+  @capture("tododelete")
   #handleDelete(evt: DeleteItemEvent): void {
     allItems.value = allItems.value.filter((item) => {
       if (item.id === evt.id) {
@@ -390,7 +378,7 @@ class TodoApplet extends BaseComponent {
     });
   }
 
-  @capture<TodoApplet, any, FilterChangeEvent>("filterchange")
+  @capture("filterchange")
   #handleFilterChange(evt: FilterChangeEvent): void {
     filter.value = evt.value;
   }
