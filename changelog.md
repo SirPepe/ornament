@@ -3,7 +3,7 @@
 ## Unreleased
 
 - **Feature**: `@observe()` registers a [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver), or [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) to use the decorated method as its callback. It then starts to observe the element for whatever the observer observes (resizes, mutations etc.). Similar to `@subscribe` you can decide when/if observation should start and end in the options, which are also the options for the observers.
-- **Other**: Bump dependencies, use an eslint/prettier setup that matches the current century, add some more hype to the readme
+- **Other**: Bump dependencies, re-organize tests, use an eslint/prettier setup that matches the current century, add some more hype to the readme
 
 ## v 1.2.0
 

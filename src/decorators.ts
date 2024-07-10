@@ -223,7 +223,7 @@ function runContextInitializerOnOrnamentInit<
   C extends
     | ClassMethodDecoratorContext<T, any>
     | ClassFieldDecoratorContext<T, any>,
->(context: C, initializer: (instance: T) => any): void {
+>(context: C, initializer: (instance: T) => void): void {
   context.addInitializer(function (this: any) {
     // The (last) init event has already happened, call initializer function
     // immediately
@@ -262,8 +262,11 @@ type ReactiveOptions<T> = {
 };
 
 type ReactiveDecorator<T extends HTMLElement> = {
-  (_: unknown, context: ClassMethodDecoratorContext<T, (this: T) => any>): void;
-  (_: unknown, context: ClassFieldDecoratorContext<T, (this: T) => any>): void;
+  (
+    _: unknown,
+    context: ClassMethodDecoratorContext<T, (this: T) => void>,
+  ): void;
+  (_: unknown, context: ClassFieldDecoratorContext<T, (this: T) => void>): void;
 };
 
 export function reactive<T extends HTMLElement>(
@@ -483,31 +486,31 @@ type ObserveBaseOptions = {
 
 // IntersectionObserver, ResizeObserver
 type ObserverCtor1 = new (
-  callback: (...args: any) => void,
+  callback: (...args: unknown[]) => void,
   options: any,
 ) => {
-  observe: (target: any) => any;
+  observe: (target: HTMLElement) => void;
   disconnect: () => void;
 };
 
 // MutationObserver
-type ObserverCtor2 = new (callback: (...args: any) => void) => {
-  observe: (target: any, options: any) => any;
+type ObserverCtor2 = new (callback: (...args: unknown[]) => void) => {
+  observe: (target: HTMLElement, options: any) => void;
   disconnect: () => void;
 };
 
 type ObserveDecorator<
   T extends HTMLElement,
   O extends ObserverCtor1 | ObserverCtor2,
-  A extends any[] = Parameters<ConstructorParameters<O>[0]>,
+  A extends unknown[] = Parameters<ConstructorParameters<O>[0]>,
 > = {
   (
     _: unknown,
-    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => any>,
+    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => void>,
   ): void;
   (
     _: unknown,
-    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => any>,
+    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => void>,
   ): void;
 };
 
@@ -522,14 +525,17 @@ export function observe<T extends HTMLElement, O extends ObserverCtor2>(
 export function observe<
   T extends HTMLElement,
   O extends ObserverCtor1 | ObserverCtor2,
->(Ctor: O, options: ObserveBaseOptions = {}): ObserveDecorator<T, O> {
+>(
+  Ctor: O,
+  options: ObserveBaseOptions = {},
+): ObserveDecorator<T, O, unknown[]> {
   options.activateOn ??= ["init", "connected"];
   options.deactivateOn ??= ["disconnected"];
   return function (_, context) {
     assertContext(context, "observe", "method/function");
     return runContextInitializerOnOrnamentInit(context, (instance: T) => {
       const observer = new Ctor(
-        (...args: any) => context.access.get(instance).call(instance, ...args),
+        (...args) => context.access.get(instance).call(instance, ...args),
         options,
       );
       if (options.activateOn?.includes("init")) {
@@ -545,14 +551,14 @@ export function observe<
   };
 }
 
-type LifecycleDecorator<T extends HTMLElement, A extends any[]> = {
+type LifecycleDecorator<T extends HTMLElement, A extends unknown[]> = {
   (
     _: unknown,
-    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => any>,
+    context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => void>,
   ): void;
   (
     _: unknown,
-    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => any>,
+    context: ClassFieldDecoratorContext<T, (this: T, ...args: A) => void>,
   ): void;
 };
 
@@ -774,7 +780,7 @@ export function prop<T extends HTMLElement, V>(
 
 type DebounceOptions<
   T extends object,
-  F extends (this: T, ...args: any[]) => any,
+  F extends (this: T, ...args: any[]) => void,
 > = {
   fn?: (
     cb: (this: T, ...args: Parameters<F>) => void,
@@ -783,7 +789,7 @@ type DebounceOptions<
 
 type DebounceDecorator<
   T extends object,
-  F extends (this: T, ...args: any[]) => any,
+  F extends (this: T, ...args: any[]) => void,
 > = (
   value: F | undefined,
   context: ClassMethodDecoratorContext<T, F> | ClassFieldDecoratorContext<T, F>,
@@ -791,7 +797,7 @@ type DebounceDecorator<
 
 export function debounce<
   T extends object,
-  F extends (this: T, ...args: any[]) => any,
+  F extends (this: T, ...args: any[]) => void,
 >(options: DebounceOptions<T, F> = EMPTY_OBJ): DebounceDecorator<T, F> {
   const fn = options.fn ?? debounce.raf();
   return function decorator(
@@ -829,7 +835,7 @@ export function debounce<
 // function object) this is just right.
 const KEY_TO_USE_WHEN_THIS_IS_UNDEFINED = Symbol(); // for bound functions
 
-debounce.asap = function <T extends object, A extends any[]>(): (
+debounce.asap = function <T extends object, A extends unknown[]>(): (
   original: (this: T, ...args: A) => void,
 ) => (this: T, ...args: A) => void {
   return function (
@@ -849,7 +855,7 @@ debounce.asap = function <T extends object, A extends any[]>(): (
   };
 };
 
-debounce.raf = function <T extends object, A extends any[]>(): (
+debounce.raf = function <T extends object, A extends unknown[]>(): (
   original: (this: T, ...args: A) => void,
 ) => (this: T, ...args: A) => void {
   return function (
@@ -870,7 +876,7 @@ debounce.raf = function <T extends object, A extends any[]>(): (
   };
 };
 
-debounce.timeout = function <T extends object, A extends any[]>(
+debounce.timeout = function <T extends object, A extends unknown[]>(
   value: number,
 ): (original: (this: T, ...args: A) => void) => (this: T, ...args: A) => void {
   return function (
