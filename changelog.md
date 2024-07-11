@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Bugfix**: [Fix support for line breaks as separators in event strings for `@subscribe()`](https://github.com/SirPepe/ornament/issues/9)
+
 ## v 1.3.0
 
 - **Feature**: Ever wanted to have an element observe itself? The new decorator `@observe()` registers a [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver), or [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) to use the decorated method as its callback. It then starts to observe the element for whatever the observer observes (resizes, mutations etc.). Similar to `@subscribe` you can decide when/if observation should start and end in the options, which are also the options for the observers.
