@@ -413,45 +413,56 @@ describe("Decorators", () => {
       });
 
       test("require the correct event types", async () => {
-        const t1 = document.createElement("div");
+        const t = document.createElement("div");
         class Test extends HTMLElement {
-          @subscribe<Test, HTMLElement, "foo", HTMLElementEventMap>(t1, "foo")
+          @subscribe<Test, HTMLElement, "foo", HTMLElementEventMap>(t, "foo")
           test1(evt: Event) {}
           @subscribe<Test, HTMLElement, "click", HTMLElementEventMap>(
-            t1,
+            t,
             "click",
           )
           test2(evt: MouseEvent) {}
           @subscribe<Test, HTMLElement, "focus", HTMLElementEventMap>(
-            t1,
+            t,
             "focus",
           )
           test3(evt: FocusEvent) {}
           @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
-            t1,
+            t,
             "focus click",
           )
           test4(evt: MouseEvent | FocusEvent) {}
           @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
-            t1,
+            t,
             // @ts-expect-error wrong event type
             "foo",
           )
           test5(evt: MouseEvent) {}
           @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
-            t1,
+            t,
             // @ts-expect-error wrong event type
             "focus",
           )
           test6(evt: MouseEvent) {}
           // @ts-expect-error wrong event type
           @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
-            t1,
+            t,
             "focus click",
           )
           test7(evt: DragEvent) {}
           // Accept anything in the absence of generics
-          @subscribe(t1, "whatever") test8(evt: DragEvent) {} // Yolo
+          @subscribe(t, "whatever") test8(evt: DragEvent) {} // Yolo
+        }
+      });
+
+      test("handle line breaks in event strings", async () => {
+        const t = document.createElement("div");
+        class Test extends HTMLElement {
+          @subscribe<Test, HTMLElement, `click\nfocus`, HTMLElementEventMap>(
+            t,
+            `click\nfocus`,
+          )
+          test1(evt: MouseEvent | FocusEvent) {}
         }
       });
 

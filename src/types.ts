@@ -183,22 +183,23 @@ export function assertContext(
   throw new TypeError(`${kind} decorator @${name} used on ${ctx.kind}`);
 }
 
-type TrimLeft<T extends string> = T extends ` ${infer Rest}`
+type Whitespace = " " | "\n";
+
+type TrimLeft<T extends string> = T extends `${Whitespace}${infer Rest}`
   ? TrimLeft<Rest>
   : T;
 
-type TrimRight<T extends string> = T extends `${infer Rest} `
+type TrimRight<T extends string> = T extends `${infer Rest}${Whitespace}`
   ? TrimRight<Rest>
   : T;
 
 type Trim<T extends string> = TrimLeft<TrimRight<T>>;
 
-type Split<Str extends string, Last = never> =
-  Trim<Str> extends `${infer First} ${infer Rest}`
-    ? First extends " "
-      ? Split<Trim<Rest>, Last>
-      : Split<Trim<Rest>, First | Last>
-    : Trim<Str> | Last;
+type Split<Str extends string, Last = never> = Str extends any
+  ? Trim<Str> extends `${infer First}${Whitespace}${infer Rest}`
+    ? Split<Rest, Split<First> | Last>
+    : Trim<Str> | Last
+  : never;
 
 type MapNames<Names extends string, BaseType, Source> = {
   [Name in Split<Names>]: Name extends keyof Source ? Source[Name] : BaseType;
