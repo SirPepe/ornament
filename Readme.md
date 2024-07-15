@@ -367,7 +367,7 @@ console.log(document.createElement("my-test")); // instance of MyTest
 ```
 
 This decorator is only really useful if you need to handle element registration
-in some other way that what `@define()` provides. It is safe to apply
+in some other way than what `@define()` provides. It is safe to apply
 `@enhance()` more than once on a class, or on both (or either) a base class and
 subclass:
 
@@ -568,8 +568,8 @@ attributes will not cause `@reactive()` methods to run.
 
 ### `@reactive(options: ReactiveOptions = {})`
 
-**Method and class field decorator** that runs class members to run when
-accessors decorated with `@prop()` or `@attr()` change their values:
+**Method and class field decorator** that runs class members when accessors
+decorated with `@prop()` or `@attr()` change their values:
 
 ```javascript
 import { define, reactive, prop, number } from "@sirpepe/ornament";
