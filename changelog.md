@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Bugfix**: [Fix support for line breaks as separators in event strings for `@subscribe()`](https://github.com/SirPepe/ornament/issues/9)
+- **Other**: Bump dependencies
 
 ## v 1.3.0
 
