@@ -67,23 +67,65 @@ class BaseComponent extends HTMLElement {
   }
 }
 
-// This application goes down the SPA rabbit hole and therefore has to deal with
-// event delegation in shadow roots. To make this palatable, the following
-// decorator (which is just a wrapper around @subscribe) has been cribbed from
-// the readme.
-const capture = <T extends HTMLElement>(eventName: string, selector = "*") =>
-  subscribe((el: T) => shadowRoots.get(el) ?? fail(), eventName, {
-    predicate: (_: unknown, evt: Event) =>
-      evt.target instanceof HTMLElement && evt.target.matches(selector),
-  });
+// App-specific events that can lead to state changes. They will all have to
+// bubble and be composed.
 
-// We need a whole lot of new events for this application, and they will all
-// have to bubble and be composed. So...
-class AppEvent extends Event {
-  constructor(name: string) {
-    super(name, { bubbles: true, composed: true });
+class NewItemEvent extends Event {
+  readonly text: string;
+  constructor(text: string) {
+    super("todonew", { bubbles: true, composed: true });
+    this.text = text;
   }
 }
+
+class DeleteItemEvent extends Event {
+  readonly id: number;
+  constructor(id: number) {
+    super("tododelete", { bubbles: true, composed: true });
+    this.id = id;
+  }
+}
+
+class DoneItemEvent extends Event {
+  readonly id: number;
+  constructor(id: number) {
+    super("tododone", { bubbles: true, composed: true });
+    this.id = id;
+  }
+}
+
+class FilterChangeEvent extends Event {
+  readonly value: Filter;
+  constructor(value: Filter) {
+    super("filterchange", { bubbles: true, composed: true });
+    this.value = value;
+  }
+}
+
+// All DOM events that can happen in this app
+type EventNameMap = HTMLElementEventMap & {
+  todonew: NewItemEvent;
+  tododelete: DeleteItemEvent;
+  tododone: DoneItemEvent;
+  filterchange: FilterChangeEvent;
+};
+
+// This application goes down the SPA rabbit hole and therefore has to deal with
+// event delegation in shadow roots. To make this palatable, the following
+// decorator (which is just a wrapper around @subscribe) has been adapted from
+// the readme.
+const capture = <T extends HTMLElement, K extends keyof EventNameMap>(
+  eventName: K,
+  selector = "*",
+) =>
+  subscribe<T, ShadowRoot, EventNameMap[K]>(
+    (el: T) => shadowRoots.get(el) ?? fail(),
+    eventName,
+    {
+      predicate: (_: unknown, evt: EventNameMap[K]) =>
+        evt.target instanceof HTMLElement && evt.target.matches(selector),
+    },
+  );
 
 // Everything above this line counts as the "framework" for the application, all
 // that follows is state management and the actual component code that builds
@@ -121,39 +163,6 @@ const filteredItems = computed(() =>
     return true;
   }),
 );
-
-// App-specific events that can lead to state changes.
-class NewItemEvent extends AppEvent {
-  readonly text: string;
-  constructor(text: string) {
-    super("todonew");
-    this.text = text;
-  }
-}
-
-class DeleteItemEvent extends AppEvent {
-  readonly id: number;
-  constructor(id: number) {
-    super("tododelete");
-    this.id = id;
-  }
-}
-
-class DoneItemEvent extends AppEvent {
-  readonly id: number;
-  constructor(id: number) {
-    super("tododone");
-    this.id = id;
-  }
-}
-
-class FilterChangeEvent extends AppEvent {
-  readonly value: Filter;
-  constructor(value: Filter) {
-    super("filterchange");
-    this.value = value;
-  }
-}
 
 // Input element plus submit button for new todo items. This class does not
 // actually create a proper new form element, but just wraps one and then throws
