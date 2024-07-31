@@ -5,7 +5,7 @@
   </picture>
 </h1>
 
-📢 **What's new in 1.3.0?** [Check out the Changelog!](./changelog.md)
+📢 **What's new in 2.0.0?** [Check out the Changelog!](./changelog.md)
 
 **Build your own frontend framework** with Ornament, a mid-level,
 pareto-optimal, treeshakable and tiny (< 5k) TypeScript-positive toolkit for web
@@ -160,8 +160,8 @@ window.customElements.define("my-greeter", MyGreeter);
 
 Ornament makes _only the most tedious bits_ of building vanilla web components
 (attribute handling and lifecycle reactions) easy by adding some primitives that
-really should be part of the standard, but aren't. Ornament is not a framework,
-but something that you might want to build your own framework on top of.
+really should be part of the standard, but aren't. **Ornament is not a framework,**
+but something that you want to build your own framework on top of.
 
 ## Guide
 
@@ -188,7 +188,8 @@ Ornament is **not a framework** but instead aims to be:
 
 - **as stable as possible** by remaining dependency-free, keeping its own code to an absolute minimum, and relying on iron-clad web standards where possible
 - **fast and lean** by being nothing more than just a bag of relatively small and simple functions
-- **malleable** by being easy to extend, easy to customize (through partial application) and easy to get rid of
+- supportive of **gradual** adoption and removal by being able to co-exist with vanilla web component code
+- **malleable** by being easy to extend, easy to customize, and easy to get rid of
 - **universal** by adhering to (the spirit of) web standards, thereby staying compatible with vanilla web component code as well as all sorts of web frameworks
 - equipped with **useful type definitions** (and work within the constraints of TypeScript)
 
@@ -237,24 +238,24 @@ universal, and will therefore more or less always keep chugging along.
 
 ### API overview
 
-| Decorator             | Class element     | `static` | `#private` | Symbols | Summary                                                                                                                           |
-| --------------------- | ----------------- | -------- | ---------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `@define()`           | Class             | -        | -          | -       | Register a custom element class with a tag name and set it up for use with Ornament's other decorators                            |
-| `@enhance()`          | Class             | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do _not_ register it with a tag name                  |
-| `@prop()`             | Accessor          | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                                             |
-| `@attr()`             | Accessor          | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type                             |
-| `@reactive()`         | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions) |
-| `@init()`             | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function after the class constructor finishes                                                         |
-| `@connected()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element connects to the DOM                                                         |
-| `@disconnected()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element disconnects from the DOM                                                    |
-| `@adopted()`          | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is adopted by a new document                                                |
-| `@formAssociated()`   | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element is associated with a form element                                           |
-| `@formReset()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's form owner resets                                                         |
-| `@formDisabled()`     | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                                             |
-| `@formStateRestore()` | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                                          |
-| `@subscribe()`        | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function to react to changes to a signal or to events on an EventTarget                               |
-| `@observe()`          | Method, Field[^2] | ✕        | ✓          | ✓       | Run a method or class field function as a callback for an IntersectionObserver, MutationObserver, or ResizeObserver               |
-| `@debounce()`         | Method, Field[^2] | ✓        | ✓          | ✓       | Debounce a method or class field function, (including `static`)                                                                   |
+| Decorator             | Class element               | `static` | `#private` | Symbols | Summary                                                                                                                           |
+| --------------------- | --------------------------- | -------- | ---------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `@define()`           | Class                       | -        | -          | -       | Register a custom element class with a tag name and set it up for use with Ornament's other decorators                            |
+| `@enhance()`          | Class                       | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do _not_ register it with a tag name                  |
+| `@prop()`             | Accessor                    | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                                             |
+| `@attr()`             | Accessor                    | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type                             |
+| `@reactive()`         | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions) |
+| `@init()`             | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function after the class constructor finishes                                                         |
+| `@connected()`        | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element connects to the DOM                                                         |
+| `@disconnected()`     | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element disconnects from the DOM                                                    |
+| `@adopted()`          | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element is adopted by a new document                                                |
+| `@formAssociated()`   | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element is associated with a form element                                           |
+| `@formReset()`        | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element's form owner resets                                                         |
+| `@formDisabled()`     | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                                             |
+| `@formStateRestore()` | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                                          |
+| `@subscribe()`        | Accessor, Method, Field[^2] | ✕        | ✓          | ✓       | Update a reactive accessor or run a method or class field function to react to changes to a signal or to events on an EventTarget |
+| `@observe()`          | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function as a callback for an IntersectionObserver, MutationObserver, or ResizeObserver               |
+| `@debounce()`         | Method, Field[^2]           | ✓        | ✓          | ✓       | Debounce a method or class field function, (including `static`)                                                                   |
 
 [^1]:
     Can be `#private` or a symbol _if_ a non-private non-symbol getter/setter
@@ -816,17 +817,21 @@ not work in Chrome-based browsers as of November 2023.
 
 ### `@subscribe(...args)`
 
-**Method or class field decorator** that causes decorated class methods or class
-field functions to subscribe to either
+**Accessor, method or class field decorator** that subscribes to either
 [Event Targets](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget) or
-[signals](https://github.com/preactjs/signals), depending on the arguments.
+[signals](https://github.com/preactjs/signals), depending on the arguments. If
+the decorated class member is a method or a function, it runs when the
+EventTarget emits a new event or when the signal receives a new value. If the
+decorated member is an accessor, it gets updated with the last event object (for
+event targets) or signal values (for signals) and in turn causes methods
+decorated with `@reactive()` to run.
 
 #### Subscribe to EventTargets: `@subscribe(targetOrTargetFactory, eventNames, options?)`
 
-Subscribe to one or more events an EventTarget. `EventTarget` is an interface
-that objects such as HTMLElement, Window, Document and _many_ more objects
-implement. You can also create a vanilla event target by calling
-`new EventTarget()`...
+Subscribe the decorated class member to one or more events an EventTarget.
+`EventTarget` is an interface that objects such as HTMLElement, Window, Document
+and _many_ more objects implement. You can also create a vanilla event target or
+extend the `EventTarget` class:
 
 ```javascript
 import { define, subscribe } from "@sirpepe/ornament";
@@ -835,7 +840,8 @@ const myTarget = new EventTarget();
 
 @define("my-test")
 class Test extends HTMLElement {
-  @subscribe(myTarget, "foo") log(evt) {
+  @subscribe(myTarget, "foo")
+  log(evt) {
     // evt = Event({ name: "foo", target: myTarget })
     // this = Test instance
     console.log(`'${evt.type}' event fired!`);
@@ -849,45 +855,19 @@ myTarget.dispatchEvent(new Event("foo"));
 // testEl.log logs "'foo' event fired!"
 ```
 
-... or you can build an event bus that implements EventTarget together with
-`@subscribe()` to keep your various components in sync:
+To subscribe to multiple events, pass a single string with the event names
+separated by whitespace:
 
 ```javascript
 import { define, subscribe } from "@sirpepe/ornament";
 
-class DataSource extends EventTarget {
-  #value = 0;
-  get value() {
-    return this.#value;
-  }
-  set value(newValue) {
-    this.#value = newValue;
-    this.dispatchEvent(new Event("change"));
-  }
-}
-
-const source = new DataSource();
+const myTarget = new EventTarget();
 
 @define("my-test")
 class Test extends HTMLElement {
-  #shadow = this.attachShadow({ mode: "open" });
-
-  @subscribe(source, "change") #update() {
-    this.#shadow.innerHTML = `Value is now ${source.value}`;
-  }
+  @subscribe(myTarget, "foo bar") #a() {} // subscribed to both "foo" and "bar"
 }
-
-let a = document.createElement("my-test");
-let b = document.createElement("my-test");
-
-source.value = 42;
 ```
-
-Both instances of `my-test` are now subscribed to `change` events on the data
-source and their shadow DOM content stays in sync.
-
-To subscribe to multiple events, pass a single string with the event names
-separated by whitespace.
 
 You can also provide a target-producing factory or promise in place of the
 target itself:
@@ -909,18 +889,6 @@ on the element instance, such as the element's shadow root. The factory function
 gets called each time an element initializes, with its first argument set to the
 instance.
 
-`@subscribe` can subscribe a method or function to more than one event at a time
-by accepting a whitespace-separated list of event names:
-
-```javascript
-import { define, subscribe } from "@sirpepe/ornament";
-
-@define("my-test")
-class Test extends HTMLElement {
-  @subscribe(window, "foo bar") #a() {} // subscribed to both "foo" and "bar"
-}
-```
-
 <details>
 <summary>Notes for TypeScript</summary>
 
@@ -930,7 +898,7 @@ you'll just have to `any` your way around that or provide this capability in
 a type-safe wrapper.
 
 Making the `@subscribe()` decorator type-safe for use with events is a gnarly
-operation. Given an event target and an event name, the decorator can't know
+prospect. Given an event target and an event name, the decorator can't know
 what type of event the method must expect. Therefore the following is possible
 by default:
 
@@ -952,35 +920,47 @@ class Test extends HTMLElement {
 A mapping between event names and corresponding event types (such as `"click"`
 → `MouseEvent`) exists for specific cases. For example `HTMLElementEventMap`
 contains the mappings for events emitted by HTML elements. But because
-`@subscribe()` can work with _any event target_, the existence of such a mapping
-can't be assumed. The only way around this is to provide the following type
-parameters to `@subscribe()`:
-
-- `T extends HTMLElement`: Type of the element instance
-- `U extends EventTarget`: Event target type
-- `N extends string`: Event name(s)
-- `M`: Mapping object (something like `HTMLElementEventMap`)
-
-This could then look like this:
+`@subscribe()` can work with _any event target_, the existence or relevancy of
+such a mapping can't be assumed. The only way around this is to create an
+abstraction for specific use cases where such a mapping is available. This can
+be based on `@subscribe()` itself:
 
 ```typescript
-import { define, subscribe } from "@sirpepe/ornament";
+// Create a variant of @subscribe() specific to DOM events
+const listen = <
+  T extends HTMLElement,
+  K extends keyof HTMLElementEventMap,
+>(
+  source: HTMLElement,
+  ...eventNames: K[]
+) =>
+  subscribe<T, HTMLElement, HTMLElementEventMap[K]>(
+    source,
+    eventNames.join(" "),
+  );
 
-let target = document.createElement("div");
-
-@define("my-test")
+const eventSource = document.createElement("div");
 class Test extends HTMLElement {
-  @subscribe<Test, HTMLElement, "click", HTMLElementEventMap>(target, "click")
-  #handleClicks(evt: MouseEvent) {} // This still type checks
+  // Works: "click" is a MouseEvent
+  @listen(eventSource, "click")
+  handleClick(evt: MouseEvent) {}
 
-  @subscribe<Test, HTMLElement, "click", HTMLElementEventMap>(target, "click")
-  #handleAnimations(evt: AnimationEvent) {} // This does no longer type check!
-}
+  // Works: all event types listed by name are covered in the union
+  @listen(eventSource, "transitionstart", "animationstart")
+  handleAnimationStart(evt: AnimationEvent | TransitionEvent) {}
+
+  // Type error: "focus" is not a mouse event
+  @listen(eventSource, "focus")
+  handleFocus(evt: MouseEvent) {}
+
+  // Type error: type "TransitionEvent" is not covered
+  @listen(eventSource, "transitionend", "animationend")
+  handleAnimationEnd(evt: AnimationEvent) {}
+
+  // Type error: "asdf" is not a DOM event
+  @listen(eventSource, "asdf")
+  handleAsdf(evt: Event) {}
 ```
-
-Passing this many type parameters is quite unacceptable from a DX perspective,
-but can be solved if you build new decorators on top of `@subscribe()` that are
-specific to certain event targets and their mappings.
 
 </details>
 
@@ -989,7 +969,8 @@ specific to certain event targets and their mappings.
 - **`targetOrTargetFactory` (EventTarget | Promise\<EventTarget\> | (instance: T) => EventTarget | Promise\<EventTarget\>)**: The event target (or event-target-returning function/promise) to subscribe to
 - **`eventNames` (string)**: The event(s) to listen to. To subscribe to multiple events, pass a single string with the event names separated by whitespace
 - **`options` (object, optional)**: Event handling options, consisting of...
-  - **predicate (function `(instance: T, event: Event) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the element instance and the event object, and must return a boolean
+  - **predicate (function `(instance: T, event: Event) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the element instance and the event object, and must return a boolean. Note that this method always handles the raw event object, before and eventual `transform()` is applied.
+  - **transform (function `<U>(instance: T, event: Event) => U`, optional)**: If provided, transforms the event object into something else. The decorated class element must be compatible with the type returned from `transform()`.
   - **activateOn (Array\<string\>, optional):** Ornament event on which to activate the subscription (that is, when to actually start listening on the EventTarget). Defaults to `["init", "connected"]`.
   - **deactivateOn (Array\<string\>, optional):** Ornament event on which to deactivate the subscription (when to call `removeEventListener()` on the EventTarget). Defaults to `["disconnected"]`.
   - **capture (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
@@ -1040,7 +1021,8 @@ to throw events around.
 
 - **`signal` (Signal)**: The signal to subscribe to
 - **`options` (object, optional)**: Update handling options, consisting of...
-  - **predicate (function `(instance: T, value) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given signal update. Gets passed the element instance and the signal's value, and must return a boolean
+  - **predicate (function `(instance: T, value) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given signal update. Gets passed the element instance and the signal's value, and must return a boolean. Note that this method always handles the raw signal value, before and eventual `transform()` is applied.
+  - **transform (function `<U>(instance: T, value) => U`, optional)**: If provided, transforms the signal value into something else. The decorated class element must be compatible with the type returned from `transform()`.
   - **activateOn (Array\<string\>, optional):** Ornament event on which to activate the subscription (that is, when to actually subscribe to the Signal). Defaults to `["init", "connected"]`.
   - **deactivateOn (Array\<string\>, optional):** Ornament event on which to unsubscribe from the signal. Defaults to `["disconnected"]`.
 
