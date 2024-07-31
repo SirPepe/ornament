@@ -161,52 +161,33 @@ export function assertTransformer<T extends HTMLElement, V>(
 export function assertContext(
   ctx: any,
   name: string,
-  kind: DecoratorContext["kind"] | "method/function",
+  kinds: string,
   allowStatic = false,
 ): void {
   if (ctx.static && !allowStatic) {
     throw new TypeError(`@${name} can't be used on static members`);
   }
-  if (kind.startsWith(ctx.kind)) {
-    return;
-  }
-  if (kind === "method/function" && ctx.kind === "field") {
-    ctx.addInitializer(function (this: any): void {
-      if (typeof ctx.access.get(this) !== "function") {
-        throw new TypeError(
-          `decorator @${name} can't be used on non-function type field`,
-        );
+  let ok = false;
+  for (const kind of kinds.split("/")) {
+    if ((kind === "function" && ctx.kind === "field") || kind === ctx.kind) {
+      ok = true;
+      // Ensure the field gets initialized with a matching type
+      if (kind === "function") {
+        ctx.addInitializer(function (this: any): void {
+          if (typeof ctx.access.get(this) !== "function") {
+            throw new TypeError(
+              `decorator @${name} can't be used on non-function type field`,
+            );
+          }
+        });
       }
-    });
-    return;
+    }
   }
-  throw new TypeError(`${kind} decorator @${name} used on ${ctx.kind}`);
+  if (!ok) {
+    throw new TypeError(`${kinds} decorator @${name} used on ${ctx.kind}`);
+  }
 }
 
-type Whitespace = " " | "\n";
-
-type TrimLeft<T extends string> = T extends `${Whitespace}${infer Rest}`
-  ? TrimLeft<Rest>
-  : T;
-
-type TrimRight<T extends string> = T extends `${infer Rest}${Whitespace}`
-  ? TrimRight<Rest>
-  : T;
-
-type Trim<T extends string> = TrimLeft<TrimRight<T>>;
-
-type Split<Str extends string, Last = never> = Str extends any
-  ? Trim<Str> extends `${infer First}${Whitespace}${infer Rest}`
-    ? Split<Rest, Split<First> | Last>
-    : Trim<Str> | Last
-  : never;
-
-type MapNames<Names extends string, BaseType, Source> = {
-  [Name in Split<Names>]: Name extends keyof Source ? Source[Name] : BaseType;
-}[Split<Names>];
-
-export type EventOf<Names extends string, Map> = Map extends never
-  ? Event
-  : MapNames<Names, Event, Map> extends Event
-    ? MapNames<Names, Event, Map>
-    : Event;
+export type NonOptional<Source, Keys extends keyof Source> = {
+  [Key in Keys]-?: Source[Key];
+} & Pick<Source, Exclude<keyof Source, Keys>>;

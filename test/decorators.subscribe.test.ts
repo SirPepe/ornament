@@ -1,6 +1,6 @@
 import { expect } from "@esm-bundle/chai";
 import { spy } from "sinon";
-import { define, subscribe, trigger } from "../src/index.js";
+import { define, reactive, subscribe, trigger } from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 import { signal } from "@preact/signals-core";
 const test = it;
@@ -14,8 +14,8 @@ describe("Decorators", () => {
         @define(generateTagName())
         class Test extends HTMLElement {
           @subscribe(counter)
-          test() {
-            fn(this, counter.value);
+          test(value: number) {
+            fn(this, value);
           }
         }
         const instance = new Test();
@@ -35,8 +35,8 @@ describe("Decorators", () => {
         @define(generateTagName())
         class Test extends HTMLElement {
           @subscribe(counter, { predicate: (_, v) => v % 2 === 0 })
-          test() {
-            fn(this, counter.value);
+          test(value: number) {
+            fn(this, value);
           }
         }
         const instance = new Test();
@@ -48,12 +48,55 @@ describe("Decorators", () => {
         expect(fn.getCalls()[1].args).to.eql([instance, 2]);
       });
 
+      test("subscribe a method to a signal with a transform", async () => {
+        const fn = spy();
+        const counter = signal(0);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(counter, { transform: (_, v) => String(v) })
+          test(value: string) {
+            fn(this, value);
+          }
+        }
+        const instance = new Test();
+        counter.value = 1;
+        counter.value = 2;
+        counter.value = 3;
+        expect(fn.callCount).to.equal(4);
+        expect(fn.getCalls()[0].args).to.eql([instance, "0"]);
+        expect(fn.getCalls()[1].args).to.eql([instance, "1"]);
+        expect(fn.getCalls()[2].args).to.eql([instance, "2"]);
+        expect(fn.getCalls()[3].args).to.eql([instance, "3"]);
+      });
+
+      test("subscribe a method to a signal with a predicate and a transform", async () => {
+        const fn = spy();
+        const counter = signal(0);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(counter, {
+            predicate: (_, v) => v % 2 === 0,
+            transform: (_, v) => String(v),
+          })
+          test(value: string) {
+            fn(this, value);
+          }
+        }
+        const instance = new Test();
+        counter.value = 1;
+        counter.value = 2;
+        counter.value = 3;
+        expect(fn.callCount).to.equal(2);
+        expect(fn.getCalls()[0].args).to.eql([instance, "0"]);
+        expect(fn.getCalls()[1].args).to.eql([instance, "2"]);
+      });
+
       test("subscribe a field function to a signal", async () => {
         const fn = spy();
         const counter = signal(0);
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(counter) test = () => fn(this, counter.value);
+          @subscribe(counter) test = (value: number) => fn(this, value);
         }
         const instance = new Test();
         counter.value = 1;
@@ -66,6 +109,51 @@ describe("Decorators", () => {
         expect(fn.getCalls()[3].args).to.eql([instance, 3]);
       });
 
+      test("subscribe an accessor to a signal", async () => {
+        const fn = spy();
+        const counter = signal(0);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(counter) accessor value: number = 0;
+          @reactive()
+          react() {
+            fn(this, this.value);
+          }
+        }
+        const instance = new Test();
+        counter.value = 1;
+        counter.value = 2;
+        counter.value = 3;
+        expect(fn.callCount).to.equal(4);
+        expect(fn.getCalls()[0].args).to.eql([instance, 0]);
+        expect(fn.getCalls()[1].args).to.eql([instance, 1]);
+        expect(fn.getCalls()[2].args).to.eql([instance, 2]);
+        expect(fn.getCalls()[3].args).to.eql([instance, 3]);
+      });
+
+      test("subscribe an accessor to a signal with a transform", async () => {
+        const fn = spy();
+        const counter = signal(0);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(counter, { transform: (_, x) => String(x) })
+          accessor value: string = "0";
+          @reactive()
+          react() {
+            fn(this, this.value);
+          }
+        }
+        const instance = new Test();
+        counter.value = 1;
+        counter.value = 2;
+        counter.value = 3;
+        expect(fn.callCount).to.equal(4);
+        expect(fn.getCalls()[0].args).to.eql([instance, "0"]);
+        expect(fn.getCalls()[1].args).to.eql([instance, "1"]);
+        expect(fn.getCalls()[2].args).to.eql([instance, "2"]);
+        expect(fn.getCalls()[3].args).to.eql([instance, "3"]);
+      });
+
       test("custom subscribe and unsubscribe triggers", async () => {
         const fn = spy();
         const counter = signal(0);
@@ -75,8 +163,8 @@ describe("Decorators", () => {
             activateOn: ["connected"],
             deactivateOn: ["disconnected"],
           })
-          test() {
-            fn(this, counter.value);
+          test(value: number) {
+            fn(this, value);
           }
         }
         // Init: no effect, subscription ony activates on connect
@@ -106,6 +194,42 @@ describe("Decorators", () => {
         // Synthetic second disconnect event should not have any effect
         trigger(instance, "disconnected");
       });
+
+      test("require the correct method types", async () => {
+        const counter = signal(0);
+        class Test extends HTMLElement {
+          // @ts-expect-error wrong parameter type
+          @subscribe(counter)
+          test0(value: string) {}
+          // @ts-expect-error wrong transformer result type
+          @subscribe(counter, { transform: (_, x) => Boolean(x) })
+          test1(value: string) {}
+        }
+      });
+
+      test("require the correct field function types", async () => {
+        const counter = signal(0);
+        class Test extends HTMLElement {
+          // @ts-expect-error wrong parameter type
+          @subscribe(counter)
+          test0 = (value: string) => {};
+          // @ts-expect-error wrong transformer result type
+          @subscribe(counter, { transform: (_, x) => Boolean(x) })
+          test1 = (value: string) => {};
+        }
+      });
+
+      test("require the correct signal types", async () => {
+        const counter = signal(0);
+        class Test extends HTMLElement {
+          // @ts-expect-error wrong parameter type
+          @subscribe(counter)
+          accessor test0: string = "";
+          // @ts-expect-error wrong transformer result type
+          @subscribe(counter, { transform: (_, x) => Boolean(x) })
+          accessor test1: string = "";
+        }
+      });
     });
 
     describe("@subscribe on event targets", () => {
@@ -126,6 +250,23 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
       });
 
+      test("subscribe a method to an event target with a transform", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "foo", { transform: (_, evt) => evt.bubbles })
+          test(data: boolean) {
+            fn(this, data);
+          }
+        }
+        const instance = new Test();
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, false]);
+      });
+
       test("subscribe a field function to an event target", async () => {
         const fn = spy();
         const target = new EventTarget();
@@ -139,6 +280,52 @@ describe("Decorators", () => {
         target.dispatchEvent(event);
         expect(fn.callCount).to.equal(1);
         expect(fn.getCalls()[0].args).to.eql([instance, event, target]);
+      });
+
+      test("subscribe a field function to an event target with a transform", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "foo", { transform: (_, evt) => evt.type })
+          test = (name: string) => fn(this, name);
+        }
+        const instance = new Test();
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, "foo"]);
+      });
+
+      test("subscribe an accessor to an event target", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "foo") accessor test: any;
+          @reactive() react = () => fn(this, this.test);
+        }
+        const instance = new Test();
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, event]);
+      });
+
+      test("subscribe an accessor to an event target with a transform", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "foo", { transform: (_, evt) => evt.target })
+          accessor test: any;
+          @reactive() react = () => fn(this, this.test);
+        }
+        const instance = new Test();
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, target]);
       });
 
       test("subscribe a method to multiple events on an event target", async () => {
@@ -385,6 +572,37 @@ describe("Decorators", () => {
         expect(fn.getCalls()[1].args).to.eql([instance, true]);
       });
 
+      test("subscribe a method with a transform", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        class TestEvent extends Event {
+          value: boolean;
+          constructor(value: boolean) {
+            super("test");
+            this.value = value;
+          }
+        }
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "test", {
+            transform: (_, evt: TestEvent) => evt.value,
+          })
+          test(value: boolean) {
+            fn(this, value);
+          }
+        }
+        const instance = new Test();
+        target.dispatchEvent(new TestEvent(true));
+        target.dispatchEvent(new TestEvent(false));
+        target.dispatchEvent(new TestEvent(true));
+        target.dispatchEvent(new TestEvent(false));
+        expect(fn.callCount).to.equal(4);
+        expect(fn.getCalls()[0].args).to.eql([instance, true]);
+        expect(fn.getCalls()[1].args).to.eql([instance, false]);
+        expect(fn.getCalls()[2].args).to.eql([instance, true]);
+        expect(fn.getCalls()[3].args).to.eql([instance, false]);
+      });
+
       test("subscribe a field function with a predicate", async () => {
         const fn = spy();
         const target = new EventTarget();
@@ -412,57 +630,70 @@ describe("Decorators", () => {
         expect(fn.getCalls()[1].args).to.eql([instance, true]);
       });
 
-      test("require the correct event types", async () => {
+      test("require the correct method types", async () => {
         const t = document.createElement("div");
         class Test extends HTMLElement {
-          @subscribe<Test, HTMLElement, "foo", HTMLElementEventMap>(t, "foo")
-          test1(evt: Event) {}
-          @subscribe<Test, HTMLElement, "click", HTMLElementEventMap>(
-            t,
-            "click",
-          )
-          test2(evt: MouseEvent) {}
-          @subscribe<Test, HTMLElement, "focus", HTMLElementEventMap>(
-            t,
-            "focus",
-          )
-          test3(evt: FocusEvent) {}
-          @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
-            t,
-            "focus click",
-          )
-          test4(evt: MouseEvent | FocusEvent) {}
-          @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
-            t,
-            // @ts-expect-error wrong event type
-            "foo",
-          )
-          test5(evt: MouseEvent) {}
-          @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
-            t,
-            // @ts-expect-error wrong event type
-            "focus",
-          )
-          test6(evt: MouseEvent) {}
-          // @ts-expect-error wrong event type
-          @subscribe<Test, HTMLElement, "focus click", HTMLElementEventMap>(
-            t,
-            "focus click",
-          )
-          test7(evt: DragEvent) {}
-          // Accept anything in the absence of generics
-          @subscribe(t, "whatever") test8(evt: DragEvent) {} // Yolo
+          // Most general case: some sort of unknown-to-TS event
+          @subscribe(t, "foo")
+          test0a(evt: Event) {}
+
+          // Unknown event, method claims to know what's going on
+          @subscribe(t, "foo")
+          test0b(evt: MouseEvent) {}
+
+          // @ts-expect-error not a subtype of Event at akk
+          @subscribe(t, "foo")
+          test0c(notAnEvent: number) {}
+
+          // With transform
+          @subscribe(t, "click", {
+            transform: (_, evt: MouseEvent) => evt.bubbles,
+          })
+          test1a(value: boolean) {}
+
+          // @ts-expect-error with transform, wrong method signature
+          @subscribe(t, "click", {
+            transform: (_, evt: MouseEvent) => evt.bubbles,
+          })
+          test1b(value: string) {}
         }
       });
 
-      test("handle line breaks in event strings", async () => {
-        const t = document.createElement("div");
+      test("abstraction specific to DOM events", async () => {
+        // Create a variant of subscribe specific to DOM events
+        const listen = <
+          T extends HTMLElement,
+          K extends keyof HTMLElementEventMap,
+        >(
+          source: HTMLElement,
+          ...eventNames: K[]
+        ) =>
+          subscribe<T, HTMLElement, HTMLElementEventMap[K]>(
+            source,
+            eventNames.join(" "),
+          );
+
+        const eventSource = document.createElement("div");
         class Test extends HTMLElement {
-          @subscribe<Test, HTMLElement, `click\nfocus`, HTMLElementEventMap>(
-            t,
-            `click\nfocus`,
-          )
-          test1(evt: MouseEvent | FocusEvent) {}
+          // Works: "click" is a MouseEvent
+          @listen(eventSource, "click")
+          handleClick(evt: MouseEvent) {}
+
+          // Works: all event types listed by name are covered in the union
+          @listen(eventSource, "transitionstart", "animationstart")
+          handleAnimationStart(evt: AnimationEvent | TransitionEvent) {}
+
+          // @ts-expect-error  "focus" is not a mouse event
+          @listen(eventSource, "focus")
+          handleFocus(evt: MouseEvent) {}
+
+          // @ts-expect-error  type "TransitionEvent" is not covered
+          @listen(eventSource, "transitionend", "animationend")
+          handleAnimationEnd(evt: AnimationEvent) {}
+
+          // @ts-expect-error  "asdf" is not a DOM event
+          @listen(eventSource, "asdf")
+          handleAsdf(evt: Event) {}
         }
       });
 
