@@ -27,7 +27,7 @@ import {
 @define("my-greeter")
 class MyGreeter extends HTMLElement {
   // No built-in rendering functionality. Shadow DOM or light DOM? Template
-  // library A, B, or C? Pick your own poison!
+  // strings, JSX, or something else entirely? You decide!
   #shadow = this.attachShadow({ mode: "open" });
 
   // Define content attributes alongside corresponding getter/setter pairs
@@ -161,7 +161,11 @@ window.customElements.define("my-greeter", MyGreeter);
 Ornament makes _only the most tedious bits_ of building vanilla web components
 (attribute handling and lifecycle reactions) easy by adding some primitives that
 really should be part of the standard, but aren't. **Ornament is not a framework,**
-but something that you want to build your own framework on top of.
+but something that you want to build your own framework on top of. Combine
+Ornament's baseline web component features with something like
+[uhtml](https://github.com/WebReflection/uhtml) or [Preact](https://preactjs.com/)
+for rending, add your favorite state management library, write some glue code
+and enjoy your very own frontend web framework.
 
 ## Guide
 
