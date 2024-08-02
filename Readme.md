@@ -283,7 +283,7 @@ console.log(document.createElement("my-test")); // instance of MyTest
 ```
 
 `@define()` also sets up attribute observation for use with the
-[@attr()](#attrtransformer-options) decorator, prepares the hooks for
+`@attr()` decorator, prepares the hooks for
 lifecycle decorators like `@connected()` and ensures that property upgrades for
 previously undefined elements happen in a predictable fashion.
 
@@ -408,8 +408,8 @@ class MyTest3 extends Base3 {}
 _without_ an associated content attribute. Such a property is more or less a
 regular accessor with two additional features:
 
-- it uses [transformers](#transformers) for type checking and validation
-- changes cause [@reactive()](#reactiveoptions) methods to run
+- it uses **transformers** for type checking and validation
+- changes cause class members decorated with `@reactive()` to run
 
 Example:
 
@@ -573,7 +573,7 @@ attributes will not cause `@reactive()` methods to run.
 
 ### `@reactive(options: ReactiveOptions = {})`
 
-**Method and class field decorator** that runs class members to run when
+**Method and class field decorator** that runs class members when
 accessors decorated with `@prop()` or `@attr()` change their values:
 
 ```javascript
@@ -601,7 +601,7 @@ testEl.bar = 2;
 Decorated members are called with no arguments. They react to changes to the
 instances' internal state and should therefore be able to access all relevant
 data through `this`. In many cases you may want to apply `@reactive()` to
-methods decorated with [@debounce()](#reactiveoptions) to prevent excessive
+methods decorated with `@debounce()` to prevent excessive
 calls.
 
 The `predicate` and/or `keys` options can be used to control whether the
@@ -815,7 +815,7 @@ can also still use the regular `formDisabledCallback()`.
 
 ### `@formStateRestore()`
 
-**Method and class field decorator** that causes decorated class methods to run
+**Method and class field decorator** that causes runs decorated class methods
 when a form-associated component's `formStateRestoreCallback()` fires. This does
 not work in Chrome-based browsers as of November 2023.
 
