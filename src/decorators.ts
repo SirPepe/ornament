@@ -5,7 +5,7 @@ import {
   type ClassAccessorDecorator,
   type Method,
   assertContext,
-  EventOf,
+  NonOptional,
 } from "./types.js";
 
 // Decorator Metadata does as of June 2024 not work reliably in Babel. Therefore
@@ -222,7 +222,8 @@ function runContextInitializerOnOrnamentInit<
   T extends HTMLElement,
   C extends
     | ClassMethodDecoratorContext<T, any>
-    | ClassFieldDecoratorContext<T, any>,
+    | ClassFieldDecoratorContext<T, any>
+    | ClassAccessorDecoratorContext<T, any>,
 >(context: C, initializer: (instance: T) => void): void {
   context.addInitializer(function (this: any) {
     // The (last) init event has already happened, call initializer function
@@ -296,17 +297,33 @@ type SubscribeBaseOptions = {
   deactivateOn?: (keyof OrnamentEventMap)[]; // defaults to ["disconnected"]
 };
 
-type EventSubscribeOptions<T, V extends Event> = AddEventListenerOptions &
-  SubscribeBaseOptions & { predicate?: (instance: T, event: V) => boolean };
-type SignalSubscribeOptions<T, V> = SubscribeBaseOptions & {
+type EventSubscribeOptionsWithoutTransform<
+  T,
+  E extends Event,
+> = AddEventListenerOptions &
+  SubscribeBaseOptions & {
+    predicate?: (instance: T, event: E) => boolean;
+  };
+
+type EventSubscribeOptionsWithTransform<
+  T,
+  E extends Event,
+  V,
+> = EventSubscribeOptionsWithoutTransform<T, E> & {
+  transform: (instance: T, value: E) => V;
+};
+
+type SignalSubscribeOptions<T, V, U> = SubscribeBaseOptions & {
+  transform?: (instance: T, value: V) => U;
   predicate?: (instance: T, value: V) => boolean;
 };
 
-type EventSubscribeDecorator<T, E extends Event> = (
+type EventSubscribeDecorator<T, V> = (
   value: unknown,
   context:
-    | ClassMethodDecoratorContext<T, Method<T, [E]>>
-    | ClassFieldDecoratorContext<T, Method<T, [E]>>,
+    | ClassMethodDecoratorContext<T, Method<T, [V]>>
+    | ClassFieldDecoratorContext<T, Method<T, [V]>>
+    | ClassAccessorDecoratorContext<T, V>,
 ) => void;
 
 type EventTargetOrFactory<T, U extends EventTarget> =
@@ -314,9 +331,12 @@ type EventTargetOrFactory<T, U extends EventTarget> =
   | ((instance: T) => EventTargetOrFactory<T, U>)
   | Promise<EventTargetOrFactory<T, U>>;
 
-type SignalSubscribeDecorator<T> = (
+type SignalSubscribeDecorator<T, V> = (
   value: unknown,
-  context: ClassMethodDecoratorContext<T> | ClassFieldDecoratorContext<T>,
+  context:
+    | ClassMethodDecoratorContext<T, Method<T, [V]>>
+    | ClassFieldDecoratorContext<T, Method<T, [V]>>
+    | ClassAccessorDecoratorContext<T, V>,
 ) => void;
 
 type SignalLike<T> = {
@@ -349,20 +369,31 @@ function unwrapTarget<T extends HTMLElement, U extends EventTarget>(
 
 function subscribeToEventTarget<
   T extends HTMLElement,
-  U extends EventTarget,
+  S extends EventTarget,
   V extends Event,
+  U,
 >(
   context:
-    | ClassMethodDecoratorContext<T, Method<T, [V]>>
-    | ClassFieldDecoratorContext<T, Method<T, [V]>>,
-  targetOrFactory: EventTargetOrFactory<T, U>,
+    | ClassMethodDecoratorContext<T, Method<T, [U]>>
+    | ClassFieldDecoratorContext<T, Method<T, [U]>>
+    | ClassAccessorDecoratorContext<T, U>,
+  targetOrFactory: EventTargetOrFactory<T, S>,
   eventNames: string,
-  options: EventSubscribeOptions<T, V>,
+  options: NonOptional<
+    EventSubscribeOptionsWithTransform<T, V, U>,
+    "activateOn" | "activateOn" | "transform"
+  >,
 ): void {
   return runContextInitializerOnOrnamentInit(context, (instance: T) => {
-    const callback = (evt: V) => {
-      if (!options.predicate || options.predicate(instance, evt)) {
-        context.access.get(instance).call(instance, evt);
+    const callback = (originalEvent: V) => {
+      if (!options.predicate || options.predicate(instance, originalEvent)) {
+        const transformedValue = options.transform(instance, originalEvent);
+        if (context.kind === "accessor") {
+          context.access.set(instance, transformedValue);
+          trigger(instance, "prop", context.name, transformedValue);
+        } else {
+          context.access.get(instance).call(instance, transformedValue);
+        }
       }
     };
     unwrapTarget(targetOrFactory, instance, (target) => {
@@ -385,17 +416,27 @@ function subscribeToEventTarget<
   });
 }
 
-function subscribeToSignal<T extends HTMLElement, S extends SignalLike<any>>(
+function subscribeToSignal<T extends HTMLElement, S extends SignalLike<any>, U>(
   context:
-    | ClassMethodDecoratorContext<T, Method<T, [SignalType<S>]>>
-    | ClassFieldDecoratorContext<T, Method<T, [SignalType<S>]>>,
+    | ClassMethodDecoratorContext<T, Method<T, [U]>>
+    | ClassFieldDecoratorContext<T, Method<T, [U]>>
+    | ClassAccessorDecoratorContext<T, U>,
   target: S,
-  options: SignalSubscribeOptions<T, SignalType<S>>,
+  options: NonOptional<
+    SignalSubscribeOptions<T, SignalType<S>, U>,
+    "activateOn" | "activateOn" | "transform"
+  >,
 ): void {
   return runContextInitializerOnOrnamentInit(context, (instance: T) => {
-    const callback = (value: SignalType<S>) => {
-      if (!options.predicate || options.predicate(instance, value)) {
-        context.access.get(instance).call(instance, value);
+    const callback = (originalValue: SignalType<S>) => {
+      if (!options.predicate || options.predicate(instance, originalValue)) {
+        const transformedValue = options.transform(instance, originalValue);
+        if (context.kind === "accessor") {
+          context.access.set(instance, transformedValue);
+          trigger(instance, "prop", context.name, transformedValue);
+        } else {
+          context.access.get(instance).call(instance, transformedValue);
+        }
       }
     };
     let cancel: null | (() => void) = null;
@@ -417,37 +458,59 @@ function subscribeToSignal<T extends HTMLElement, S extends SignalLike<any>>(
   });
 }
 
+// Overload 1.1: signal without transform
 export function subscribe<T extends HTMLElement, S extends SignalLike<any>>(
   target: S,
-  options?: SignalSubscribeOptions<T, SignalType<S>>,
-): SignalSubscribeDecorator<T>;
+  options?: SignalSubscribeOptions<T, SignalType<S>, SignalType<S>>,
+): SignalSubscribeDecorator<T, SignalType<S>>;
+// Overload 1.2: signal with transform SignalType<S> -> U
+export function subscribe<T extends HTMLElement, S extends SignalLike<any>, U>(
+  target: S,
+  options?: SignalSubscribeOptions<T, SignalType<S>, U>,
+): SignalSubscribeDecorator<T, U>;
+// Overload 2.1: Event target without transform
 export function subscribe<
   T extends HTMLElement,
   U extends EventTarget,
-  N extends string,
-  M = never,
+  E extends Event,
 >(
   targetOrFactory: EventTargetOrFactory<T, U>,
-  names: N,
-  options?: EventSubscribeOptions<T, EventOf<N, M>>,
-): EventSubscribeDecorator<T, EventOf<N, M>>;
+  names: string,
+  options?: EventSubscribeOptionsWithoutTransform<T, E>,
+): EventSubscribeDecorator<T, E>;
+// Overload 2.2: Event target with transform
+export function subscribe<
+  T extends HTMLElement,
+  U extends EventTarget,
+  E extends Event,
+  R,
+>(
+  targetOrFactory: EventTargetOrFactory<T, U>,
+  names: string,
+  options: EventSubscribeOptionsWithTransform<T, E, R>,
+): EventSubscribeDecorator<T, R>;
+// Implementation, thanks to too many overloads without much of any internal
+// type safety. Hooray for flexibility...
 export function subscribe<T extends HTMLElement>(
-  targetOrFactory: EventTargetOrFactory<T, any> | SignalLike<any>,
+  targetOrFactory: SignalLike<any> | EventTargetOrFactory<T, any>,
   namesOrOptions?:
-    | EventSubscribeOptions<T, any>
-    | SignalSubscribeOptions<T, any>
+    | EventSubscribeOptionsWithTransform<T, any, any>
+    | EventSubscribeOptionsWithoutTransform<T, any>
+    | SignalSubscribeOptions<T, any, any>
     | string,
   options:
-    | EventSubscribeOptions<T, any>
-    | SignalSubscribeOptions<T, any> = EMPTY_OBJ,
-): EventSubscribeDecorator<T, any> | SignalSubscribeDecorator<T> {
+    | EventSubscribeOptionsWithTransform<T, any, any>
+    | EventSubscribeOptionsWithoutTransform<T, any>
+    | undefined = EMPTY_OBJ,
+): SignalSubscribeDecorator<T, any> | EventSubscribeDecorator<T, any> {
   return function (
     _: unknown,
     context:
-      | ClassMethodDecoratorContext<T, Method<T, [any]>>
-      | ClassFieldDecoratorContext<T, Method<T, [any]>>,
+      | ClassMethodDecoratorContext<T, any>
+      | ClassFieldDecoratorContext<T, any>
+      | ClassAccessorDecoratorContext<T, any>,
   ): void {
-    assertContext(context, "subscribe", "method/function");
+    assertContext(context, "subscribe", "method/function/accessor");
     // Arguments for subscribing to an event target
     if (
       (typeof targetOrFactory === "function" ||
@@ -455,14 +518,12 @@ export function subscribe<T extends HTMLElement>(
         "then" in targetOrFactory) &&
       typeof namesOrOptions === "string"
     ) {
-      options.activateOn ??= ["init", "connected"];
-      options.deactivateOn ??= ["disconnected"];
-      return subscribeToEventTarget(
-        context,
-        targetOrFactory,
-        namesOrOptions,
-        options,
-      );
+      return subscribeToEventTarget(context, targetOrFactory, namesOrOptions, {
+        transform: (_, x) => x,
+        activateOn: ["init", "connected"],
+        deactivateOn: ["disconnected"],
+        ...options,
+      });
     }
     // Arguments for subscribing to a signal
     if (
@@ -470,10 +531,12 @@ export function subscribe<T extends HTMLElement>(
       (typeof namesOrOptions === "object" ||
         typeof namesOrOptions === "undefined")
     ) {
-      namesOrOptions ??= {};
-      namesOrOptions.activateOn ??= ["init", "connected"];
-      namesOrOptions.deactivateOn ??= ["disconnected"];
-      return subscribeToSignal(context, targetOrFactory, namesOrOptions);
+      return subscribeToSignal(context, targetOrFactory, {
+        transform: (_, x) => x,
+        activateOn: ["init", "connected"],
+        deactivateOn: ["disconnected"],
+        ...namesOrOptions,
+      });
     }
     throw new Error("Invalid arguments to @subscribe");
   };

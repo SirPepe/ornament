@@ -182,7 +182,7 @@ export function number<T extends HTMLElement>(
   return createTransformer<T, any>({
     parse(value) {
       if (value === null) {
-        return nullable ? null : initialValues.get(this) ?? 0;
+        return nullable ? null : (initialValues.get(this) ?? 0);
       }
       const asNumber = Number(value);
       if (Number.isNaN(asNumber)) {
@@ -255,7 +255,7 @@ export function int<T extends HTMLElement>(
   return createTransformer<T, any>({
     parse(value) {
       if (value === null) {
-        return nullable ? null : initialValues.get(this) ?? 0n;
+        return nullable ? null : (initialValues.get(this) ?? 0n);
       }
       try {
         return clamp(parseBigInt(value), min, max);

@@ -4,6 +4,9 @@ import { define, observe } from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 const test = it;
 
+// Observers are async and test may be quite slow
+const TIMEOUT = 250;
+
 describe("Decorators", () => {
   describe("@observe", () => {
     describe("MutationObserver", () => {
@@ -22,7 +25,7 @@ describe("Decorators", () => {
         }
         const instance = new Test();
         instance.innerText = `Test`;
-        await wait(); // Mutation observers are async
+        await wait(TIMEOUT); // Mutation observers are async
         expect(fn.callCount).to.equal(1);
         expect(fn.getCalls()[0].args).to.eql([instance, ["childList"], true]);
       });
@@ -43,7 +46,7 @@ describe("Decorators", () => {
         const instance = new Test();
         document.body.append(instance);
         instance.innerText = `Test`;
-        await wait(); // Mutation observers are async
+        await wait(TIMEOUT); // Mutation observers are async
         expect(fn.callCount).to.equal(1);
         expect(fn.getCalls()[0].args).to.eql([instance, ["childList"], true]);
       });
@@ -67,18 +70,18 @@ describe("Decorators", () => {
         }
         const instance = new Test();
         instance.innerText = `Test 1`;
-        await wait(100); // Mutation observers are async
+        await wait(TIMEOUT); // Mutation observers are async
         expect(fn.callCount).to.equal(0); // Nothing happens, not connected
         document.body.append(instance); // connect
-        await wait(100); // Mutation observers are async
+        await wait(TIMEOUT); // Mutation observers are async
         expect(fn.callCount).to.equal(0); // No changes since connecting
         instance.innerText = `Test 2`;
-        await wait(100); // Mutation observers are async
+        await wait(TIMEOUT); // Mutation observers are async
         expect(fn.callCount).to.equal(1); // collect records when connected
         expect(fn.getCalls()[0].args).to.eql([instance, ["childList"], true]);
         instance.remove(); // disconnect
         instance.innerText = `Test 3`;
-        await wait(100); // Mutation observers are async
+        await wait(TIMEOUT); // Mutation observers are async
         expect(fn.callCount).to.equal(1); // No new changes
       });
     });
@@ -101,14 +104,14 @@ describe("Decorators", () => {
           }
         }
         const instance = new Test();
-        await wait(100); // Intersection observers are async
+        await wait(TIMEOUT); // Intersection observers are async
         expect(fn.callCount).to.equal(1);
         expect(fn.getCalls()[0].args).to.eql([instance, [false], true]);
       });
     });
 
     describe("ResizeObserver", () => {
-      test.only("Observe resizes", async () => {
+      test("Observe resizes", async () => {
         const fn = spy();
         @define(generateTagName())
         class Test extends HTMLElement {
@@ -122,7 +125,7 @@ describe("Decorators", () => {
           }
         }
         const instance = new Test();
-        await wait(100); // Resize observers are async
+        await wait(TIMEOUT); // Resize observers are async
         expect(fn.callCount).to.equal(1);
         const [self, records, typeCheck] = fn.getCalls()[0].args;
         expect(self).to.equal(instance);
