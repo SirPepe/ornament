@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.0
+
+### FEATURE: Decorator metadata
+
+Ornament, being a collection of decorators, now stores its metadata in
+[Decorator Metadata](https://github.com/tc39/proposal-decorator-metadata). To
+avoid collisions with other libraries, the actual metadata is hidden behind a
+symbol that is exported by Ornament as `METADATA` or available behind the key
+`"ORNAMENT_METADATA"` in the global symbol registry. The contents of the
+metadata record should not be considered part of Ornament's stable API and
+could change at any moment. Use with caution!
+
+### Other changes in 2.0.1
+
+Bump dependencies.
+
 ## 2.0.0
 
 ### BREAKING: Event name mapping removed from `@subscribe()`

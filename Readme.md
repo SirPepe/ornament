@@ -1712,8 +1712,18 @@ create your own events while using TypeScript.
 ### `NO_VALUE`
 
 Transformers can return a special symbol to indicate that they were unable to
-parse an input. This symbol is exported by Ornament as `NO_VALUE` or available
-under the key `"ORNAMENT_NO_VALUE"` in the global symbol registry.
+parse an input. This symbol is exported by Ornament as `NO_VALUE` and is also
+available behind the key `"ORNAMENT_NO_VALUE"` in the global symbol registry.
+
+### `METADATA`
+
+Ornament, being a collection of decorators, stores its metadata in
+[Decorator Metadata](https://github.com/tc39/proposal-decorator-metadata). To
+avoid collisions with other libraries, the actual metadata is hidden behind a
+symbol that is exported by Ornament as `METADATA` or available behind the key
+`"ORNAMENT_METADATA"` in the global symbol registry. The contents of the
+metadata record should not be considered part of Ornament's stable API and
+could change at any moment. Use with caution!
 
 ## Troubleshooting
 

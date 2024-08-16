@@ -1,5 +1,5 @@
 import { listen, trigger } from "./bus.js";
-import { EMPTY_OBJ, NO_VALUE } from "./lib.js";
+import { EMPTY_OBJ, METADATA, NO_VALUE } from "./lib.js";
 import {
   type Transformer,
   type ClassAccessorDecorator,
@@ -8,40 +8,32 @@ import {
   NonOptional,
 } from "./types.js";
 
-// Decorator Metadata does as of June 2024 not work reliably in Babel. Therefore
-// metadata in this module is a bunch of manually managed WeakMaps until Babel's
-// issues are fixed. The first bit of metadata maps debounced methods to their
-// originals, scoped by component instance. This is required to make @init()
-// calls run synchronously, even if @debounce() was applied to the method in
-// question.
-const ALL_DEBOUNCED_METHODS = new WeakMap<
-  object,
-  WeakMap<Method<any, any>, Method<any, any>>
->();
-
-// This should really be scoped on a class-by-class basis, but the @attr()
-// decorator has no context without decorator metadata (which, again, is too
-// unreliable in Babel as of June 2024). The list of observable attributes must
-// be available before the accessor initializers run, so the only way forward is
-// to observe every attribute defined by @attr() on all classes.
-const ALL_ATTRIBUTES = new Set<string>();
+type Metadata = {
+  attributes: Set<string>;
+  methods: WeakMap<Method<any, any>, Method<any, any>>;
+};
 
 // Can be rewritten to support decorator metadata once that's fixed.
-function getMetadata(key: "attributes"): Set<string>;
+function getMetadata(
+  key: "attributes",
+  context: { readonly metadata: DecoratorMetadata },
+): Set<string>;
 function getMetadata(
   key: "methods",
-  context: object,
+  context: { readonly metadata: DecoratorMetadata },
 ): WeakMap<Method<any, any>, Method<any, any>>;
-function getMetadata(key: "attributes" | "methods", context?: any): any {
+function getMetadata(
+  key: "attributes" | "methods",
+  context: { readonly metadata: DecoratorMetadata },
+): any {
+  const metadata = ((context.metadata[METADATA] as Metadata) ??= {
+    attributes: new Set(),
+    methods: new WeakMap(),
+  });
   if (key === "attributes") {
-    return ALL_ATTRIBUTES;
+    return metadata.attributes;
   }
-  let methodMap = ALL_DEBOUNCED_METHODS.get(context);
-  if (!methodMap) {
-    methodMap = new WeakMap();
-    ALL_DEBOUNCED_METHODS.set(context, methodMap);
-  }
-  return methodMap;
+  return metadata.methods;
 }
 
 // Explained in @enhance()
@@ -119,7 +111,10 @@ export function enhance<T extends CustomElementConstructor>(): (
       }
 
       static get observedAttributes(): string[] {
-        return [...originalObservedAttributes, ...getMetadata("attributes")];
+        return [
+          ...originalObservedAttributes,
+          ...getMetadata("attributes", context),
+        ];
       }
 
       connectedCallback(): void {
@@ -251,7 +246,7 @@ export function init<T extends HTMLElement>(): LifecycleDecorator<
     assertContext(context, "init", "method/function");
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
       const method = context.access.get(instance);
-      (getMetadata("methods", instance).get(method) ?? method).call(instance);
+      (getMetadata("methods", context).get(method) ?? method).call(instance);
     });
   };
 }
@@ -689,7 +684,7 @@ export function attr<T extends HTMLElement, V>(
     // Add the name to the set of all observed attributes, even if "reflective"
     // is false. The content attribute must in all cases be observed to enable
     // the message bus to emit events.
-    getMetadata("attributes").add(contentAttrName);
+    getMetadata("attributes", context).add(contentAttrName);
 
     // If the attribute needs to be observed and the accessor initializes,
     // register the attribute handler callback with the current element
@@ -874,7 +869,7 @@ export function debounce<
       return context.addInitializer(function (): void {
         const func = context.access.get(this);
         const debounced = fn(func).bind(this);
-        getMetadata("methods", this).set(debounced, func);
+        getMetadata("methods", context).set(debounced, func);
         context.access.set(this, debounced as F);
       });
     }
@@ -885,7 +880,7 @@ export function debounce<
     const debounced = fn(func);
     if (!context.static) {
       context.addInitializer(function (): void {
-        getMetadata("methods", this).set(debounced, func);
+        getMetadata("methods", context).set(debounced, func);
       });
     }
     return debounced as F;
