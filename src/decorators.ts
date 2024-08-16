@@ -9,7 +9,7 @@ import {
 } from "./types.js";
 
 type Metadata = {
-  attributes: Set<string>;
+  attributes: Map<string, Transformer<any, any>>;
   methods: WeakMap<Method<any, any>, Method<any, any>>;
 };
 
@@ -17,23 +17,19 @@ type Metadata = {
 function getMetadata(
   key: "attributes",
   context: { readonly metadata: DecoratorMetadata },
-): Set<string>;
+): Metadata["attributes"];
 function getMetadata(
   key: "methods",
   context: { readonly metadata: DecoratorMetadata },
-): WeakMap<Method<any, any>, Method<any, any>>;
+): Metadata["methods"];
 function getMetadata(
   key: "attributes" | "methods",
   context: { readonly metadata: DecoratorMetadata },
-): any {
-  const metadata = ((context.metadata[METADATA] as Metadata) ??= {
-    attributes: new Set(),
+): Metadata["methods" | "attributes"] {
+  return ((context.metadata[METADATA] as Metadata) ??= {
+    attributes: new Map(),
     methods: new WeakMap(),
-  });
-  if (key === "attributes") {
-    return metadata.attributes;
-  }
-  return metadata.methods;
+  })[key];
 }
 
 // Explained in @enhance()
@@ -113,7 +109,7 @@ export function enhance<T extends CustomElementConstructor>(): (
       static get observedAttributes(): string[] {
         return [
           ...originalObservedAttributes,
-          ...getMetadata("attributes", context),
+          ...getMetadata("attributes", context).keys(),
         ];
       }
 
@@ -684,7 +680,7 @@ export function attr<T extends HTMLElement, V>(
     // Add the name to the set of all observed attributes, even if "reflective"
     // is false. The content attribute must in all cases be observed to enable
     // the message bus to emit events.
-    getMetadata("attributes", context).add(contentAttrName);
+    getMetadata("attributes", context).set(contentAttrName, transformer);
 
     // If the attribute needs to be observed and the accessor initializes,
     // register the attribute handler callback with the current element
