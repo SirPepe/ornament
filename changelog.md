@@ -12,9 +12,10 @@ symbol that is exported by Ornament as `METADATA` or available behind the key
 metadata record should not be considered part of Ornament's stable API and
 could change at any moment. Use with caution!
 
-### Other changes in 2.0.1
+### Other changes in 2.1.0
 
-Bump dependencies.
+Bump dependencies, run tests against playwright's "webkit" browser too (for
+whatever that's worth.)
 
 ## 2.0.0
 

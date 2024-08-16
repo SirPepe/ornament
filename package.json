@@ -15,7 +15,7 @@
   },
   "scripts": {
     "lint": "npx prettier . --check && eslint",
-    "test": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve --playwright --browsers chromium firefox",
+    "test": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve --playwright --browsers chromium firefox webkit",
     "test-dev": "NODE_ENV=test web-test-runner test/**/*.test.ts --node-resolve",
     "build": "npm run lint && rollup -c rollup.config.mjs && npm run size",
     "build-examples": "cd examples && rollup -c rollup.config.mjs",
