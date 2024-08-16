@@ -13,15 +13,16 @@ export class OrnamentEvent<K extends keyof OrnamentEventMap> extends Event {
   }
 }
 
-export function trigger<
-  T extends HTMLElement,
-  K extends keyof OrnamentEventMap,
->(instance: T, name: K, ...args: OrnamentEventMap[K]): void {
+export function trigger<T, K extends keyof OrnamentEventMap>(
+  instance: T,
+  name: K,
+  ...args: OrnamentEventMap[K]
+): void {
   const target = ((instance as any)[EVENT_BUS_TARGET] ??= new EventTarget());
   target.dispatchEvent(new OrnamentEvent(name, args));
 }
 
-export function listen<T extends HTMLElement, K extends keyof OrnamentEventMap>(
+export function listen<T, K extends keyof OrnamentEventMap>(
   instance: T,
   name: K,
   callback: (this: T, ...args: OrnamentEventMap[K]) => void,

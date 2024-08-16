@@ -22,11 +22,7 @@ export type Optional<T> = {
   [P in keyof T]?: T[P] | undefined | null;
 };
 
-export type Transformer<
-  T extends HTMLElement,
-  Value,
-  IntermediateValue = Value,
-> = {
+export type Transformer<T, Value, IntermediateValue = Value> = {
   // Validates and/or transforms a value before it is used to initialize the
   // accessor. Can also be used to run a side effect when the accessor
   // initializes. Defaults to the identity function.
@@ -138,7 +134,7 @@ export function assertType<K extends keyof Types>(
   }
 }
 
-export function assertTransformer<T extends HTMLElement, V>(
+export function assertTransformer<T, V>(
   input: unknown,
   fieldName = "transformer",
 ): asserts input is Transformer<T, V> {
