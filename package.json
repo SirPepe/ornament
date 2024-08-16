@@ -56,8 +56,8 @@
     "@rollup/plugin-terser": "^0.4.3",
     "@types/mocha": "^10.0.3",
     "@types/sinon": "^17.0.0",
-    "@typescript-eslint/eslint-plugin": "^7.6.0",
-    "@typescript-eslint/parser": "^7.6.0",
+    "@typescript-eslint/eslint-plugin": "^8.1.0",
+    "@typescript-eslint/parser": "^8.1.0",
     "@web/dev-server-rollup": "^0.6.0",
     "@web/test-runner": "^0.18.0",
     "@web/test-runner-playwright": "^0.11.0",
@@ -70,7 +70,7 @@
     "rollup": "^4.2.0",
     "sinon": "^18.0.0",
     "typescript": "5.5",
-    "typescript-eslint": "^7.14.1",
+    "typescript-eslint": "^8.1.0",
     "uhtml": "^4.5.0"
   }
 }
