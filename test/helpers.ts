@@ -1,3 +1,5 @@
+(Symbol as any).metadata ??= Symbol.for("Symbol.metadata");
+
 export const wait = (t = 0, x?: any) =>
   new Promise<any>((r) => setTimeout(() => r(x), t));
 

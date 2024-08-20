@@ -1,4 +1,4 @@
-import { NO_VALUE, isArray } from "./lib.js";
+import { NO_VALUE } from "./lib.js";
 
 declare global {
   interface OrnamentEventMap {
@@ -17,10 +17,6 @@ declare global {
     ];
   }
 }
-
-export type Optional<T> = {
-  [P in keyof T]?: T[P] | undefined | null;
-};
 
 export type Transformer<T, Value, IntermediateValue = Value> = {
   // Validates and/or transforms a value before it is used to initialize the
@@ -136,7 +132,7 @@ export function assertType<K extends keyof Types>(
 
 export function assertTransformer<T, V>(
   input: unknown,
-  fieldName = "transformer",
+  fieldName = "transform",
 ): asserts input is Transformer<T, V> {
   assertRecord(input, fieldName);
   for (const method of [
@@ -187,3 +183,7 @@ export function assertContext(
 export type NonOptional<Source, Keys extends keyof Source> = {
   [Key in Keys]-?: Source[Key];
 } & Pick<Source, Exclude<keyof Source, Keys>>;
+
+export type Optional<T> = {
+  [P in keyof T]?: T[P] | undefined | null;
+};

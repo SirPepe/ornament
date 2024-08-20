@@ -1,4 +1,4 @@
-import { EMPTY_OBJ, NO_VALUE, isArray } from "./lib.js";
+import { NO_VALUE } from "./lib.js";
 import {
   assertRecord,
   assertType,
@@ -86,7 +86,9 @@ export function string<T extends object>(): Transformer<T, string> {
 }
 
 // behaves like href on <a>
-export function href<T extends object>(): Transformer<T, string> {
+export function href<T extends object>({
+  location = window.location,
+}: { location?: Location } = {}): Transformer<T, string> {
   const currentValues = new WeakMap<T, string | null>();
   const defaultValues = new WeakMap<T, string>();
   return createTransformer<T, string>({
@@ -109,7 +111,7 @@ export function href<T extends object>(): Transformer<T, string> {
       if (currentValues.get(this) === null) {
         return defaultValues.get(this)!;
       }
-      return String(new URL(value, String(window.location)));
+      return String(new URL(value, String(location)));
     },
     init(value = "") {
       currentValues.set(this, null);
@@ -164,7 +166,7 @@ export function number<T extends object>(
   options?: Optional<NumberOptions>,
 ): Transformer<T, number>;
 export function number<T extends object>(
-  options: Optional<NumberOptions> = EMPTY_OBJ,
+  options: Optional<NumberOptions> = {},
 ): Transformer<T, any> {
   const initialValues = new WeakMap<T, number>();
   const { min, max, allowNaN, nullable } = numberOptions(options);
@@ -241,7 +243,7 @@ export function int<T extends object>(
   options?: Optional<IntOptions>,
 ): Transformer<T, bigint>;
 export function int<T extends object>(
-  options: Optional<IntOptions> = EMPTY_OBJ,
+  options: Optional<IntOptions> = {},
 ): Transformer<T, any> {
   const initialValues = new WeakMap<T, bigint>();
   const { min, max, nullable } = bigintOptions(options);
@@ -288,7 +290,7 @@ type JSONOptions = {
 };
 
 export function json<T extends object>(
-  options: JSONOptions = EMPTY_OBJ,
+  options: JSONOptions = {},
 ): Transformer<T, any> {
   const initialValues = new WeakMap<T, any>();
   return createTransformer<T, any>({
@@ -331,12 +333,12 @@ type LiteralOptions<T, V> = {
 };
 
 function literalOptions<T extends object, V>(
-  input: unknown = EMPTY_OBJ,
+  input: unknown = {},
 ): LiteralOptions<T, V> {
   assertRecord(input, "options");
   const { values, transform } = input;
   assertTransformer<T, V>(transform, "transform");
-  if (!isArray(values)) {
+  if (!Array.isArray(values)) {
     throw new TypeError(
       `Expected "values" to be array, got "${typeof values}".`,
     );
@@ -390,9 +392,7 @@ type ListOptions<T, V> = {
   transform: Transformer<T, V>;
 };
 
-function listOptions<T, V>(
-  input: unknown = EMPTY_OBJ,
-): Required<ListOptions<T, V>> {
+function listOptions<T, V>(input: unknown = {}): Required<ListOptions<T, V>> {
   assertRecord(input, "options");
   const { separator = ",", transform } = input;
   assertTransformer<T, V>(transform);
@@ -413,7 +413,7 @@ export function list<T extends object, V>(
     values: unknown,
     isContentAttribute: boolean,
   ): void {
-    if (!isArray(values)) {
+    if (!Array.isArray(values)) {
       throw new Error(`Expected array, got ${typeof values}`);
     }
     for (const value of values) {

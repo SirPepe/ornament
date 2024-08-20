@@ -5,10 +5,10 @@
   </picture>
 </h1>
 
-📢 **What's new in 2.0.0?** [Check out the Changelog!](./changelog.md)
+📢 **What's new in 2.1.0?** [Check out the Changelog!](./changelog.md)
 
 **Build your own frontend framework** with Ornament, a mid-level,
-pareto-optimal, treeshakable and tiny (< 5k) TypeScript-positive toolkit for web
+pareto-optimal, treeshakable and tiny TypeScript-positive toolkit for web
 component infrastructure! Escape from heavyweight frameworks, constant rewrites
 and the all-encompassing frontend FOMO with a declarative, simple, and type-safe
 API for web components:
@@ -268,7 +268,7 @@ universal, and will therefore more or less always keep chugging along.
 
 [^2]: Class field values must be of type `function`
 
-### `@define(tagName: string, options: ElementDefinitionOptions = {})`
+### `@define(tagName: string, options: ElementDefinitionOptions = {}, registry: CustomElementRegistry = window.customElements)`
 
 **Class decorator** to register a class as a custom element, basically an
 alternative syntax for [`customElements.define()`](https://developer.mozilla.org/en-US/docs/Web/API/CustomElementRegistry/define);
@@ -352,6 +352,10 @@ console.log(test.foo); // only type checks with the above interface declaration
 
 </details>
 
+If you want to run your component code in a non-browser environment like JSDOM,
+you can pass the JSDOM's CustomElementRegistry as the third argument to
+`@define()`.
+
 ### `@enhance()`
 
 **Class decorator** to set up attribute observation and lifecycle hooks
@@ -402,7 +406,7 @@ class Base3 extends HTMLElement {}
 class MyTest3 extends Base3 {}
 ```
 
-### `@prop(transformer: Transformer)`
+### `@prop(transformer: Transformer<any, any>)`
 
 **Accessor decorator** to define an IDL property on the custom element class
 _without_ an associated content attribute. Such a property is more or less a
@@ -445,7 +449,7 @@ Note that you can still define your own accessors, getters, setters etc. as you
 would usually do. They will still work as expected, but they will not cause
 `@reactive()` methods to run.
 
-### `@attr(transformer: Transformer, options: AttrOptions = {})`
+### `@attr(transformer: Transformer<any, any>, options: AttrOptions = {})`
 
 **Accessor decorator** to define an IDL attribute with a matching content
 attribute on the custom element class. This results in something very similar to
@@ -830,12 +834,13 @@ decorated member is an accessor, it gets updated with the last event object (for
 event targets) or signal values (for signals) and in turn causes methods
 decorated with `@reactive()` to run.
 
-#### Subscribe to EventTargets: `@subscribe(targetOrTargetFactory, eventNames, options?)`
+#### Subscribe to EventTargets: `@subscribe(targetOrTargetFactory: EventTarget | ((instance: T) => EventTarget) | Promise<EventTarget>, eventNames: string, options: EventSubscribeOptions = {})`
 
 Subscribe the decorated class member to one or more events an EventTarget.
-`EventTarget` is an interface that objects such as HTMLElement, Window, Document
-and _many_ more objects implement. You can also create a vanilla event target or
-extend the `EventTarget` class:
+[EventTarget](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget) is
+an interface that objects such as HTMLElement, Window, Document and _many_ more
+objects implement. You can also create a vanilla event target or extend the
+`EventTarget` class:
 
 ```javascript
 import { define, subscribe } from "@sirpepe/ornament";
@@ -970,7 +975,7 @@ class Test extends HTMLElement {
 
 ##### Options for `@subscribe()` for EventTarget
 
-- **`targetOrTargetFactory` (EventTarget | Promise\<EventTarget\> | (instance: T) => EventTarget | Promise\<EventTarget\>)**: The event target (or event-target-returning function/promise) to subscribe to
+- **`targetOrTargetFactory` (EventTarget | Promise\<EventTarget\> | ((instance: T) => EventTarget) | Promise\<EventTarget\>)**: The event target (or event-target-returning function/promise) to subscribe to
 - **`eventNames` (string)**: The event(s) to listen to. To subscribe to multiple events, pass a single string with the event names separated by whitespace
 - **`options` (object, optional)**: Event handling options, consisting of...
   - **predicate (function `(instance: T, event: Event) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the element instance and the event object, and must return a boolean. Note that this method always handles the raw event object, before and eventual `transform()` is applied.
@@ -982,7 +987,7 @@ class Test extends HTMLElement {
   - **passive (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
   - **signal (AbortSignal, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
 
-#### Subscribe to Signals: `@subscribe(signal, options?)`
+#### Subscribe to Signals: `@subscribe(signal: SignalLike<any>, options: SignalSubscribeOptions = {})`
 
 Subscribe to a signal:
 
@@ -1030,7 +1035,7 @@ to throw events around.
   - **activateOn (Array\<string\>, optional):** Ornament event on which to activate the subscription (that is, when to actually subscribe to the Signal). Defaults to `["init", "connected"]`.
   - **deactivateOn (Array\<string\>, optional):** Ornament event on which to unsubscribe from the signal. Defaults to `["disconnected"]`.
 
-### `@debounce(options?)`
+### `@debounce(options: DebounceOptions = {})`
 
 **Method and class field decorator** for debouncing method/function invocation:
 
@@ -1083,7 +1088,7 @@ able to return anything but `undefined`.
   - `debounce.timeout(ms: number)`: uses `setTimeout()`
   - `debounce.asap()`: runs the function after the next microtask
 
-### `@observe(ObserverConstructor, options?)`
+### `@observe(ctor: ObserverConstructor, options: ObserverOptions = {})`
 
 **Method and class field decorator** that sets up a [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver), or [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) with the element instance as the target and the decorated method as the callback. This enables the element to observe itself:
 
@@ -1111,10 +1116,11 @@ el.innerText = "Test"; // cause mutation
 
 #### Options for `@observe()`
 
-- **`Ctor` (function)**: The observer constructor function (probably `MutationObserver`, `ResizeObserver`, or `IntersectionObserver`)
-- **`options` (object, optional)**: The options for the observer (see MDN for options for [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver/observe#options), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/IntersectionObserver/IntersectionObserver#options), [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver/observe#options))
-- **activateOn (Array\<string\>, optional):** Ornament event on which to start observing the element. Defaults to `["init", "connected"]`.
-- **deactivateOn (Array\<string\>, optional):** Ornament event on which to stop observing the element. Defaults to `["disconnected"]`.
+- **`Ctor` (function)**: The observer constructor function (probably one of `MutationObserver`, `ResizeObserver`, and `IntersectionObserver`)
+- **`options` (object, optional)**: A mixin type consisting of
+  - All options for the relevant observer type (see MDN for options for [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver/observe#options), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/IntersectionObserver/IntersectionObserver#options), [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver/observe#options))
+  - **activateOn (Array\<string\>, optional):** Ornament event on which to start observing the element. Defaults to `["init", "connected"]`.
+  - **deactivateOn (Array\<string\>, optional):** Ornament event on which to stop observing the element. Defaults to `["disconnected"]`.
 
 ## Transformers
 
@@ -1128,7 +1134,7 @@ running side effects.
 | Transformer | Type                                           | Options                              |
 | ----------- | ---------------------------------------------- | ------------------------------------ |
 | `string()`  | `string`                                       |                                      |
-| `href()`    | `string` (URL)                                 |                                      |
+| `href()`    | `string` (URL)                                 | `location`                           |
 | `bool()`    | `boolean`                                      |                                      |
 | `number()`  | `number`                                       | `min`, `max`, `allowNaN`, `nullable` |
 | `int()`     | `bigint`                                       | `min`, `max`, `nullable`             |
@@ -1270,7 +1276,7 @@ class Test extends HTMLElement {
 | Set content attribute    | Content attribute value | As set (equal to IDL attribute value)        |
 | Remove content attribute | Initial value or `""`   | Removed                                      |
 
-### Transformer `href()`
+### Transformer `href({ location = window.location }: { location?: Location } = {})`
 
 Implements a string attribute or property that works exactly like the `href`
 attribute on `<a>` in that it automatically turns relative URLs into absolute
@@ -1294,6 +1300,9 @@ testEl.foo = "https://example.com/foo/bar/";
 console.log(testEl.foo); // > "https://example.com/foo/bar/"
 ```
 
+If you want to run your component code in a non-browser environment like JSDOM,
+you can pass the JSDOM's `window.location` as the option `location`.
+
 #### Behavior overview for transformer `href()`
 
 | Operation                                      | IDL attribute value         | Content attribute (when used with `@attr()`) |
@@ -1304,7 +1313,7 @@ console.log(testEl.foo); // > "https://example.com/foo/bar/"
 | Set content attribute to any other string `x`  | Relative URL to `x`         | As set                                       |
 | Remove content attribute                       | Initial value or `""`       | Removed                                      |
 
-### Transformer `number(options?)`
+### Transformer `number(options: NumberOptions = {})`
 
 Implements a number attribute with optional range constraints.
 
@@ -1346,10 +1355,11 @@ initializer throw exceptions.
 | Set content attribute to out-of-range value | No change                                                    | As set                                                               |
 | Remove content attribute                    | `null` is `nullable` is true, otherwise initial value or `0` | Removed                                                              |
 
-### Transformer `int(options?)`
+### Transformer `int(options: IntOptions = {})`
 
 Implements a bigint attribute. Content attribute values are expressed as plain
-numeric strings without the tailing `n` used in JavaScript's BigInt.
+numeric strings without the trailing `n` used in JavaScript's BigInt literal
+syntax.
 
 ```javascript
 import { define, attr, int } from "@sirpepe/ornament";
@@ -1419,7 +1429,7 @@ you can use the `literal()` transformer with the strings `"true"` and `"false"`.
 | Set content attribute to `x`   | `true`              | As set                                                               |
 | Remove content attribute       | `false`             | Removed                                                              |
 
-### Transformer `list(options?)`
+### Transformer `list(options: ListOptions  = {})`
 
 Implements an attribute with an array of values, defined by another transformer.
 The `list()` transformer passes individual items to the transformer passed in
@@ -1472,7 +1482,7 @@ console.log(el.foo); // > [1, 2, 3]
 | Set content attribute    | Attribute value is split on the separator, then trimmed, then non-empty strings are passed into `options.transformer.parse` | As set                                               |
 | Remove content attribute | Initial value or empty array                                                                                                | Removed                                              |
 
-### Transformer `literal(options?)`
+### Transformer `literal(options: LiteralOptions = {})`
 
 Implements an attribute with a finite number of valid values. Should really be
 called "enum", but that's a reserved word in JavaScript. It works by declaring
@@ -1511,7 +1521,7 @@ the accessor has no initial value, the first element in `values`.
 | Set content attribute to `x`   | Parsed by `options.transformer.parse`. If the result is in `options.values`, result, otherwise no change | As set                                       |
 | Remove attribute               | Initial value or first element in `options.values`                                                       | Removed                                      |
 
-### Transformer `json()`
+### Transformer `json(options: JSONOptions = {})`
 
 Implements an attribute that can take any value. When used with `@attr()`, the
 value must be serializable with JSON in order to be reflected as a content
@@ -1639,6 +1649,92 @@ explicitly implement them.
 The behavior of `event()` matches the behavior of built-in event handlers like
 `onclick`.
 
+## Metadata
+
+HTML elements do usually not expose any metadata, even though knowing the names
+and data types for content attributes would be quite useful sometimes. Ornament
+exposes a few metadata helper functions that help in scenarios where
+meta-programming components (eg. SSR) is required.
+
+### `getTagName(instanceOrCtor)`
+
+Given an instance or custom element constructor, this function returns
+**the element's tag name**. It returns `null` if the object in question is not
+a custom element defined via `@define()`:
+
+```javascript
+import { define, getTagName } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {}
+
+console.log(getTagName(Test));
+// > "my-test"
+
+console.log(getTagName(new Test()));
+// > "my-test"
+```
+
+This serves roughly the same function as the standard
+[CustomElementRegistry.getName() method](https://developer.mozilla.org/en-US/docs/Web/API/CustomElementRegistry/getName)
+but does not require access to the specific CustomElementRegistry that the
+element is registered with.
+
+### `listAttributes(instanceOrCtor)`
+
+**Lists the content attribute names** that were defined via `@attr()` on the
+custom element (or constructor) in question:
+
+```javascript
+import { define, attr, string, listAttributes } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @attr(string()) accessor foo = "";
+  @attr(string(), { as: "asdf" }) accessor bar = "";
+}
+
+console.log(listAttributes(Test));
+// > ["foo", "asdf"]
+
+console.log(listAttributes(new Test()));
+// > ["foo", "asdf"]
+```
+
+This is roughly analogous to the `observedAttributes` static property on custom
+element classes, but only lists content attributes defined with ornament's
+`@attr()` - manually defined attributes and IDL attributes defined with
+`@prop()` are excluded.
+
+### `getAttribute(instanceOrCtor, contentAttributeName)`
+
+**Returns the IDL attribute name and transformer** used to define a content
+attribute:
+
+```javascript
+import { define, attr, number, getAttribute } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  // Requires non-negative values
+  @attr(number({ min: 0 }), { as: "asdf" }) accessor bar = 0;
+}
+
+const { prop, transformer } = getAttribute(Test, "asdf");
+
+console.log(prop);
+// > "bar" - the backend accessor for the content attribute "asdf"
+
+transformer.parse("-1");
+// > 0; input clamped to valid value
+
+transformer.validate(-1, true);
+// Throws an error; the transformer only accepts nonnegative numbers
+```
+
+This is particularly useful if you need access to the parsing and
+stringification logic for content attributes for eg. SSR.
+
 ## Event Bus
 
 Ornament runs intra-component communication over an internal event bus. You will
@@ -1720,10 +1816,10 @@ available behind the key `"ORNAMENT_NO_VALUE"` in the global symbol registry.
 Ornament, being a collection of decorators, stores its metadata in
 [Decorator Metadata](https://github.com/tc39/proposal-decorator-metadata). To
 avoid collisions with other libraries, the actual metadata is hidden behind a
-symbol that is exported by Ornament as `METADATA` or available behind the key
-`"ORNAMENT_METADATA"` in the global symbol registry. The contents of the
-metadata record should not be considered part of Ornament's stable API and
-could change at any moment. Use with caution!
+symbol that is exported by Ornament as `ORNAMENT_METADATA_KEY` or available
+behind the key `"ORNAMENT_METADATA_KEY"` in the global symbol registry. The
+contents of the metadata record should not be considered part of Ornament's
+stable API and could change at any moment. Use the metadata API instead.
 
 ## Troubleshooting
 

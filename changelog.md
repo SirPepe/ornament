@@ -2,20 +2,69 @@
 
 ## 2.1.0
 
-### FEATURE: Decorator metadata
+### FEATURE: Customizable environment
+
+Two functions have received backwards-compatible updates to make them work in
+environments where the `window` object is not the global object. This is only
+relevant if you run your component code in eg. Node.js with
+[jsdom](https://github.com/jsdom/jsdom) to do SSR. The affected functions are:
+
+- **decorator `@define()`**: now takes an optional third argument to customize
+  the `CustomElementRegistry` to use. Defaults to `window.customElements`.
+- **transformer `href()`**: now takes an optional options object with a field
+  `location` that can customize the `Location` object to use. Defaults to
+  `window.location`.
+
+This will be useful if you want to run your components outside of browsers and
+of no concern if you don't.
+
+### FEATURE: Component metadata
 
 Ornament, being a collection of decorators, now stores its metadata in
-[Decorator Metadata](https://github.com/tc39/proposal-decorator-metadata). To
-avoid collisions with other libraries, the actual metadata is hidden behind a
-symbol that is exported by Ornament as `METADATA` or available behind the key
-`"ORNAMENT_METADATA"` in the global symbol registry. The contents of the
-metadata record should not be considered part of Ornament's stable API and
-could change at any moment. Use with caution!
+[Decorator Metadata](https://github.com/tc39/proposal-decorator-metadata). This
+gets rid of a few janky workarounds and saves a few bytes in the process, but is
+not really noticeable in and of itself. What is _actually_ new is an API to
+access (some of) the available component metadata:
+
+```javascript
+import {
+  define,
+  attr,
+  string,
+  number,
+  getTagName,
+  listAttributes,
+  getAttribute,
+} from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @attr(string()) accessor foo = "";
+  @attr(number({ min: 0 }), { as: "asdf" }) accessor bar = "";
+}
+
+console.log(getTagName(Test)); // > "my-test"
+
+console.log(listAttributes(Test)); // > ["foo", "asdf"]
+
+const { prop, transformer } = getAttribute(Test, "asdf");
+// prop = "bar" - the backend accessor for the content attribute "asdf"
+// transformer = the transformer for the content attribute "asdf"
+
+transformer.parse("-1");
+// > 0; input clamped to valid value
+
+transformer.validate(-1, true);
+// Throws an error; the transformer only accepts nonnegative numbers
+```
+
+This should be useful if you need access to the parsing and stringification
+logic for content attributes to do eg. SSR.
 
 ### Other changes in 2.1.0
 
-Bump dependencies, run tests against playwright's "webkit" browser too (for
-whatever that's worth.)
+Bump dependencies, play a little code golf, tweak and expand readme, run tests
+against playwright's "webkit" browser too - for whatever that's worth.
 
 ## 2.0.0
 
