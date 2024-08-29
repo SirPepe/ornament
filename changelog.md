@@ -2,6 +2,12 @@
 
 ## 2.1.0
 
+### FEATURE: Website
+
+[Ornament now has a sort-of proper web page!](https://sirpepe.github.io/use-ornament/)
+The page is generated straight from the readme file and does not add much, but
+it's something!
+
 ### FEATURE: `predicate` option for `@observe()`
 
 You can now control if an invocation of an observer callback should cause an
