@@ -2,15 +2,56 @@
 
 ## 2.1.0
 
+### FEATURE: `predicate` option for `@observe()`
+
+You can now control if an invocation of an observer callback should cause an
+invocation of the decorated method:
+
+```javascript
+import { define, observe } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @observe(MutationObserver, {
+    childList: true,
+    // Only call the decorated method when the records contain removals
+    predicate: (records) => {
+      const removals = records.filter((r) => r.removedNodes.length > 0);
+      return removals.length > 0;
+    },
+  })
+  reactToUpdate(records, observer) {
+    console.log("Something happened!");
+  }
+}
+
+const instance = new Test();
+document.body.append(instance);
+
+const el = document.createElement("div");
+instance.append(el); // no nodes removed = no output
+
+// Wait some time (mutation observers batch mutations)
+
+el.remove(); // el removed = "Something happened!"
+```
+
+This makes it more feasible to combine `@observe()` with `@reactive()` on
+methods that need to react to changes but that should not be overburdened with
+figuring out whether or not the root cause is actually cause for a reaction.
+This work belongs to the decorators, and has always been supported via a
+predicate in the options for `@reactive()`. Now `@observe()` can do the same!
+
 ### FEATURE: Customizable environment
 
 Two functions have received backwards-compatible updates to make them work in
 environments where the `window` object is not the global object. This is only
 relevant if you run your component code in eg. Node.js with
-[jsdom](https://github.com/jsdom/jsdom) to do SSR. The affected functions are:
+[JSDOM](https://github.com/jsdom/jsdom) or similar to do SSR. The affected
+functions are:
 
 - **decorator `@define()`**: now takes an optional third argument to customize
-  the `CustomElementRegistry` to use. Defaults to `window.customElements`.
+  which `CustomElementRegistry` to use. Defaults to `window.customElements`.
 - **transformer `href()`**: now takes an optional options object with a field
   `location` that can customize the `Location` object to use. Defaults to
   `window.location`.
@@ -48,7 +89,7 @@ console.log(getTagName(Test)); // > "my-test"
 console.log(listAttributes(Test)); // > ["foo", "asdf"]
 
 const { prop, transformer } = getAttribute(Test, "asdf");
-// prop = "bar" - the backend accessor for the content attribute "asdf"
+// prop = "bar" = name of the public accessor for the content attribute "asdf"
 // transformer = the transformer for the content attribute "asdf"
 
 transformer.parse("-1");

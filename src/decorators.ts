@@ -515,14 +515,19 @@ export function subscribe<T extends HTMLElement>(
   };
 }
 
-type ObserveBaseOptions = {
+type ObserveBaseOptions<T, O extends ObserverCtor1 | ObserverCtor2> = {
   activateOn?: (keyof OrnamentEventMap)[]; // defaults to ["init", "connected"]
   deactivateOn?: (keyof OrnamentEventMap)[]; // defaults to ["disconnected"]
+  predicate?: (
+    entries: Parameters<ConstructorParameters<O>[0]>[0],
+    observer: Parameters<ConstructorParameters<O>[0]>[1],
+    instance: T,
+  ) => boolean;
 };
 
 // IntersectionObserver, ResizeObserver
 type ObserverCtor1 = new (
-  callback: (...args: unknown[]) => void,
+  callback: (entries: unknown[], observer: InstanceType<ObserverCtor1>) => void,
   options: any,
 ) => {
   observe: (target: HTMLElement) => void;
@@ -530,7 +535,9 @@ type ObserverCtor1 = new (
 };
 
 // MutationObserver
-type ObserverCtor2 = new (callback: (...args: unknown[]) => void) => {
+type ObserverCtor2 = new (
+  callback: (entries: unknown[], observer: InstanceType<ObserverCtor2>) => void,
+) => {
   observe: (target: HTMLElement, options: any) => void;
   disconnect: () => void;
 };
@@ -552,28 +559,33 @@ type ObserveDecorator<
 
 export function observe<T extends HTMLElement, O extends ObserverCtor1>(
   Ctor: O,
-  options?: ObserveBaseOptions & ConstructorParameters<O>[1],
+  options?: ObserveBaseOptions<T, O> & ConstructorParameters<O>[1],
 ): ObserveDecorator<T, O>;
 export function observe<T extends HTMLElement, O extends ObserverCtor2>(
   Ctor: O,
-  options?: ObserveBaseOptions & Parameters<InstanceType<O>["observe"]>[1],
+  options?: ObserveBaseOptions<T, O> &
+    Parameters<InstanceType<O>["observe"]>[1],
 ): ObserveDecorator<T, O>;
 export function observe<
   T extends HTMLElement,
   O extends ObserverCtor1 | ObserverCtor2,
 >(
   Ctor: O,
-  options: ObserveBaseOptions = {},
+  options: ObserveBaseOptions<T, O> = {},
 ): ObserveDecorator<T, O, unknown[]> {
   options.activateOn ??= ["init", "connected"];
   options.deactivateOn ??= ["disconnected"];
   return function (_, context) {
     assertContext(context, "observe", "method/function");
     return runContextInitializerOnOrnamentInit(context, (instance: T) => {
-      const observer = new Ctor(
-        (...args) => context.access.get(instance).call(instance, ...args),
-        options,
-      );
+      const observer = new Ctor((entries, observer) => {
+        if (
+          !options.predicate ||
+          options.predicate(entries, observer, instance)
+        ) {
+          context.access.get(instance).call(instance, entries, observer);
+        }
+      }, options);
       if (options.activateOn?.includes("init")) {
         observer.observe(instance, options);
       }
