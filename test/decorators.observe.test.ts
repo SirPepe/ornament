@@ -58,7 +58,7 @@ describe("Decorators", () => {
           @observe(MutationObserver, {
             childList: true,
             // Only track removals
-            predicate: (records) => {
+            predicate: (_, records) => {
               const removals = records.filter(
                 (record) => record.removedNodes.length > 0,
               );

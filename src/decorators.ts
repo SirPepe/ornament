@@ -14,7 +14,7 @@ const INITIALIZER_KEY: unique symbol = Symbol();
 const INITIALIZED_BY: unique symbol = Symbol();
 
 // Un-clobber an accessor's name if the element upgrades after a property with
-// a matching name has already been set.
+// a matching name has already been set ("safe upgrade").
 function initAccessorInitialValue(
   instance: any,
   name: string | symbol,
@@ -492,7 +492,7 @@ export function subscribe<T extends HTMLElement>(
       typeof namesOrOptions === "string"
     ) {
       return subscribeToEventTarget(context, targetOrFactory, namesOrOptions, {
-        transform: (_, x) => x,
+        transform: (_, value) => value,
         activateOn: ["init", "connected"],
         deactivateOn: ["disconnected"],
         ...options,
@@ -505,7 +505,7 @@ export function subscribe<T extends HTMLElement>(
         typeof namesOrOptions === "undefined")
     ) {
       return subscribeToSignal(context, targetOrFactory, {
-        transform: (_, x) => x,
+        transform: (_, value) => value,
         activateOn: ["init", "connected"],
         deactivateOn: ["disconnected"],
         ...namesOrOptions,
@@ -519,9 +519,10 @@ type ObserveBaseOptions<T, O extends ObserverCtor1 | ObserverCtor2> = {
   activateOn?: (keyof OrnamentEventMap)[]; // defaults to ["init", "connected"]
   deactivateOn?: (keyof OrnamentEventMap)[]; // defaults to ["disconnected"]
   predicate?: (
+    this: T,
+    instance: T,
     entries: Parameters<ConstructorParameters<O>[0]>[0],
     observer: Parameters<ConstructorParameters<O>[0]>[1],
-    instance: T,
   ) => boolean;
 };
 
@@ -542,11 +543,7 @@ type ObserverCtor2 = new (
   disconnect: () => void;
 };
 
-type ObserveDecorator<
-  T extends HTMLElement,
-  O extends ObserverCtor1 | ObserverCtor2,
-  A extends unknown[] = Parameters<ConstructorParameters<O>[0]>,
-> = {
+type ObserveMethodDecorator<T extends HTMLElement, A extends unknown[]> = {
   (
     _: unknown,
     context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => void>,
@@ -560,28 +557,33 @@ type ObserveDecorator<
 export function observe<T extends HTMLElement, O extends ObserverCtor1>(
   Ctor: O,
   options?: ObserveBaseOptions<T, O> & ConstructorParameters<O>[1],
-): ObserveDecorator<T, O>;
+): ObserveMethodDecorator<T, Parameters<ConstructorParameters<O>[0]>>;
 export function observe<T extends HTMLElement, O extends ObserverCtor2>(
   Ctor: O,
   options?: ObserveBaseOptions<T, O> &
     Parameters<InstanceType<O>["observe"]>[1],
-): ObserveDecorator<T, O>;
+): ObserveMethodDecorator<T, Parameters<ConstructorParameters<O>[0]>>;
 export function observe<
   T extends HTMLElement,
   O extends ObserverCtor1 | ObserverCtor2,
 >(
   Ctor: O,
   options: ObserveBaseOptions<T, O> = {},
-): ObserveDecorator<T, O, unknown[]> {
+): ObserveMethodDecorator<T, unknown[]> {
   options.activateOn ??= ["init", "connected"];
   options.deactivateOn ??= ["disconnected"];
-  return function (_, context) {
+  return function (
+    _: unknown,
+    context:
+      | ClassMethodDecoratorContext<T, (this: T, ...args: unknown[]) => void>
+      | ClassFieldDecoratorContext<T, (this: T, ...args: unknown[]) => void>,
+  ) {
     assertContext(context, "observe", "method/function");
     return runContextInitializerOnOrnamentInit(context, (instance: T) => {
       const observer = new Ctor((entries, observer) => {
         if (
           !options.predicate ||
-          options.predicate(entries, observer, instance)
+          options.predicate.call(instance, instance, entries, observer)
         ) {
           context.access.get(instance).call(instance, entries, observer);
         }

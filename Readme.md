@@ -1090,7 +1090,7 @@ able to return anything but `undefined`.
 
 ### `@observe(ctor: ObserverConstructor, options: ObserverOptions = {})`
 
-**Method and class field decorator** that sets up a [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver), or [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) with the element instance as the target and the decorated method as the callback. This enables the element to observe itself:
+**Method and class field decorator** that sets up a [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver), or [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) with the element instance as the target and the decorated method as the callback. This enables the web component to observe itself:
 
 ```javascript
 import { define, observe } from "@sirpepe/ornament";
@@ -1119,7 +1119,7 @@ el.innerText = "Test"; // cause mutation
 - **`Ctor` (function)**: The observer constructor function (probably one of `MutationObserver`, `ResizeObserver`, and `IntersectionObserver`)
 - **`options` (object, optional)**: A mixin type consisting of
   - All options for the relevant observer type (see MDN for options for [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver/observe#options), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/IntersectionObserver/IntersectionObserver#options), [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver/observe#options))
-  - **`predicate` (Function `(records, observer, instance) => boolean`)**: If provided, controls whether or not an observer callback invocation calls the decorated method. Gets passed the observer's callback arguments (an array of records and the observer object) as well as the element instance and must return a boolean.
+  - **`predicate` (function `(instance: T, records, observer) => boolean`)**: If provided, controls whether or not an observer callback invocation calls the decorated method. Gets passed the observer's callback arguments (an array of records and the observer object) as well as the element instance and must return a boolean.
   - **activateOn (Array\<string\>, optional):** Ornament event on which to start observing the element. Defaults to `["init", "connected"]`.
   - **deactivateOn (Array\<string\>, optional):** Ornament event on which to stop observing the element. Defaults to `["disconnected"]`.
 
