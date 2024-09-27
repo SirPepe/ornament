@@ -5,13 +5,29 @@
 ### FEATURE: Website
 
 [Ornament now has a sort-of proper web page!](https://sirpepe.github.io/use-ornament/)
-The page is generated straight from the readme file and does not add much, but
-it's something!
+The page is generated straight from the readme file and does not add much.
+
+### FEATURE: Customizable environment
+
+Two functions have received backwards-compatible updates to make them work in
+environments where the `window` object is not the global object. This is only
+relevant if you run your component code in eg. Node.js with
+[JSDOM](https://github.com/jsdom/jsdom) or similar to do SSR. The affected
+functions are:
+
+- **decorator `@define()`**: now takes an optional third argument to customize
+  which `CustomElementRegistry` to use. Defaults to `window.customElements`.
+- **transformer `href()`**: now takes an optional options object with a field
+  `location` that can customize the `Location` object to use. Defaults to
+  `window.location`.
+
+This will be useful if you want to run your components outside of browsers and
+of no concern if you don't.
 
 ### FEATURE: `predicate` option for `@observe()`
 
 You can now control if an invocation of an observer callback should cause an
-invocation of the decorated method:
+invocation of the decorated method or class field function:
 
 ```javascript
 import { define, observe } from "@sirpepe/ornament";
@@ -21,7 +37,7 @@ class Test extends HTMLElement {
   @observe(MutationObserver, {
     childList: true,
     // Only call the decorated method when the records contain removals
-    predicate: (records) => {
+    predicate: (element, records, observer) => {
       const removals = records.filter((r) => r.removedNodes.length > 0);
       return removals.length > 0;
     },
@@ -47,23 +63,6 @@ methods that need to react to changes but that should not be overburdened with
 figuring out whether or not the root cause is actually cause for a reaction.
 This work belongs to the decorators, and has always been supported via a
 predicate in the options for `@reactive()`. Now `@observe()` can do the same!
-
-### FEATURE: Customizable environment
-
-Two functions have received backwards-compatible updates to make them work in
-environments where the `window` object is not the global object. This is only
-relevant if you run your component code in eg. Node.js with
-[JSDOM](https://github.com/jsdom/jsdom) or similar to do SSR. The affected
-functions are:
-
-- **decorator `@define()`**: now takes an optional third argument to customize
-  which `CustomElementRegistry` to use. Defaults to `window.customElements`.
-- **transformer `href()`**: now takes an optional options object with a field
-  `location` that can customize the `Location` object to use. Defaults to
-  `window.location`.
-
-This will be useful if you want to run your components outside of browsers and
-of no concern if you don't.
 
 ### FEATURE: Component metadata
 
