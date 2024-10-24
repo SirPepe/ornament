@@ -8,6 +8,8 @@ const babelPlugin = fromRollup(babel);
 const nodeResolvePlugin = fromRollup(nodeResolve);
 
 export default {
+  browserStartTimeout: 90000,
+  nodeResolve: true,
   mimeTypes: {
     "**/*.ts": "js",
   },

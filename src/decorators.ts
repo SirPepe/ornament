@@ -1,5 +1,6 @@
 import { listen, trigger } from "./bus.js";
-import { EMPTY_OBJ, NO_VALUE } from "./lib.js";
+import { NO_VALUE } from "./lib.js";
+import { getMetadataFromContext } from "./metadata.js";
 import {
   type Transformer,
   type ClassAccessorDecorator,
@@ -8,48 +9,12 @@ import {
   NonOptional,
 } from "./types.js";
 
-// Decorator Metadata does as of June 2024 not work reliably in Babel. Therefore
-// metadata in this module is a bunch of manually managed WeakMaps until Babel's
-// issues are fixed. The first bit of metadata maps debounced methods to their
-// originals, scoped by component instance. This is required to make @init()
-// calls run synchronously, even if @debounce() was applied to the method in
-// question.
-const ALL_DEBOUNCED_METHODS = new WeakMap<
-  object,
-  WeakMap<Method<any, any>, Method<any, any>>
->();
-
-// This should really be scoped on a class-by-class basis, but the @attr()
-// decorator has no context without decorator metadata (which, again, is too
-// unreliable in Babel as of June 2024). The list of observable attributes must
-// be available before the accessor initializers run, so the only way forward is
-// to observe every attribute defined by @attr() on all classes.
-const ALL_ATTRIBUTES = new Set<string>();
-
-// Can be rewritten to support decorator metadata once that's fixed.
-function getMetadata(key: "attributes"): Set<string>;
-function getMetadata(
-  key: "methods",
-  context: object,
-): WeakMap<Method<any, any>, Method<any, any>>;
-function getMetadata(key: "attributes" | "methods", context?: any): any {
-  if (key === "attributes") {
-    return ALL_ATTRIBUTES;
-  }
-  let methodMap = ALL_DEBOUNCED_METHODS.get(context);
-  if (!methodMap) {
-    methodMap = new WeakMap();
-    ALL_DEBOUNCED_METHODS.set(context, methodMap);
-  }
-  return methodMap;
-}
-
 // Explained in @enhance()
 const INITIALIZER_KEY: unique symbol = Symbol();
 const INITIALIZED_BY: unique symbol = Symbol();
 
 // Un-clobber an accessor's name if the element upgrades after a property with
-// a matching name has already been set.
+// a matching name has already been set ("safe upgrade").
 function initAccessorInitialValue(
   instance: any,
   name: string | symbol,
@@ -104,7 +69,7 @@ export function enhance<T extends CustomElementConstructor>(): (
       // is no *real* reason to have any code related to the event targets here,
       // but if TS worked as advertised, the line below would accurately
       // describe the observable effects the program has:
-      // [EVENT_BUS_TARGET]!: EventTarget; // this is entirely useless
+      // [ORNAMENT_EVENT_BUS_KEY]!: EventTarget; // this is entirely useless
       // May 2024: a workaround for a plugin ordering issue in babel requires
       // the line above to be commented out. See the entire thread at
       // https://github.com/babel/babel/issues/16373#issuecomment-2017480546
@@ -119,7 +84,10 @@ export function enhance<T extends CustomElementConstructor>(): (
       }
 
       static get observedAttributes(): string[] {
-        return [...originalObservedAttributes, ...getMetadata("attributes")];
+        return [
+          ...originalObservedAttributes,
+          ...getMetadataFromContext(context).attr.keys(),
+        ];
       }
 
       connectedCallback(): void {
@@ -198,17 +166,20 @@ export function enhance<T extends CustomElementConstructor>(): (
 
 // The class decorator @define() defines a custom element and also injects a
 // mixin class that hat deals with attribute observation and reactive
-// init callback handling.
+// init callback handling. The custom element registry is customizable to
+// support eg. SSR with JSDOM.
 export function define<T extends CustomElementConstructor>(
   tagName: string,
   options: ElementDefinitionOptions = {},
+  registry = window.customElements,
 ): (target: T, context: ClassDecoratorContext<T>) => T {
   return function (target: T, context: ClassDecoratorContext<T>): T {
     assertContext(context, "define", "class");
+    getMetadataFromContext(context).tagName = tagName;
 
     // Define the custom element after all other decorators have been applied
     context.addInitializer(function () {
-      window.customElements.define(tagName, this, options);
+      registry.define(tagName, this, options);
     });
 
     // Install the mixin class via @enhance()
@@ -251,7 +222,9 @@ export function init<T extends HTMLElement>(): LifecycleDecorator<
     assertContext(context, "init", "method/function");
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
       const method = context.access.get(instance);
-      (getMetadata("methods", instance).get(method) ?? method).call(instance);
+      (getMetadataFromContext(context).method.get(method) ?? method).call(
+        instance,
+      );
     });
   };
 }
@@ -271,7 +244,7 @@ type ReactiveDecorator<T extends HTMLElement> = {
 };
 
 export function reactive<T extends HTMLElement>(
-  options: ReactiveOptions<T> = EMPTY_OBJ,
+  options: ReactiveOptions<T> = {},
 ): ReactiveDecorator<T> {
   return function (_, context) {
     assertContext(context, "reactive", "method/function");
@@ -501,7 +474,7 @@ export function subscribe<T extends HTMLElement>(
   options:
     | EventSubscribeOptionsWithTransform<T, any, any>
     | EventSubscribeOptionsWithoutTransform<T, any>
-    | undefined = EMPTY_OBJ,
+    | undefined = {},
 ): SignalSubscribeDecorator<T, any> | EventSubscribeDecorator<T, any> {
   return function (
     _: unknown,
@@ -519,7 +492,7 @@ export function subscribe<T extends HTMLElement>(
       typeof namesOrOptions === "string"
     ) {
       return subscribeToEventTarget(context, targetOrFactory, namesOrOptions, {
-        transform: (_, x) => x,
+        transform: (_, value) => value,
         activateOn: ["init", "connected"],
         deactivateOn: ["disconnected"],
         ...options,
@@ -532,7 +505,7 @@ export function subscribe<T extends HTMLElement>(
         typeof namesOrOptions === "undefined")
     ) {
       return subscribeToSignal(context, targetOrFactory, {
-        transform: (_, x) => x,
+        transform: (_, value) => value,
         activateOn: ["init", "connected"],
         deactivateOn: ["disconnected"],
         ...namesOrOptions,
@@ -542,14 +515,20 @@ export function subscribe<T extends HTMLElement>(
   };
 }
 
-type ObserveBaseOptions = {
+type ObserveBaseOptions<T, O extends ObserverCtor1 | ObserverCtor2> = {
   activateOn?: (keyof OrnamentEventMap)[]; // defaults to ["init", "connected"]
   deactivateOn?: (keyof OrnamentEventMap)[]; // defaults to ["disconnected"]
+  predicate?: (
+    this: T,
+    instance: T,
+    entries: Parameters<ConstructorParameters<O>[0]>[0],
+    observer: Parameters<ConstructorParameters<O>[0]>[1],
+  ) => boolean;
 };
 
 // IntersectionObserver, ResizeObserver
 type ObserverCtor1 = new (
-  callback: (...args: unknown[]) => void,
+  callback: (entries: unknown[], observer: InstanceType<ObserverCtor1>) => void,
   options: any,
 ) => {
   observe: (target: HTMLElement) => void;
@@ -557,16 +536,14 @@ type ObserverCtor1 = new (
 };
 
 // MutationObserver
-type ObserverCtor2 = new (callback: (...args: unknown[]) => void) => {
+type ObserverCtor2 = new (
+  callback: (entries: unknown[], observer: InstanceType<ObserverCtor2>) => void,
+) => {
   observe: (target: HTMLElement, options: any) => void;
   disconnect: () => void;
 };
 
-type ObserveDecorator<
-  T extends HTMLElement,
-  O extends ObserverCtor1 | ObserverCtor2,
-  A extends unknown[] = Parameters<ConstructorParameters<O>[0]>,
-> = {
+type ObserveMethodDecorator<T extends HTMLElement, A extends unknown[]> = {
   (
     _: unknown,
     context: ClassMethodDecoratorContext<T, (this: T, ...args: A) => void>,
@@ -579,28 +556,38 @@ type ObserveDecorator<
 
 export function observe<T extends HTMLElement, O extends ObserverCtor1>(
   Ctor: O,
-  options?: ObserveBaseOptions & ConstructorParameters<O>[1],
-): ObserveDecorator<T, O>;
+  options?: ObserveBaseOptions<T, O> & ConstructorParameters<O>[1],
+): ObserveMethodDecorator<T, Parameters<ConstructorParameters<O>[0]>>;
 export function observe<T extends HTMLElement, O extends ObserverCtor2>(
   Ctor: O,
-  options?: ObserveBaseOptions & Parameters<InstanceType<O>["observe"]>[1],
-): ObserveDecorator<T, O>;
+  options?: ObserveBaseOptions<T, O> &
+    Parameters<InstanceType<O>["observe"]>[1],
+): ObserveMethodDecorator<T, Parameters<ConstructorParameters<O>[0]>>;
 export function observe<
   T extends HTMLElement,
   O extends ObserverCtor1 | ObserverCtor2,
 >(
   Ctor: O,
-  options: ObserveBaseOptions = {},
-): ObserveDecorator<T, O, unknown[]> {
+  options: ObserveBaseOptions<T, O> = {},
+): ObserveMethodDecorator<T, unknown[]> {
   options.activateOn ??= ["init", "connected"];
   options.deactivateOn ??= ["disconnected"];
-  return function (_, context) {
+  return function (
+    _: unknown,
+    context:
+      | ClassMethodDecoratorContext<T, (this: T, ...args: unknown[]) => void>
+      | ClassFieldDecoratorContext<T, (this: T, ...args: unknown[]) => void>,
+  ) {
     assertContext(context, "observe", "method/function");
     return runContextInitializerOnOrnamentInit(context, (instance: T) => {
-      const observer = new Ctor(
-        (...args) => context.access.get(instance).call(instance, ...args),
-        options,
-      );
+      const observer = new Ctor((entries, observer) => {
+        if (
+          !options.predicate ||
+          options.predicate.call(instance, instance, entries, observer)
+        ) {
+          context.access.get(instance).call(instance, entries, observer);
+        }
+      }, options);
       if (options.activateOn?.includes("init")) {
         observer.observe(instance, options);
       }
@@ -659,7 +646,7 @@ type AttrOptions = {
 // The accessor decorator @attr() defines a DOM attribute backed by an accessor.
 export function attr<T extends HTMLElement, V>(
   transformer: Transformer<T, V>,
-  options: AttrOptions = EMPTY_OBJ,
+  options: AttrOptions = {},
 ): ClassAccessorDecorator<T, V> {
   const reflective = options.reflective ?? true;
   // Enables early exits from the attributeChangedCallback for content attribute
@@ -689,7 +676,10 @@ export function attr<T extends HTMLElement, V>(
     // Add the name to the set of all observed attributes, even if "reflective"
     // is false. The content attribute must in all cases be observed to enable
     // the message bus to emit events.
-    getMetadata("attributes").add(contentAttrName);
+    getMetadataFromContext(context).attr.set(contentAttrName, {
+      prop: idlAttrName,
+      transformer,
+    });
 
     // If the attribute needs to be observed and the accessor initializes,
     // register the attribute handler callback with the current element
@@ -810,6 +800,10 @@ export function prop<T extends HTMLElement, V>(
 ): ClassAccessorDecorator<T, V> {
   return function (target, context): ClassAccessorDecoratorResult<T, V> {
     assertContext(context, "prop", "accessor");
+    getMetadataFromContext(context).prop.set(context.name, {
+      prop: context.name,
+      transformer,
+    });
     return {
       init(input) {
         return transformer.init.call(
@@ -861,7 +855,7 @@ type DebounceDecorator<
 export function debounce<
   T extends object,
   F extends (this: T, ...args: any[]) => void,
->(options: DebounceOptions<T, F> = EMPTY_OBJ): DebounceDecorator<T, F> {
+>(options: DebounceOptions<T, F> = {}): DebounceDecorator<T, F> {
   const fn = options.fn ?? debounce.raf();
   return function decorator(
     value: F | undefined,
@@ -874,7 +868,7 @@ export function debounce<
       return context.addInitializer(function (): void {
         const func = context.access.get(this);
         const debounced = fn(func).bind(this);
-        getMetadata("methods", this).set(debounced, func);
+        getMetadataFromContext(context).method.set(debounced, func);
         context.access.set(this, debounced as F);
       });
     }
@@ -885,7 +879,7 @@ export function debounce<
     const debounced = fn(func);
     if (!context.static) {
       context.addInitializer(function (): void {
-        getMetadata("methods", this).set(debounced, func);
+        getMetadataFromContext(context).method.set(debounced, func);
       });
     }
     return debounced as F;

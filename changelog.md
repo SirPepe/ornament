@@ -1,5 +1,117 @@
 # Changelog
 
+## 2.1.0
+
+### FEATURE: Website
+
+[Ornament now has a sort-of proper web page!](https://sirpepe.github.io/use-ornament/)
+The page is generated straight from the readme file and does not add much.
+
+### FEATURE: Customizable environment
+
+Two functions have received backwards-compatible updates to make them work in
+environments where the `window` object is not the global object. This is only
+relevant if you run your component code in eg. Node.js with
+[JSDOM](https://github.com/jsdom/jsdom) or similar to do SSR. The affected
+functions are:
+
+- **decorator `@define()`**: now takes an optional third argument to customize
+  which `CustomElementRegistry` to use. Defaults to `window.customElements`.
+- **transformer `href()`**: now takes an optional options object with a field
+  `location` that can customize the `Location` object to use. Defaults to
+  `window.location`.
+
+This will be useful if you want to run your components outside of browsers and
+of no concern if you don't.
+
+### FEATURE: `predicate` option for `@observe()`
+
+You can now control if an invocation of an observer callback should cause an
+invocation of the decorated method or class field function:
+
+```javascript
+import { define, observe } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @observe(MutationObserver, {
+    childList: true,
+    // Only call the decorated method when the records contain removals
+    predicate: (element, records, observer) => {
+      const removals = records.filter((r) => r.removedNodes.length > 0);
+      return removals.length > 0;
+    },
+  })
+  reactToUpdate(records, observer) {
+    console.log("Something happened!");
+  }
+}
+
+const instance = new Test();
+document.body.append(instance);
+
+const el = document.createElement("div");
+instance.append(el); // no nodes removed = no output
+
+// Wait some time (mutation observers batch mutations)
+
+el.remove(); // el removed = "Something happened!"
+```
+
+This makes it more feasible to combine `@observe()` with `@reactive()` on
+methods that need to react to changes but that should not be overburdened with
+figuring out whether or not the root cause is actually cause for a reaction.
+This work belongs to the decorators, and has always been supported via a
+predicate in the options for `@reactive()`. Now `@observe()` can do the same!
+
+### FEATURE: Component metadata
+
+Ornament, being a collection of decorators, now stores its metadata in
+[Decorator Metadata](https://github.com/tc39/proposal-decorator-metadata). This
+gets rid of a few janky workarounds and saves a few bytes in the process, but is
+not really noticeable in and of itself. What is _actually_ new is an API to
+access (some of) the available component metadata:
+
+```javascript
+import {
+  define,
+  attr,
+  string,
+  number,
+  getTagName,
+  listAttributes,
+  getAttribute,
+} from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @attr(string()) accessor foo = "";
+  @attr(number({ min: 0 }), { as: "asdf" }) accessor bar = "";
+}
+
+console.log(getTagName(Test)); // > "my-test"
+
+console.log(listAttributes(Test)); // > ["foo", "asdf"]
+
+const { prop, transformer } = getAttribute(Test, "asdf");
+// prop = "bar" = name of the public accessor for the content attribute "asdf"
+// transformer = the transformer for the content attribute "asdf"
+
+transformer.parse("-1");
+// > 0; input clamped to valid value
+
+transformer.validate(-1, true);
+// Throws an error; the transformer only accepts nonnegative numbers
+```
+
+This should be useful if you need access to the parsing and stringification
+logic for content attributes to do eg. SSR.
+
+### Other changes in 2.1.0
+
+Bump dependencies, play a little code golf, tweak and expand readme, run tests
+against playwright's "webkit" browser too - for whatever that's worth.
+
 ## 2.0.0
 
 ### BREAKING: Event name mapping removed from `@subscribe()`

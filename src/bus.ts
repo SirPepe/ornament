@@ -3,7 +3,7 @@
 // instances themselves have initialized completely. Lazy initialization is the
 // only way this can work.
 
-import { EVENT_BUS_TARGET } from "./lib";
+const ORNAMENT_EVENT_BUS_KEY: unique symbol = Symbol();
 
 export class OrnamentEvent<K extends keyof OrnamentEventMap> extends Event {
   readonly args: OrnamentEventMap[K];
@@ -13,21 +13,24 @@ export class OrnamentEvent<K extends keyof OrnamentEventMap> extends Event {
   }
 }
 
-export function trigger<
-  T extends HTMLElement,
-  K extends keyof OrnamentEventMap,
->(instance: T, name: K, ...args: OrnamentEventMap[K]): void {
-  const target = ((instance as any)[EVENT_BUS_TARGET] ??= new EventTarget());
+export function trigger<T, K extends keyof OrnamentEventMap>(
+  instance: T,
+  name: K,
+  ...args: OrnamentEventMap[K]
+): void {
+  const target = ((instance as any)[ORNAMENT_EVENT_BUS_KEY] ??=
+    new EventTarget());
   target.dispatchEvent(new OrnamentEvent(name, args));
 }
 
-export function listen<T extends HTMLElement, K extends keyof OrnamentEventMap>(
+export function listen<T, K extends keyof OrnamentEventMap>(
   instance: T,
   name: K,
   callback: (this: T, ...args: OrnamentEventMap[K]) => void,
   options?: AddEventListenerOptions,
 ): void {
-  const target = ((instance as any)[EVENT_BUS_TARGET] ??= new EventTarget());
+  const target = ((instance as any)[ORNAMENT_EVENT_BUS_KEY] ??=
+    new EventTarget());
   target.addEventListener(
     name,
     (evt: any): void => callback.call(instance, ...evt.args),

@@ -1,4 +1,4 @@
-import { EMPTY_OBJ, NO_VALUE, isArray } from "./lib.js";
+import { NO_VALUE } from "./lib.js";
 import {
   assertRecord,
   assertType,
@@ -22,7 +22,7 @@ const protoTransformer = {
 export const any: () => Transformer<any, any> = () =>
   Object.create(protoTransformer);
 
-function createTransformer<T extends HTMLElement, V, IntermediateV = V>(
+function createTransformer<T, V, IntermediateV = V>(
   input: Partial<Transformer<T, V, IntermediateV>>,
 ): Transformer<T, V, IntermediateV> {
   return Object.assign(Object.create(protoTransformer), input);
@@ -71,7 +71,7 @@ function clamp<T extends number | bigint>(value: T, min?: T, max?: T): T {
 }
 
 // Stringify everything, stateless and simple.
-export function string<T extends HTMLElement>(): Transformer<T, string> {
+export function string<T extends object>(): Transformer<T, string> {
   const initialValues = new WeakMap<T, string>();
   return createTransformer<T, string>({
     parse(newValue) {
@@ -86,7 +86,9 @@ export function string<T extends HTMLElement>(): Transformer<T, string> {
 }
 
 // behaves like href on <a>
-export function href<T extends HTMLElement>(): Transformer<T, string> {
+export function href<T extends object>({
+  location = window.location,
+}: { location?: Location } = {}): Transformer<T, string> {
   const currentValues = new WeakMap<T, string | null>();
   const defaultValues = new WeakMap<T, string>();
   return createTransformer<T, string>({
@@ -109,7 +111,7 @@ export function href<T extends HTMLElement>(): Transformer<T, string> {
       if (currentValues.get(this) === null) {
         return defaultValues.get(this)!;
       }
-      return String(new URL(value, String(window.location)));
+      return String(new URL(value, String(location)));
     },
     init(value = "") {
       currentValues.set(this, null);
@@ -119,7 +121,7 @@ export function href<T extends HTMLElement>(): Transformer<T, string> {
   });
 }
 
-export function bool<T extends HTMLElement>(): Transformer<T, boolean> {
+export function bool<T extends object>(): Transformer<T, boolean> {
   return createTransformer<T, boolean>({
     parse: (value) => value !== null,
     transform: Boolean,
@@ -157,14 +159,14 @@ function numberOptions(input: unknown): NumberOptions {
   };
 }
 
-export function number<T extends HTMLElement>(
+export function number<T extends object>(
   options: Optional<Omit<NumberOptions, "nullable">> & { nullable: true },
 ): Transformer<T, number | null | undefined>;
-export function number<T extends HTMLElement>(
+export function number<T extends object>(
   options?: Optional<NumberOptions>,
 ): Transformer<T, number>;
-export function number<T extends HTMLElement>(
-  options: Optional<NumberOptions> = EMPTY_OBJ,
+export function number<T extends object>(
+  options: Optional<NumberOptions> = {},
 ): Transformer<T, any> {
   const initialValues = new WeakMap<T, number>();
   const { min, max, allowNaN, nullable } = numberOptions(options);
@@ -234,14 +236,14 @@ function parseBigInt(value: string): bigint {
 
 type IntOptions = NumericOptions<bigint>;
 
-export function int<T extends HTMLElement>(
+export function int<T extends object>(
   options: Optional<Omit<IntOptions, "nullable">> & { nullable: true },
 ): Transformer<T, bigint | null | undefined>;
-export function int<T extends HTMLElement>(
+export function int<T extends object>(
   options?: Optional<IntOptions>,
 ): Transformer<T, bigint>;
-export function int<T extends HTMLElement>(
-  options: Optional<IntOptions> = EMPTY_OBJ,
+export function int<T extends object>(
+  options: Optional<IntOptions> = {},
 ): Transformer<T, any> {
   const initialValues = new WeakMap<T, bigint>();
   const { min, max, nullable } = bigintOptions(options);
@@ -287,8 +289,8 @@ type JSONOptions = {
   replacer?: Parameters<typeof JSON.stringify>[1];
 };
 
-export function json<T extends HTMLElement>(
-  options: JSONOptions = EMPTY_OBJ,
+export function json<T extends object>(
+  options: JSONOptions = {},
 ): Transformer<T, any> {
   const initialValues = new WeakMap<T, any>();
   return createTransformer<T, any>({
@@ -325,18 +327,18 @@ export function json<T extends HTMLElement>(
   });
 }
 
-type LiteralOptions<T extends HTMLElement, V> = {
+type LiteralOptions<T, V> = {
   values: V[];
   transform: Transformer<T, V>;
 };
 
-function literalOptions<T extends HTMLElement, V>(
-  input: unknown = EMPTY_OBJ,
+function literalOptions<T extends object, V>(
+  input: unknown = {},
 ): LiteralOptions<T, V> {
   assertRecord(input, "options");
   const { values, transform } = input;
   assertTransformer<T, V>(transform, "transform");
-  if (!isArray(values)) {
+  if (!Array.isArray(values)) {
     throw new TypeError(
       `Expected "values" to be array, got "${typeof values}".`,
     );
@@ -347,7 +349,7 @@ function literalOptions<T extends HTMLElement, V>(
   return { values, transform };
 }
 
-export function literal<T extends HTMLElement, V>(
+export function literal<T extends object, V>(
   options: LiteralOptions<T, V>,
 ): Transformer<T, V> {
   const initialValues = new WeakMap<T, V>();
@@ -385,14 +387,12 @@ export function literal<T extends HTMLElement, V>(
   });
 }
 
-type ListOptions<T extends HTMLElement, V> = {
+type ListOptions<T, V> = {
   separator?: string;
   transform: Transformer<T, V>;
 };
 
-function listOptions<T extends HTMLElement, V>(
-  input: unknown = EMPTY_OBJ,
-): Required<ListOptions<T, V>> {
+function listOptions<T, V>(input: unknown = {}): Required<ListOptions<T, V>> {
   assertRecord(input, "options");
   const { separator = ",", transform } = input;
   assertTransformer<T, V>(transform);
@@ -402,7 +402,7 @@ function listOptions<T extends HTMLElement, V>(
   return { separator, transform };
 }
 
-export function list<T extends HTMLElement, V>(
+export function list<T extends object, V>(
   inputOptions: ListOptions<T, V>,
 ): Transformer<T, V[], any[]> {
   const initialValues = new WeakMap<T, V[]>();
@@ -413,7 +413,7 @@ export function list<T extends HTMLElement, V>(
     values: unknown,
     isContentAttribute: boolean,
   ): void {
-    if (!isArray(values)) {
+    if (!Array.isArray(values)) {
       throw new Error(`Expected array, got ${typeof values}`);
     }
     for (const value of values) {
@@ -465,13 +465,10 @@ export function list<T extends HTMLElement, V>(
 type Handler<T, E extends Event> =
   | ((this: T, evt: E) => boolean | undefined | void)
   | null;
-type HandlerTransform<T extends HTMLElement, E extends Event> = Transformer<
-  T,
-  Handler<T, E>
->;
+type HandlerTransform<T, E extends Event> = Transformer<T, Handler<T, E>>;
 
 export function event<
-  T extends HTMLElement,
+  T extends EventTarget,
   E extends Event,
 >(): HandlerTransform<T, E> {
   const functions = new WeakMap<T, Handler<T, E>>();

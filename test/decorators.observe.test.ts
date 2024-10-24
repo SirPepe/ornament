@@ -51,6 +51,40 @@ describe("Decorators", () => {
         expect(fn.getCalls()[0].args).to.eql([instance, ["childList"], true]);
       });
 
+      test("Respect the predicate", async () => {
+        const fn = spy();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @observe(MutationObserver, {
+            childList: true,
+            // Only track removals
+            predicate: (_, records) => {
+              const removals = records.filter(
+                (record) => record.removedNodes.length > 0,
+              );
+              return removals.length > 0;
+            },
+          })
+          test(records: MutationRecord[], observer: MutationObserver) {
+            fn(
+              this,
+              records.map((record) => record.type),
+              observer instanceof MutationObserver,
+            );
+          }
+        }
+        const instance = new Test();
+        document.body.append(instance);
+        const el = document.createElement("div");
+        instance.append(el);
+        await wait(TIMEOUT); // Mutation observers are async
+        expect(fn.callCount).to.equal(0); // additions are filtered out
+        el.remove();
+        await wait(TIMEOUT); // Mutation observers are async
+        expect(fn.callCount).to.equal(1); // removals are tracked
+        expect(fn.getCalls()[0].args).to.eql([instance, ["childList"], true]);
+      });
+
       test("Start/Stop observing based on connected state", async () => {
         const fn = spy();
         @define(generateTagName())
