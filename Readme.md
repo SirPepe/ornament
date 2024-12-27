@@ -623,7 +623,7 @@ run, the following needs to be true:
 
 - **`keys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) to monitor. Can include private names and symbols. Defaults to monitoring all content and IDL attributes defined by `@prop()` or `@attr()`.
 - **`excludeKeys` (Array\<string | symbol\>, optional)**: List of attributes (defined by `@prop()` or `@attr()`) not to monitor. Can include private names and symbols. Defaults to an empty array.
-- **`predicate` (Function `(instance: T) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change. Note that this function is not part of the class declaration itself and can therefore _not_ access private fields on `instance`.
+- **`predicate` (Function `(instance: T, prop: string | symbol, newValue: any) => boolean`)**: If provided, controls whether or not the decorated method is called for a given change. Note that this function is not part of the class declaration itself and can therefore _not_ access private fields on `instance`, but the predicate function gets passed the affected IDL property's name and new value.
 
 ### `@init()`
 

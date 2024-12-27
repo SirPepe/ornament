@@ -232,7 +232,7 @@ export function init<T extends HTMLElement>(): LifecycleDecorator<
 type ReactiveOptions<T> = {
   keys?: (string | symbol)[];
   excludeKeys?: (string | symbol)[];
-  predicate?: (instance: T) => boolean;
+  predicate?: (instance: T, key: string | symbol, value: any) => boolean;
 };
 
 type ReactiveDecorator<T extends HTMLElement> = {
@@ -252,9 +252,9 @@ export function reactive<T extends HTMLElement>(
     // completion. This prevents prop set-up in the constructor from triggering
     // reactive methods.
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
-      listen(instance, "prop", (name) => {
+      listen(instance, "prop", (name, newValue) => {
         if (
-          (!options.predicate || options.predicate(instance)) &&
+          (!options.predicate || options.predicate(instance, name, newValue)) &&
           (!options.keys || options.keys.includes(name)) &&
           (!options.excludeKeys || !options.excludeKeys.includes(name))
         ) {

@@ -149,30 +149,40 @@ describe("Decorators", () => {
     });
 
     test("predicate option", async () => {
-      const fn = spy();
+      const testFn = spy();
+      const predFn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(number()) accessor value = 0;
         @reactive({
-          predicate: (instance) => instance.value % 2 === 0,
+          predicate: (instance, key, value) => {
+            predFn(instance, key, value);
+            return instance.value % 2 === 0;
+          },
         })
         test() {
-          fn(this.value);
+          testFn(this.value);
         }
       }
       const el = new Test();
       el.value++;
-      expect(fn.callCount).to.equal(0);
+      expect(testFn.callCount).to.equal(0);
+      expect(predFn.callCount).to.equal(1);
+      expect(predFn.getCalls()[0].args).to.eql([el, "value", 1]);
       el.value++;
-      expect(fn.callCount).to.equal(1);
-      expect(fn.getCalls()[0].args).to.eql([2]);
+      expect(testFn.callCount).to.equal(1);
+      expect(testFn.getCalls()[0].args).to.eql([2]);
+      expect(predFn.callCount).to.equal(2);
+      expect(predFn.getCalls()[1].args).to.eql([el, "value", 2]);
       el.value++;
-      expect(fn.callCount).to.equal(1);
-      expect(fn.getCalls()[0].args).to.eql([2]);
+      expect(testFn.callCount).to.equal(1);
+      expect(predFn.callCount).to.equal(3);
+      expect(predFn.getCalls()[2].args).to.eql([el, "value", 3]);
       el.value++;
-      expect(fn.callCount).to.equal(2);
-      expect(fn.getCalls()[0].args).to.eql([2]);
-      expect(fn.getCalls()[1].args).to.eql([4]);
+      expect(testFn.callCount).to.equal(2);
+      expect(testFn.getCalls()[1].args).to.eql([4]);
+      expect(predFn.callCount).to.equal(4);
+      expect(predFn.getCalls()[3].args).to.eql([el, "value", 4]);
     });
 
     test("static class member as a predicate (for accessing a private field)", async () => {
