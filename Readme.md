@@ -248,25 +248,28 @@ universal, and will therefore more or less always keep chugging along.
 | `@enhance()`          | Class                       | -        | -          | -       | Set up a custom element class for use with Ornament's other decorators, but do _not_ register it with a tag name                  |
 | `@prop()`             | Accessor                    | ✕        | ✓          | ✓       | Define an accessor to work as an IDL attribute with a given data type                                                             |
 | `@attr()`             | Accessor                    | ✕        | ✓[^1]      | ✓[^1]   | Define an accessor to work as a content attribute and associated IDL attribute with a given data type                             |
-| `@reactive()`         | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions) |
-| `@init()`             | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function after the class constructor finishes                                                         |
-| `@connected()`        | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element connects to the DOM                                                         |
-| `@disconnected()`     | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element disconnects from the DOM                                                    |
-| `@adopted()`          | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element is adopted by a new document                                                |
-| `@formAssociated()`   | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element is associated with a form element                                           |
-| `@formReset()`        | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element's form owner resets                                                         |
-| `@formDisabled()`     | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                                             |
-| `@formStateRestore()` | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                                          |
-| `@subscribe()`        | Accessor, Method, Field[^2] | ✕        | ✓          | ✓       | Update a reactive accessor or run a method or class field function to react to changes to a signal or to events on an EventTarget |
-| `@observe()`          | Method, Field[^2]           | ✕        | ✓          | ✓       | Run a method or class field function as a callback for an IntersectionObserver, MutationObserver, or ResizeObserver               |
-| `@debounce()`         | Method, Field[^2]           | ✓        | ✓          | ✓       | Debounce a method or class field function, (including `static`)                                                                   |
+| `@state()`            | Accessor                    | ✕        | ✓          | ✓[^2]   | Track the accessor's value in the element's [CustomStateSet](https://developer.mozilla.org/en-US/docs/Web/API/CustomStateSet)     |
+| `@reactive()`         | Method, Field[^3]           | ✕        | ✓          | ✓       | Run a method or class field function when accessors decorated with `@prop()` or `@attr()` change value (with optional conditions) |
+| `@init()`             | Method, Field[^3]           | ✕        | ✓          | ✓       | Run a method or class field function after the class constructor finishes                                                         |
+| `@connected()`        | Method, Field[^3]           | ✕        | ✓          | ✓       | Run a method or class field function when the element connects to the DOM                                                         |
+| `@disconnected()`     | Method, Field[^3]           | ✕        | ✓          | ✓       | Run a method or class field function when the element disconnects from the DOM                                                    |
+| `@adopted()`          | Method, Field[^3]           | ✕        | ✓          | ✓       | Run a method or class field function when the element is adopted by a new document                                                |
+| `@formAssociated()`   | Method, Field[^3]           | ✕        | ✓          | ✓       | Run a method or class field function when the element is associated with a form element                                           |
+| `@formReset()`        | Method, Field[^3]           | ✕        | ✓          | ✓       | Run a method or class field function when the element's form owner resets                                                         |
+| `@formDisabled()`     | Method, Field[^3]           | ✕        | ✓          | ✓       | Run a method or class field function when the element's ancestor fieldset is disabled                                             |
+| `@formStateRestore()` | Method, Field[^3]           | ✕        | ✓          | ✓       | Run a method or class field function when the element's `formStateRestoreCallback` fires                                          |
+| `@subscribe()`        | Accessor, Method, Field[^3] | ✕        | ✓          | ✓       | Update a reactive accessor or run a method or class field function to react to changes to a signal or to events on an EventTarget |
+| `@observe()`          | Method, Field[^3]           | ✕        | ✓          | ✓       | Run a method or class field function as a callback for an IntersectionObserver, MutationObserver, or ResizeObserver               |
+| `@debounce()`         | Method, Field[^3]           | ✓        | ✓          | ✓       | Debounce a method or class field function, (including `static`)                                                                   |
 
 [^1]:
     Can be `#private` or a symbol _if_ a non-private non-symbol getter/setter
     pair for the attribute name exists and a content attribute name has been
     set using the `as` option.
 
-[^2]: Class field values must be of type `function`
+[^2]: Can be a symbol _if_ a string value has been provided for the state field
+
+[^3]: Class field values must be of type `function`
 
 ### `@define(tagName: string, options: ElementDefinitionOptions = {}, registry: CustomElementRegistry = window.customElements)`
 
@@ -574,6 +577,81 @@ attributes will not cause `@reactive()` methods to run.
 
 - **`as` (string, optional)**: Sets an attribute name different from the accessor's name, similar to how the `class` content attribute works for the `className` IDL attribute on built-in elements. If `as` is not set, the content attribute's name will be equal to the accessor's name. `as` is required when the decorator is applied to a symbol or private property.
 - **`reflective` (boolean, optional)**: If `false`, prevents the content attribute from updating when the IDL attribute is updated, similar to how `value` works on `input` elements. Defaults to true.
+
+### `@state(options: StateOptions = {})`
+
+**Accessor decorator** that tracks the accessor's value in the element's
+[CustomStateSet](https://developer.mozilla.org/en-US/docs/Web/API/CustomStateSet).
+By default, the state's name is the decorated member's name and `Boolean` is
+used to decide whether a state should be added or removed from the set.
+
+```javascript
+import { define, state } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @state()
+  accessor foo = 0;
+  // Default: tracks the state "foo" by transforming the value with Boolean()
+
+  @state({ name: "isOdd", toBoolean: (value) => value % 2 !== 0 })
+  accessor bar = 0;
+  // Custom: tracks "bar" as "isOff" by transforming the value with toBoolean()
+}
+
+let testEl = document.createElement("my-test");
+
+// Custom state "foo" is not set, since Boolean(0) === false
+console.log(testEl.matches(":state(foo)")); // > false
+
+// Custom state "isOdd" is not set, since (value % 2 !== 0) === false
+console.log(testEl.matches(":state(isOdd)")); // > false
+
+testEl.foo = 1;
+testEl.bar = 1;
+
+// Custom state "foo" is set, since Boolean(1) === true
+console.log(testEl.matches(":state(foo)")); // > true
+
+// Custom state "isOdd" is set, since (value % 2 !== 0) === true
+console.log(testEl.matches(":state(isOdd)")); // > true
+```
+
+The decorator works with private accessors. If no `name` option is provided, the
+custom state name includes the `#` sign. Use on symbol accessors requires the
+`name` option.
+
+To properly combine with `@prop()` and `@attr()`, `@state()` should be applied
+to the accessor last to benefit from the type checking and/or conversion
+provided from the other decorators:
+
+```javascript
+import { define, state, prop, number } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @prop(number({ min: 0 })) // <- @prop() comes first
+  @state({ toBoolean: (x) => x % 2 === 0 }) // <- @state() comes last
+  accessor foo = 0;
+}
+
+const testEl = new Test();
+// state "foo" is true
+
+testEl.foo = 1;
+// state "foo" is false
+
+try {
+  testEl.foo = -2; // <- this fails
+} catch {
+  // state "foo" on el still false; @prop intercepted the set operation
+}
+```
+
+#### Options for `@state()`
+
+- **`name` (string, optional)**: name of the state in the CustomStateSet. If `name` is not set, the state's name will be equal to the accessor's name. `name` is required when the decorator is applied to a symbol.
+- **`toBoolean` (((value, instance) => boolean), optional)**: Function to transform the accessor's value into a boolean, which in turn decides whether a state should be added or removed from the set. Defaults to the `Boolean` function.
 
 ### `@reactive(options: ReactiveOptions = {})`
 

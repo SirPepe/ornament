@@ -27,6 +27,23 @@ function initAccessorInitialValue(
   return defaultValue;
 }
 
+// Tracks internals to, on one hand, make them available to multiple parts of
+// the library and on the other hand expose the same API (with the same
+// constraints, eg. attachInternals() can only be called once) to component
+// classes.
+const INTERNALS_MAP = new WeakMap<HTMLElement, ElementInternals>();
+const ATTACH_INTERNALS_CALLED = new WeakSet<HTMLElement>();
+
+function getInternals(instance: HTMLElement): ElementInternals {
+  const existingInternals = INTERNALS_MAP.get(instance);
+  if (existingInternals) {
+    return existingInternals;
+  }
+  const newInternals = HTMLElement.prototype.attachInternals.call(instance);
+  INTERNALS_MAP.set(instance, newInternals);
+  return newInternals;
+}
+
 // The class decorator @enhance() injects the mixin class that hat deals with
 // attribute observation and reactive init callback handling. You should
 // probably stick to @define(), which does the same thing, but also defines the
@@ -88,6 +105,18 @@ export function enhance<T extends CustomElementConstructor>(): (
           ...originalObservedAttributes,
           ...getMetadataFromContext(context).attr.keys(),
         ];
+      }
+
+      // Same API as the original attachInternals(), but allows the rest of the
+      // library to liberally access internals.
+      attachInternals(): ElementInternals {
+        if (ATTACH_INTERNALS_CALLED.has(this)) {
+          throw new Error(
+            "ElementInternals for the specified element was already attached",
+          );
+        }
+        ATTACH_INTERNALS_CALLED.add(this);
+        return getInternals(this);
       }
 
       connectedCallback(): void {
@@ -788,6 +817,44 @@ export function attr<T extends HTMLElement, V>(
       },
       get() {
         return transformer.transformGet.call(this, target.get.call(this));
+      },
+    };
+  };
+}
+
+type StateOptions<T, V> = {
+  name?: string; // defaults to the accessor's name
+  toBoolean?: (value: V, instance: T) => boolean; // defaults to Boolean
+};
+
+// The accessor decorator @state() controls a custom state set entry
+export function state<T extends HTMLElement, V>(
+  options: StateOptions<T, V> = {},
+): ClassAccessorDecorator<T, V> {
+  return function (target, context): ClassAccessorDecoratorResult<T, V> {
+    assertContext(context, "state", "accessor");
+    const { name = context.name, toBoolean = Boolean } = options;
+    if (typeof name === "symbol") {
+      throw new TypeError(
+        "Custom state set values can not be symbols. Provide a string name for your accessor's custom state field or use a regular property name instead of a symbol.",
+      );
+    }
+    return {
+      init(input) {
+        if (toBoolean(input, this)) {
+          getInternals(this).states.add(name);
+        } else {
+          getInternals(this).states.delete(name);
+        }
+        return input;
+      },
+      set(input) {
+        if (toBoolean(input, this)) {
+          getInternals(this).states.add(name);
+        } else {
+          getInternals(this).states.delete(name);
+        }
+        target.set.call(this, input);
       },
     };
   };
