@@ -11,7 +11,8 @@
       "require": "./dist/min/index.min.js",
       "default": "./dist/esm/index.js"
     },
-    "./readme": "./Readme.md"
+    "./readme": "./Readme.md",
+    "./changelog": "./changelog.md"
   },
   "scripts": {
     "lint": "npx prettier . --check && eslint",

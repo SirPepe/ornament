@@ -1,5 +1,69 @@
 # Changelog
 
+## 2.2.0
+
+### FEATURE: new decorator `@state()`
+
+`@state()` is a new accessor decorator that tracks the accessor's value in the element's [CustomStateSet](https://developer.mozilla.org/en-US/docs/Web/API/CustomStateSet):
+
+```javascript
+import { define, state } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {
+  @state()
+  accessor foo = 0;
+  // Default: tracks the state "foo" by transforming the value with Boolean()
+
+  @state({ name: "isOdd", toBoolean: (value) => value % 2 !== 0 })
+  accessor bar = 0;
+  // Custom: tracks "bar" as "isOff" by transforming the value with toBoolean()
+}
+
+let testEl = document.createElement("my-test");
+
+// Custom state "foo" is not set, since Boolean(0) === false
+console.log(testEl.matches(":state(foo)")); // > false
+
+// Custom state "isOdd" is not set, since (value % 2 !== 0) === false
+console.log(testEl.matches(":state(isOdd)")); // > false
+
+testEl.foo = 1;
+testEl.bar = 1;
+
+// Custom state "foo" is set, since Boolean(1) === true
+console.log(testEl.matches(":state(foo)")); // > true
+
+// Custom state "isOdd" is set, since (value % 2 !== 0) === true
+console.log(testEl.matches(":state(isOdd)")); // > true
+```
+
+`@state()` can be combined with `@prop()` and `@attr()`, but it does not have
+to be.
+
+### Feature: `getInternals(instance: HTMLElement): ElementInternals`
+
+The utility function `getInternals()` provides easy access to a component's
+[ElementInternals](https://developer.mozilla.org/en-US/docs/Web/API/ElementInternals).
+In contrast to the regular `attachInternals()` method, `getInternals()` be as
+often as required:
+
+```javascript
+import { define, getInternals } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {}
+const testEl = new Test();
+
+const internals1 = getInternals(testEl);
+const internals2 = testEl.attachInternals();
+console.log(internals1 === internals2); // > true
+
+getInternals(testEl); // works a second time
+getInternals(testEl); // works a third time
+testEl.attachInternals()).to.throw(); // > Exception on second use
+```
+
 ## 2.1.0
 
 ### FEATURE: Website

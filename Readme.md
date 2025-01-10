@@ -5,9 +5,9 @@
   </picture>
 </h1>
 
-📢 **What's new in 2.1.0?** [Check out the Changelog!](./changelog.md)
+📢 **What's new in 2.2.0?** [Check out the Changelog!](./changelog.md)
 
-**Build your own frontend framework** with Ornament, a mid-level,
+**Build your own frontend framework** with Ornament, a stable, mid-level,
 pareto-optimal, treeshakable and tiny TypeScript-positive toolkit for web
 component infrastructure! Escape from heavyweight frameworks, constant rewrites
 and the all-encompassing frontend FOMO with a declarative, simple, and type-safe
@@ -46,8 +46,9 @@ class MyGreeter extends HTMLElement {
 }
 ```
 
-Ornament makes web components fun and easy when compared to the equivalent
-boilerplate monstrosity that one would have to write by hand otherwise:
+Ornament makes quasi-vanilla web components fun and easy when compared to the
+equivalent boilerplate monstrosity that one would have to write by hand
+otherwise:
 
 <details>
 <summary>😱 Unveil the horror 😱</summary>
@@ -172,14 +173,14 @@ and enjoy your very own frontend web framework.
 ### Installation
 
 Install [@sirpepe/ornament](https://www.npmjs.com/package/@sirpepe/ornament)
-with your favorite package manager. To get the decorator syntax working in 2024,
+with your favorite package manager. To get the decorator syntax working in 2025,
 you will probably need [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
 (with option `version` set to `"2023-11"`) or
 [TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
 (with the option `experimentalDecorators` turned _off_).
 
 Apart from that, Ornament is just a bunch of functions. No further setup
-required, no extra concepts to learn.
+required.
 
 ### General philosophy
 
@@ -209,7 +210,8 @@ following:
 - specialized syntax for every (or any specific) use case
 
 You can (and probably have to) therefore pick or write your own solutions for
-the above features. Check out the `examples` folder for inspiration!
+the above features. Check out the `examples` folder for inspiration! The
+examples can be built using `npm run build-examples`.
 
 ### Exit strategy
 
@@ -288,7 +290,9 @@ console.log(document.createElement("my-test")); // instance of MyTest
 `@define()` also sets up attribute observation for use with the
 `@attr()` decorator, prepares the hooks for
 lifecycle decorators like `@connected()` and ensures that property upgrades for
-previously undefined elements happen in a predictable fashion.
+previously undefined elements happen in a predictable fashion. Ornament's
+features will only work if the component class is decorated with either
+`@define()` or `@enhance()`.
 
 <details>
 <summary>What are safe upgrades?</summary>
@@ -408,6 +412,9 @@ class Base3 extends HTMLElement {}
 @enhance()
 class MyTest3 extends Base3 {}
 ```
+
+Remember that Ornament's features will only work if the component class is
+decorated with either `@define()` or `@enhance()`.
 
 ### `@prop(transformer: Transformer<any, any>)`
 
@@ -1168,7 +1175,7 @@ able to return anything but `undefined`.
 
 ### `@observe(ctor: ObserverConstructor, options: ObserverOptions = {})`
 
-**Method and class field decorator** that sets up a [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver), or [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) with the element instance as the target and the decorated method as the callback. This enables the web component to observe itself:
+**Method and class field decorator** that sets up a [MutationObserver](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver), [ResizeObserver](https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver), or [IntersectionObserver](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API) with the element instance as the target and the decorated method as the callback. This enables the component to observe itself:
 
 ```javascript
 import { define, observe } from "@sirpepe/ornament";
@@ -1190,7 +1197,7 @@ el.innerText = "Test"; // cause mutation
 // Test.reactToChanges() gets called asynchronously by the observer
 ```
 
-`@observe()` always observes the element that the decorated method belongs to and its reactions are always observably (heh) asynchronous. The decorator does little more than create an observer object with the options provided and the decorated method as the callback function. In theory this should work with every kind of DOM-related observer but has only been tested with MutationObserver, ResizeObserver and IntersectionObserver so far.
+`@observe()` always observes the element that the decorated method belongs to and its reactions are always observably (heh) asynchronous. The decorator does little more than create an observer object with the options provided and the decorated method as the callback function. In theory this should work with every kind of DOM-related observer, but has only been tested with MutationObserver, ResizeObserver and IntersectionObserver so far.
 
 #### Options for `@observe()`
 
