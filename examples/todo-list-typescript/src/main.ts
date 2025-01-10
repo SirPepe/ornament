@@ -13,6 +13,7 @@ import {
   connected,
   debounce,
   subscribe,
+  getInternals,
 } from "@sirpepe/ornament";
 import { signal, computed } from "@preact/signals-core";
 import { render, html } from "uhtml";
@@ -32,23 +33,12 @@ const reRender =
       context,
     );
 
-function fail(): never {
-  throw new Error("This should never happen");
-}
-
-// For extra fun, let's make the shadow roots in the components of this example
-// private and closed. But we can't use private class fields, because we do need
-// to access the shadow roots in decorators... so let's go the weak map route!
-const shadowRoots = new WeakMap<HTMLElement, ShadowRoot>();
-
 // Custom base class to provide some common functionality, in this case
-// rendering to shadow DOM with uhtml. Apart from type annotations, this is the
-// same as the base class in the plain JS example.
+// rendering to shadow DOM with uhtml. For extra fun, this makes the shadow
+// roots in the components private and closed. Apart from that (and type
+// annotations), this is the same as the base class in the plain JS example.
 class BaseComponent extends HTMLElement {
-  constructor() {
-    super();
-    shadowRoots.set(this, this.attachShadow({ mode: "closed" }));
-  }
+  #root = this.attachShadow({ mode: "closed" });
 
   // Wraps uhtml's render() function to make it available to every subclass
   // without importing extra libraries.
@@ -59,11 +49,13 @@ class BaseComponent extends HTMLElement {
   // Essentially wraps uhtml's render() function. If the class has a `css`
   // property, its contents is added in a style tag next to the actual content.
   render(content: any) {
-    const root = shadowRoots.get(this) ?? fail();
     if ("css" in this) {
-      return render(root, this.html`${content}<style>${this.css}</style>`);
+      return render(
+        this.#root,
+        this.html`${content}<style>${this.css}</style>`,
+      );
     }
-    return render(root, content);
+    return render(this.#root, content);
   }
 }
 
@@ -113,13 +105,14 @@ type EventNameMap = HTMLElementEventMap & {
 // This application goes down the SPA rabbit hole and therefore has to deal with
 // event delegation in shadow roots. To make this palatable, the following
 // decorator (which is just a wrapper around @subscribe) has been adapted from
-// the readme.
+// the readme. getInternals() enabled access to the component's private and
+// closed shadow roots.
 const capture = <T extends HTMLElement, K extends keyof EventNameMap>(
   eventName: K,
   selector = "*",
 ) =>
   subscribe<T, ShadowRoot, EventNameMap[K]>(
-    (el: T) => shadowRoots.get(el) ?? fail(),
+    (el: T) => getInternals(el).shadowRoot,
     eventName,
     {
       predicate: (_: unknown, evt: EventNameMap[K]) =>
