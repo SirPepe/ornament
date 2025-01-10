@@ -34,7 +34,7 @@ function initAccessorInitialValue(
 const INTERNALS_MAP = new WeakMap<HTMLElement, ElementInternals>();
 const ATTACH_INTERNALS_CALLED = new WeakSet<HTMLElement>();
 
-function getInternals(instance: HTMLElement): ElementInternals {
+export function getInternals(instance: HTMLElement): ElementInternals {
   const existingInternals = INTERNALS_MAP.get(instance);
   if (existingInternals) {
     return existingInternals;

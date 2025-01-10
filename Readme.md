@@ -1882,6 +1882,30 @@ listen(someElement, "prop", (evt) => {
 Event type used on the internal event bus. Only really useful if you want to
 create your own events while using TypeScript.
 
+## Other utilities
+
+### `getInternals(instance: HTMLElement): ElementInternals`
+
+Get the [ElementInternals](https://developer.mozilla.org/en-US/docs/Web/API/ElementInternals)
+for a component instance. While `getInternals()` be called as often as required,
+component's `attachInternals()` methods are still single-use:
+
+```javascript
+import { define, getInternals } from "@sirpepe/ornament";
+
+@define("my-test")
+class Test extends HTMLElement {}
+const testEl = new Test();
+
+const internals1 = getInternals(testEl);
+const internals2 = testEl.attachInternals();
+console.log(internals1 === internals2); // > true
+
+getInternals(testEl); // works a second time
+getInternals(testEl); // works a third time
+testEl.attachInternals()).to.throw(); // > Exception on second use
+```
+
 ## Symbols
 
 ### `NO_VALUE`
