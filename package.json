@@ -1,6 +1,6 @@
 {
   "name": "@sirpepe/ornament",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Micro-library for building vanilla web component frameworks",
   "type": "module",
   "main": "dist/esm/index.js",
