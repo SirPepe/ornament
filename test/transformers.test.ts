@@ -14,7 +14,6 @@ import {
   string,
   list,
   any,
-  reactive,
   init,
 } from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
