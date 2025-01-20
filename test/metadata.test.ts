@@ -8,7 +8,6 @@ import {
   getAttribute,
   prop,
   number,
-  NO_VALUE,
 } from "../src/index.js";
 import { generateTagName } from "./helpers.js";
 const test = it;
