@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.1
+
+### BUGFIX: enable multiple bundles of Ornament to co-exist
+
+By turning several symbols used in Ornament's plumbing into _registered_
+symbols, use cases where multiple bundles of Ornament have to co-exist on one
+page now work. The different bundles can not track each other's metadata,
+events, component initialization status, and more - as long as they are roughly
+compatible. This update contains no breaking changes and the bug it fixes is,
+frankly, something that nobody should ever have noticed.
+
 ## 2.2.0
 
 ### FEATURE: new decorator `@state()`

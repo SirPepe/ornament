@@ -3,7 +3,9 @@
 // instances themselves have initialized completely. Lazy initialization is the
 // only way this can work.
 
-const ORNAMENT_EVENT_BUS_KEY: unique symbol = Symbol();
+const ORNAMENT_EVENT_BUS_KEY: unique symbol = Symbol.for(
+  "ORNAMENT_EVENT_BUS_KEY",
+);
 
 export class OrnamentEvent<K extends keyof OrnamentEventMap> extends Event {
   readonly args: OrnamentEventMap[K];

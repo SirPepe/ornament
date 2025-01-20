@@ -10,8 +10,8 @@ import {
 } from "./types.js";
 
 // Explained in @enhance()
-const INITIALIZER_KEY: unique symbol = Symbol();
-const INITIALIZED_BY: unique symbol = Symbol();
+const INITIALIZER_KEY: unique symbol = Symbol.for("ORNAMENT_INITIALIZER_KEY");
+const INITIALIZED_BY: unique symbol = Symbol.for("ORNAMENT_INITIALIZED_BY");
 
 // Un-clobber an accessor's name if the element upgrades after a property with
 // a matching name has already been set ("safe upgrade").
@@ -31,16 +31,16 @@ function initAccessorInitialValue(
 // the library and on the other hand expose the same API (with the same
 // constraints, eg. attachInternals() can only be called once) to component
 // classes.
-const INTERNALS_MAP = new WeakMap<HTMLElement, ElementInternals>();
-const ATTACH_INTERNALS_CALLED = new WeakSet<HTMLElement>();
-
+const ORNAMENT_INTERNALS_KEY: unique symbol = Symbol.for(
+  "ORNAMENT_INTERNALS_KEY",
+);
 export function getInternals(instance: HTMLElement): ElementInternals {
-  const existingInternals = INTERNALS_MAP.get(instance);
+  const existingInternals = (instance as any)[ORNAMENT_INTERNALS_KEY];
   if (existingInternals) {
     return existingInternals;
   }
   const newInternals = HTMLElement.prototype.attachInternals.call(instance);
-  INTERNALS_MAP.set(instance, newInternals);
+  (instance as any)[ORNAMENT_INTERNALS_KEY] = newInternals;
   return newInternals;
 }
 
@@ -77,16 +77,19 @@ export function enhance<T extends CustomElementConstructor>(): (
     // "public" as commonly understood by TypeScript (or anyone, really).
     // See https://github.com/microsoft/TypeScript/issues/51347
     return class extends target {
-      // Instances will most likely end up with an field [BUS_TARGET] containing
-      // the event target for the event bus. But because these targets may be
-      // needed before the class declarations, including this code, finish
-      // initializing (or they may be never needed), the event bus functions
-      // just slap them on instances if and when they become important. And
-      // because TypeScript can't do anything with the mixin class type, there
-      // is no *real* reason to have any code related to the event targets here,
-      // but if TS worked as advertised, the line below would accurately
-      // describe the observable effects the program has:
-      // [ORNAMENT_EVENT_BUS_KEY]!: EventTarget; // this is entirely useless
+      // Instances will most likely end up with a few extra class fields like
+      // [ORNAMENT_EVENT_BUS_KEY] and [ORNAMENT_INTERNALS_KEY] containing
+      // the event target for the event bus and the ElementInternals. But
+      // because these fields may need to be accessed before the class
+      // declarations, including this code, finish initializing (or they may be
+      // never needed), relevant functions just slap them on instances if and
+      // when they become important. And because TypeScript can't do anything
+      // with the mixin class type, there is no *real* reason to have any code
+      // related to the event targets or internals storage here, but *if* TS
+      // worked as advertised, the lines below would accurately describe the
+      // observable effects the program has:
+      // [ORNAMENT_EVENT_BUS_KEY]!: EventTarget;
+      // [ORNAMENT_INTERNALS_KEY]!: ElementInternals;
       // May 2024: a workaround for a plugin ordering issue in babel requires
       // the line above to be commented out. See the entire thread at
       // https://github.com/babel/babel/issues/16373#issuecomment-2017480546
@@ -108,14 +111,15 @@ export function enhance<T extends CustomElementConstructor>(): (
       }
 
       // Same API as the original attachInternals(), but allows the rest of the
-      // library to liberally access internals.
+      // library to liberally access internals via getInternals().
+      #attachInternalsCalled = false;
       attachInternals(): ElementInternals {
-        if (ATTACH_INTERNALS_CALLED.has(this)) {
+        if (this.#attachInternalsCalled) {
           throw new Error(
             "ElementInternals for the specified element was already attached",
           );
         }
-        ATTACH_INTERNALS_CALLED.add(this);
+        this.#attachInternalsCalled = true;
         return getInternals(this);
       }
 
