@@ -1,28 +1,21 @@
 import globals from "globals";
-import pluginJs from "@eslint/js";
+import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier";
 
-export default [
+export default tseslint.config(
   {
-    files: ["**/*.{js,mjs,cjs,ts,jsx}"],
-    ignores: ["dist/*.*"],
-    languageOptions: { globals: { ...globals.browser, ...globals.node } },
+    ignores: ["dist/**/*", "**/lib/main.js"],
   },
-  pluginJs.configs.recommended,
-  ...tseslint.configs.recommended,
+  eslint.configs.recommended,
+  tseslint.configs.recommended,
   eslintConfigPrettier,
   {
+    languageOptions: { globals: { ...globals.browser, ...globals.node } },
     rules: {
-      "no-unused-private-class-members": "off",
-      "no-constant-condition": [
-        "warn",
-        {
-          checkLoops: false,
-        },
-      ],
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": "off",
+      "no-unused-private-class-members": "off",
     },
   },
-];
+);
