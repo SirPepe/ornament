@@ -1,5 +1,45 @@
 # Changelog
 
+## 2.2.2
+
+### BUGFIX: fix `attachInternals()` breaking under convoluted circumstances
+
+I certain convoluted, but not entirely impossible scenarios calling
+`attachInternals()` could fail, complaining about
+`TypeError: object is not the right class`. Ornament's `@enhance()` and
+`@define()` inject a mixin class into component's class hierarchies which, among
+other things, overrides [`attachInternals()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/attachInternals)
+in a way that makes Ornament's `getInternals()` work while still keeping
+`attachInternals()` single-use. This was tracked in a private field in Ornament
+< 2.2.2., but private fields can fail when class hierarchies become too...
+interesting. Specifically the following failed:
+
+```javascript
+function whatever() {
+  return function (target) {
+    @enhance()
+    class Mixin extends target {}
+    return Mixin;
+  };
+}
+
+class Base extends HTMLElement {}
+
+@whatever()
+class Test extends Base {
+  constructor() {
+    super();
+    this.attachInternals(); // <- Error
+  }
+}
+
+window.customElements.define(generateTagName(), Test);
+const testEl = new Test();
+```
+
+By swapping the private field for yet another symbol, this problem is avoided
+in Ornament 2.2.2.
+
 ## 2.2.1
 
 ### BUGFIX: enable multiple bundles of Ornament to co-exist

@@ -30,9 +30,15 @@ function initAccessorInitialValue(
 // Tracks internals to, on one hand, make them available to multiple parts of
 // the library and on the other hand expose the same API (with the same
 // constraints, eg. attachInternals() can only be called once) to component
-// classes.
+// classes. ORNAMENT_INTERNALS_KEY and ORNAMENT_ATTACH_INTERNALS_CALLED are
+// symbols rather than private fields to a) allow multiple bundles of ornament
+// to work together and b) prevent private field access error under more
+// convoluted circumstances (see test suite)
 const ORNAMENT_INTERNALS_KEY: unique symbol = Symbol.for(
   "ORNAMENT_INTERNALS_KEY",
+);
+const ORNAMENT_ATTACH_INTERNALS_CALLED = Symbol.for(
+  "ORNAMENT_ATTACH_INTERNALS_CALLED",
 );
 export function getInternals(instance: HTMLElement): ElementInternals {
   const existingInternals = (instance as any)[ORNAMENT_INTERNALS_KEY];
@@ -112,14 +118,14 @@ export function enhance<T extends CustomElementConstructor>(): (
 
       // Same API as the original attachInternals(), but allows the rest of the
       // library to liberally access internals via getInternals().
-      #attachInternalsCalled = false;
+      [ORNAMENT_ATTACH_INTERNALS_CALLED] = false;
       attachInternals(): ElementInternals {
-        if (this.#attachInternalsCalled) {
+        if (this[ORNAMENT_ATTACH_INTERNALS_CALLED]) {
           throw new Error(
             "ElementInternals for the specified element was already attached",
           );
         }
-        this.#attachInternalsCalled = true;
+        this[ORNAMENT_ATTACH_INTERNALS_CALLED] = true;
         return getInternals(this);
       }
 
