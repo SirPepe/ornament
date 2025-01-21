@@ -17,15 +17,18 @@ const commonConfig = {
   ],
 };
 
-const plugins = [
-  terser({
-    compress: {
-      passes: 3,
-      unsafe_arrows: true,
-      booleans_as_integers: true,
-    },
-  }),
-];
+const plugins =
+  process.env.NODE_ENV !== "development"
+    ? [
+        terser({
+          compress: {
+            passes: 3,
+            unsafe_arrows: true,
+            booleans_as_integers: true,
+          },
+        }),
+      ]
+    : [];
 
 export default [
   {
