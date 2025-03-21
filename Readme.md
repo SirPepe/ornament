@@ -1064,7 +1064,7 @@ class Test extends HTMLElement {
 - **`eventNames` (string)**: The event(s) to listen to. To subscribe to multiple events, pass a single string with the event names separated by whitespace
 - **`options` (object, optional)**: Event handling options, consisting of...
   - **predicate (function `(this: T, event: Event, instance: T) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given event. Gets passed the element instance and the event object, and must return a boolean. Note that this method always handles the raw event object, before and eventual `transform()` is applied.
-  - **transform (function `<U>(instance: T, event: Event) => U`, optional)**: If provided, transforms the event object into something else. The decorated class element must be compatible with the type returned from `transform()`.
+  - **transform (function `<U>(this: T, event: Event, instance: T) => U`, optional)**: If provided, transforms the event object into something else. The decorated class element must be compatible with the type returned from `transform()`.
   - **activateOn (Array\<string\>, optional):** Ornament event on which to activate the subscription (that is, when to actually start listening on the EventTarget). Defaults to `["init", "connected"]`.
   - **deactivateOn (Array\<string\>, optional):** Ornament event on which to deactivate the subscription (when to call `removeEventListener()` on the EventTarget). Defaults to `["disconnected"]`.
   - **capture (boolean, optional):** [option for `addEventListener()`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters)
@@ -1116,7 +1116,7 @@ to throw events around.
 - **`signal` (Signal)**: The signal to subscribe to
 - **`options` (object, optional)**: Update handling options, consisting of...
   - **predicate (function `(this: T, value, instance: T) => boolean`, optional)**: If provided, controls whether or not the decorated method is called for a given signal update. Gets passed the element instance and the signal's value, and must return a boolean. Note that this method always handles the raw signal value, before and eventual `transform()` is applied.
-  - **transform (function `<U>(instance: T, value) => U`, optional)**: If provided, transforms the signal value into something else. The decorated class element must be compatible with the type returned from `transform()`.
+  - **transform (function `<U>(this: T, value, instance: T) => U`, optional)**: If provided, transforms the signal value into something else. The decorated class element must be compatible with the type returned from `transform()`.
   - **activateOn (Array\<string\>, optional):** Ornament event on which to activate the subscription (that is, when to actually subscribe to the Signal). Defaults to `["init", "connected"]`.
   - **deactivateOn (Array\<string\>, optional):** Ornament event on which to unsubscribe from the signal. Defaults to `["disconnected"]`.
 

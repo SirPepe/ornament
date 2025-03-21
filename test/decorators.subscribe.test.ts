@@ -61,10 +61,16 @@ describe("Decorators", () => {
 
       test("subscribe a method to a signal with a transform", async () => {
         const fn = spy();
+        const transformFn = spy();
         const counter = signal(0);
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(counter, { transform: (_, v) => String(v) })
+          @subscribe(counter, {
+            transform(value, instance) {
+              transformFn(this, value, instance);
+              return String(value);
+            },
+          })
           test(value: string) {
             fn(this, value);
           }
@@ -78,6 +84,11 @@ describe("Decorators", () => {
         expect(fn.getCalls()[1].args).to.eql([instance, "1"]);
         expect(fn.getCalls()[2].args).to.eql([instance, "2"]);
         expect(fn.getCalls()[3].args).to.eql([instance, "3"]);
+        expect(transformFn.callCount).to.equal(4);
+        expect(transformFn.getCalls()[0].args).to.eql([instance, 0, instance]);
+        expect(transformFn.getCalls()[1].args).to.eql([instance, 1, instance]);
+        expect(transformFn.getCalls()[2].args).to.eql([instance, 2, instance]);
+        expect(transformFn.getCalls()[3].args).to.eql([instance, 3, instance]);
       });
 
       test("subscribe a method to a signal with a predicate and a transform", async () => {
@@ -87,7 +98,7 @@ describe("Decorators", () => {
         class Test extends HTMLElement {
           @subscribe(counter, {
             predicate: (value) => value % 2 === 0,
-            transform: (_, value) => String(value),
+            transform: (value) => String(value),
           })
           test(value: string) {
             fn(this, value);
@@ -147,7 +158,7 @@ describe("Decorators", () => {
         const counter = signal(0);
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(counter, { transform: (_, x) => String(x) })
+          @subscribe(counter, { transform: (x) => String(x) })
           accessor value: string = "0";
           @reactive()
           react() {
@@ -263,10 +274,16 @@ describe("Decorators", () => {
 
       test("subscribe a method to an event target with a transform", async () => {
         const fn = spy();
+        const transformFn = spy();
         const target = new EventTarget();
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(target, "foo", { transform: (_, evt) => evt.bubbles })
+          @subscribe(target, "foo", {
+            transform(evt, instance) {
+              transformFn(this, evt, instance);
+              return evt.bubbles;
+            },
+          })
           test(data: boolean) {
             fn(this, data);
           }
@@ -276,6 +293,12 @@ describe("Decorators", () => {
         target.dispatchEvent(event);
         expect(fn.callCount).to.equal(1);
         expect(fn.getCalls()[0].args).to.eql([instance, false]);
+        expect(transformFn.callCount).to.equal(1);
+        expect(transformFn.getCalls()[0].args).to.eql([
+          instance,
+          event,
+          instance,
+        ]);
       });
 
       test("subscribe a field function to an event target", async () => {
@@ -298,7 +321,7 @@ describe("Decorators", () => {
         const target = new EventTarget();
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(target, "foo", { transform: (_, evt) => evt.type })
+          @subscribe(target, "foo", { transform: (evt) => evt.type })
           test = (name: string) => fn(this, name);
         }
         const instance = new Test();
@@ -328,7 +351,7 @@ describe("Decorators", () => {
         const target = new EventTarget();
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(target, "foo", { transform: (_, evt) => evt.target })
+          @subscribe(target, "foo", { transform: (evt) => evt.target })
           accessor test: any;
           @reactive() react = () => fn(this, this.test);
         }
@@ -609,7 +632,7 @@ describe("Decorators", () => {
         @define(generateTagName())
         class Test extends HTMLElement {
           @subscribe(target, "test", {
-            transform: (_, evt: TestEvent) => evt.value,
+            transform: (evt: TestEvent) => evt.value,
           })
           test(value: boolean) {
             fn(this, value);
@@ -665,19 +688,19 @@ describe("Decorators", () => {
           @subscribe(t, "foo")
           test0b(evt: MouseEvent) {}
 
-          // @ts-expect-error not a subtype of Event at akk
+          // @ts-expect-error not a subtype of Event at all
           @subscribe(t, "foo")
           test0c(notAnEvent: number) {}
 
           // With transform
           @subscribe(t, "click", {
-            transform: (_, evt: MouseEvent) => evt.bubbles,
+            transform: (evt: MouseEvent) => evt.bubbles,
           })
           test1a(value: boolean) {}
 
           // @ts-expect-error with transform, wrong method signature
           @subscribe(t, "click", {
-            transform: (_, evt: MouseEvent) => evt.bubbles,
+            transform: (evt: MouseEvent) => evt.bubbles,
           })
           test1b(value: string) {}
         }

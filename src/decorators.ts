@@ -328,11 +328,11 @@ type EventSubscribeOptionsWithTransform<
   E extends Event,
   V,
 > = EventSubscribeOptionsWithoutTransform<T, E> & {
-  transform: (instance: T, value: E) => V;
+  transform: (this: T, value: E, instance: T) => V; // TODO: accept transformer
 };
 
 type SignalSubscribeOptions<T, V, U> = SubscribeBaseOptions & {
-  transform?: (instance: T, value: V) => U;
+  transform?: (this: T, value: V, instance: T) => U; // TODO: accept transformer
   predicate?: (this: T, value: V, instance: T) => boolean;
 };
 
@@ -408,7 +408,11 @@ function subscribeToEventTarget<
         !options.predicate ||
         options.predicate.call(instance, originalEvent, instance)
       ) {
-        const transformedValue = options.transform(instance, originalEvent);
+        const transformedValue = options.transform.call(
+          instance,
+          originalEvent,
+          instance,
+        );
         if (context.kind === "accessor") {
           context.access.set(instance, transformedValue);
           // TODO: this results in two prop events if the decorated accessor is
@@ -456,7 +460,11 @@ function subscribeToSignal<T extends HTMLElement, S extends SignalLike<any>, U>(
         !options.predicate ||
         options.predicate.call(instance, originalValue, instance)
       ) {
-        const transformedValue = options.transform(instance, originalValue);
+        const transformedValue = options.transform.call(
+          instance,
+          originalValue,
+          instance,
+        );
         if (context.kind === "accessor") {
           context.access.set(instance, transformedValue);
           trigger(instance, "prop", context.name, transformedValue);
@@ -545,7 +553,7 @@ export function subscribe<T extends HTMLElement>(
       typeof namesOrOptions === "string"
     ) {
       return subscribeToEventTarget(context, targetOrFactory, namesOrOptions, {
-        transform: (_, value) => value,
+        transform: (value) => value,
         activateOn: ["init", "connected"],
         deactivateOn: ["disconnected"],
         ...options,
@@ -558,7 +566,7 @@ export function subscribe<T extends HTMLElement>(
         typeof namesOrOptions === "undefined")
     ) {
       return subscribeToSignal(context, targetOrFactory, {
-        transform: (_, value) => value,
+        transform: (value) => value,
         activateOn: ["init", "connected"],
         deactivateOn: ["disconnected"],
         ...namesOrOptions,
