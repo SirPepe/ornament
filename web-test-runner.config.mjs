@@ -8,6 +8,9 @@ const babelPlugin = fromRollup(babel);
 const nodeResolvePlugin = fromRollup(nodeResolve);
 
 export default {
+  // Remove concurrency: 1 once https://github.com/modernweb-dev/web/issues/2907
+  // is fixed
+  concurrency: 1,
   browserStartTimeout: 90000,
   nodeResolve: true,
   mimeTypes: {
