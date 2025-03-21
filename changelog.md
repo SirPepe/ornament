@@ -10,8 +10,8 @@ act as a predicate. The following example uses the `transform` option for the
 
 ```javascript
 // Ornament 2.x
-@define("my-element")
-class MyElement extends HTMLElement {
+@define("test-element")
+class TestElement extends HTMLElement {
   // Note: "evt" is the _second_ argument to "transform" ⮧
   @subscribe(document, "input", { transform: (instance, evt) => evt.target })
   lastInputUsed = null;
@@ -33,6 +33,66 @@ function signatures on the following APIs:
 | `@subscribe()` to EventTarget, option `predicate` | `(this: undefined, instance: T, event: Event) => boolean`                      | `(this: T, event: Event, instance: T) => boolean`                       |
 | `@subscribe()` to EventTarget, option `transform` | `(this: undefined, instance: T, event: Event) => boolean`                      | `(this: T, event: Event, instance: T) => boolean`                       |
 | `@state()`, option `toBoolean`                    | `(this: undefined, value: V, instance: T) => boolean`                          | `(this: T, value: V, instance: T) => boolean`                           |
+
+### BREAKING: applying `@subscribe()` to an accessor no longer cause reactive methods to run on update
+
+The `@subscribe()` decorator can be applied to accessors:
+
+```javascript
+const target = new EventTarget();
+
+@define("test-element")
+class TestElement extends HTMLElement {
+  @subscribe(target, "foo")
+  accessor test: any;
+
+  @reactive()
+  react() {
+    console.log("Something happened");
+  };
+}
+
+const instance = new TestElement();
+const event = new Event("foo");
+target.dispatchEvent(event);
+```
+
+The above code subscribes the accessor `test` to `foo` events on `target`, which
+means that after dispatching `event` on `instance`, `instance.test` contains the
+event object `event`. In Ornament 2.x, the above code also caused the reactive
+method `rect()` to run, but _only_ for updates that originate from the
+subscription created by `@subscribe()`. If the accessor was also decorated with
+`@prop()`, such an update would result in _two_ calls to `react()`... which is
+actually the best-case scenario, since manual invocation of the accessor's
+setter did not result in _any_ updates at all! To summarize the behavior in 2.x:
+
+- Implicit magic behind the scenes (`@subscribe()` caused some of the effects of `@prop()`)
+- Unnecessary reactive updates and in the best-case scenario (`@subscribe()` _with_ `@prop()`)
+- Inconsistent behavior and inconsistent type guards in the worst-case case scenario (`@subscribe()` _without_ `@prop()`)
+
+In Ornament 3.x, accessor updates due to `@subscribe()` no longer cause reactive
+methods to run. If you want this effect (and add type guards), you now _have_ to
+explicitly combine `@subscribe()` with `@prop()` and a transformer:
+
+```javascript
+const target = new EventTarget();
+
+@define("test-element")
+class TestElement extends HTMLElement {
+  @subscribe(target, "foo")
+  @prop(any())
+  accessor test: any;
+
+  @reactive()
+  react() {
+    console.log("Something happened");
+  };
+}
+
+const instance = new TestElement();
+const event = new Event("foo");
+target.dispatchEvent(event);
+```
 
 ## 2.2.2
 

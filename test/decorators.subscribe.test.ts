@@ -1,6 +1,14 @@
 import { expect } from "@esm-bundle/chai";
 import { spy } from "sinon";
-import { define, reactive, subscribe, trigger } from "../src/index.js";
+import {
+  any,
+  define,
+  prop,
+  reactive,
+  string,
+  subscribe,
+  trigger,
+} from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 import { signal } from "@preact/signals-core";
 const test = it;
@@ -336,7 +344,10 @@ describe("Decorators", () => {
         const target = new EventTarget();
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(target, "foo") accessor test: any;
+          @subscribe(target, "foo")
+          @prop(any())
+          accessor test: any;
+
           @reactive() react = () => fn(this, this.test);
         }
         const instance = new Test();
@@ -351,7 +362,8 @@ describe("Decorators", () => {
         const target = new EventTarget();
         @define(generateTagName())
         class Test extends HTMLElement {
-          @subscribe(target, "foo", { transform: (evt) => evt.target })
+          @subscribe(target, "foo", { transform: (evt) => evt.type })
+          @prop(string())
           accessor test: any;
           @reactive() react = () => fn(this, this.test);
         }
@@ -359,7 +371,7 @@ describe("Decorators", () => {
         const event = new Event("foo");
         target.dispatchEvent(event);
         expect(fn.callCount).to.equal(1);
-        expect(fn.getCalls()[0].args).to.eql([instance, target]);
+        expect(fn.getCalls()[0].args).to.eql([instance, "foo"]);
       });
 
       test("subscribe a method to multiple events on an event target", async () => {

@@ -415,9 +415,6 @@ function subscribeToEventTarget<
         );
         if (context.kind === "accessor") {
           context.access.set(instance, transformedValue);
-          // TODO: this results in two prop events if the decorated accessor is
-          // already a prop. Maybe the following should not trigger an event
-          trigger(instance, "prop", context.name, transformedValue);
         } else {
           context.access.get(instance).call(instance, transformedValue);
         }

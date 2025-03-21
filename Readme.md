@@ -916,8 +916,9 @@ not work in Chrome-based browsers as of November 2023.
 the decorated class member is a method or a function, it runs when the
 EventTarget emits a new event or when the signal receives a new value. If the
 decorated member is an accessor, it gets updated with the last event object (for
-event targets) or signal values (for signals) and in turn causes methods
-decorated with `@reactive()` to run.
+event targets) or signal values (for signals). You can decorate the accessor
+with `@prop()` to cause methods decorated with `@reactive()` to run when its
+value changes.
 
 #### Subscribe to EventTargets: `@subscribe(targetOrTargetFactory: EventTarget | ((instance: T) => EventTarget) | Promise<EventTarget>, eventNames: string, options: EventSubscribeOptions = {})`
 
@@ -992,7 +993,7 @@ you'll just have to `any` your way around that or provide this capability in
 a type-safe wrapper.
 
 Making the `@subscribe()` decorator type-safe for use with events is a gnarly
-prospect. Given an event target and an event name, the decorator can't know
+prospect. Given an event target and an event name, the decorator _can't_ know
 what type of event the method must expect. Therefore the following is possible
 by default:
 
@@ -1014,7 +1015,7 @@ class Test extends HTMLElement {
 A mapping between event names and corresponding event types (such as `"click"`
 → `MouseEvent`) exists for specific cases. For example `HTMLElementEventMap`
 contains the mappings for events emitted by HTML elements. But because
-`@subscribe()` can work with _any event target_, the existence or relevancy of
+`@subscribe()` can work with _any event target_, the existence or relevance of
 such a mapping can't be assumed. The only way around this is to create an
 abstraction for specific use cases where such a mapping is available. This can
 be based on `@subscribe()` itself:
