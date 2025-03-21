@@ -32,10 +32,7 @@ function signatures on the following APIs:
 | `@subscribe()` to Signal, option `transform`      | `(this: undefined, instance: T, value: V) => boolean`                          | `(this: T, value: V, instance: T) => boolean`                           |
 | `@subscribe()` to EventTarget, option `predicate` | `(this: undefined, instance: T, event: Event) => boolean`                      | `(this: T, event: Event, instance: T) => boolean`                       |
 | `@subscribe()` to EventTarget, option `transform` | `(this: undefined, instance: T, event: Event) => boolean`                      | `(this: T, event: Event, instance: T) => boolean`                       |
-
-Other APIs that are affected in a backwards-compatible way:
-
-- **`@state()`**: the option `toBoolean` is now called with its `this` set to the component instance
+| `@state()`, option `toBoolean`                    | `(this: undefined, value: V, instance: T) => boolean`                          | `(this: T, value: V, instance: T) => boolean`                           |
 
 ## 2.2.2
 
