@@ -328,11 +328,11 @@ type EventSubscribeOptionsWithTransform<
   E extends Event,
   V,
 > = EventSubscribeOptionsWithoutTransform<T, E> & {
-  transform: (this: T, value: E, instance: T) => V; // TODO: accept transformer
+  transform: (this: T, value: E, instance: T) => V;
 };
 
 type SignalSubscribeOptions<T, V, U> = SubscribeBaseOptions & {
-  transform?: (this: T, value: V, instance: T) => U; // TODO: accept transformer
+  transform?: (this: T, value: V, instance: T) => U;
   predicate?: (this: T, value: V, instance: T) => boolean;
 };
 
