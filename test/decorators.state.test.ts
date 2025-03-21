@@ -41,13 +41,13 @@ describe("Decorators", () => {
       expect(el.matches(`:state(\\#foo)`)).to.equal(false);
     });
 
-    test("custom toBoolean()", () => {
+    test("custom toBoolean() called with appropriate arguments and 'this' value", () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
         @state({
-          toBoolean: (value, instance) => {
-            fn(value, instance);
+          toBoolean(value, instance) {
+            fn(this, value, instance);
             return value % 2 === 0;
           },
         })
@@ -56,11 +56,11 @@ describe("Decorators", () => {
       const el = new Test();
       expect(el.matches(`:state(foo)`)).to.equal(true);
       expect(fn.callCount).to.equal(1);
-      expect(fn.getCalls()[0].args).to.eql([0, el]);
+      expect(fn.getCalls()[0].args).to.eql([el, 0, el]);
       el.foo = 1;
       expect(el.matches(`:state(foo)`)).to.equal(false);
       expect(fn.callCount).to.equal(2);
-      expect(fn.getCalls()[1].args).to.eql([1, el]);
+      expect(fn.getCalls()[1].args).to.eql([el, 1, el]);
     });
 
     test("with @prop", () => {

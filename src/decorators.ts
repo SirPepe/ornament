@@ -402,6 +402,8 @@ function subscribeToEventTarget<
         const transformedValue = options.transform(instance, originalEvent);
         if (context.kind === "accessor") {
           context.access.set(instance, transformedValue);
+          // TODO: this results in two prop events if the decorated accessor is
+          // already a prop. Maybe the following should not trigger an event
           trigger(instance, "prop", context.name, transformedValue);
         } else {
           context.access.get(instance).call(instance, transformedValue);
@@ -834,7 +836,7 @@ export function attr<T extends HTMLElement, V>(
 
 type StateOptions<T, V> = {
   name?: string; // defaults to the accessor's name
-  toBoolean?: (value: V, instance: T) => boolean; // defaults to Boolean
+  toBoolean?: (this: T, value: V, instance: T) => boolean; // defaults to Boolean
 };
 
 // The accessor decorator @state() controls a custom state set entry
@@ -851,7 +853,7 @@ export function state<T extends HTMLElement, V>(
     }
     return {
       init(input) {
-        if (toBoolean(input, this)) {
+        if (toBoolean.call(this, input, this)) {
           getInternals(this).states.add(name);
         } else {
           getInternals(this).states.delete(name);
@@ -859,7 +861,7 @@ export function state<T extends HTMLElement, V>(
         return input;
       },
       set(input) {
-        if (toBoolean(input, this)) {
+        if (toBoolean.call(this, input, this)) {
           getInternals(this).states.add(name);
         } else {
           getInternals(this).states.delete(name);

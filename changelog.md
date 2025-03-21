@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.0.0
+
+### BREAKING: revamped function signatures for transforms and predicates in several options objects
+
+This affects the following APIs:
+
+Other APIs that are affected in a backwards-compatible way:
+
+- **`@state()`**: the option `toBoolean` is now called with its `this` set to the component instance
+
 ## 2.2.2
 
 ### BUGFIX: fix `attachInternals()` breaking under convoluted circumstances

@@ -5,7 +5,7 @@
   </picture>
 </h1>
 
-📢 **What's new in 2.2.2?** [Check out the Changelog!](./changelog.md)
+📢 **What's new in 3.0.0?** [Check out the Changelog!](./changelog.md)
 
 **Build your own frontend framework** with Ornament, a stable, mid-level,
 pareto-optimal, treeshakable and tiny TypeScript-positive toolkit for web
@@ -658,7 +658,7 @@ try {
 #### Options for `@state()`
 
 - **`name` (string, optional)**: name of the state in the CustomStateSet. If `name` is not set, the state's name will be equal to the accessor's name. `name` is required when the decorator is applied to a symbol.
-- **`toBoolean` (((value, instance) => boolean), optional)**: Function to transform the accessor's value into a boolean, which in turn decides whether a state should be added or removed from the set. Defaults to the `Boolean` function.
+- **`toBoolean` (((value, instance) => boolean), optional)**: Function to transform the accessor's value into a boolean, which in turn decides whether a state should be added or removed from the set. Defaults to the `Boolean` function. Called with `this` set to the component instance.
 
 ### `@reactive(options: ReactiveOptions = {})`
 
