@@ -934,7 +934,7 @@ export function debounce<
   F extends (this: T, ...args: any[]) => void,
 >(options: DebounceOptions<T, F> = {}): DebounceDecorator<T, F> {
   const fn = options.fn ?? debounce.raf();
-  return function decorator(
+  return function (
     value: F | undefined,
     context:
       | ClassMethodDecoratorContext<T, F>
