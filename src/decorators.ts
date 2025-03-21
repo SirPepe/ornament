@@ -320,7 +320,7 @@ type EventSubscribeOptionsWithoutTransform<
   E extends Event,
 > = AddEventListenerOptions &
   SubscribeBaseOptions & {
-    predicate?: (instance: T, event: E) => boolean;
+    predicate?: (this: T, event: E, instance: T) => boolean;
   };
 
 type EventSubscribeOptionsWithTransform<
@@ -333,7 +333,7 @@ type EventSubscribeOptionsWithTransform<
 
 type SignalSubscribeOptions<T, V, U> = SubscribeBaseOptions & {
   transform?: (instance: T, value: V) => U;
-  predicate?: (instance: T, value: V) => boolean;
+  predicate?: (this: T, value: V, instance: T) => boolean;
 };
 
 type EventSubscribeDecorator<T, V> = (
@@ -404,7 +404,10 @@ function subscribeToEventTarget<
 ): void {
   return runContextInitializerOnOrnamentInit(context, (instance: T) => {
     const callback = (originalEvent: V) => {
-      if (!options.predicate || options.predicate(instance, originalEvent)) {
+      if (
+        !options.predicate ||
+        options.predicate.call(instance, originalEvent, instance)
+      ) {
         const transformedValue = options.transform(instance, originalEvent);
         if (context.kind === "accessor") {
           context.access.set(instance, transformedValue);
@@ -449,7 +452,10 @@ function subscribeToSignal<T extends HTMLElement, S extends SignalLike<any>, U>(
 ): void {
   return runContextInitializerOnOrnamentInit(context, (instance: T) => {
     const callback = (originalValue: SignalType<S>) => {
-      if (!options.predicate || options.predicate(instance, originalValue)) {
+      if (
+        !options.predicate ||
+        options.predicate.call(instance, originalValue, instance)
+      ) {
         const transformedValue = options.transform(instance, originalValue);
         if (context.kind === "accessor") {
           context.access.set(instance, transformedValue);

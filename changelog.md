@@ -25,9 +25,11 @@ was `undefined`. This is not very ergonomic and runs counter to similar APIs in
 almost all libraries and web standards. To remedy this, Ornament 3.x changes the
 function signatures on the following APIs:
 
-| API                               | Before                                                        | After                                                                   |
-| --------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `@reactive()`, option `predicate` | `(instance: T, key: string \| symbol, value: any) => boolean` | `(this: T, key: string \| symbol, value: any, instance: T) => boolean;` |
+| API                                               | Before                                                                         | After                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `@reactive()`, option `predicate`                 | `(this: undefined, instance: T, key: string \| symbol, value: any) => boolean` | `(this: T, key: string \| symbol, value: any, instance: T) => boolean;` |
+| `@subscribe()` to Signal, option `predicate`      | `(this: undefined, instance: T, value: V) => boolean`                          | `(this: T, value: V, instance: T) => boolean`                           |
+| `@subscribe()` to EventTarget, option `predicate` | `(this: undefined, instance: T, event: Event) => boolean`                      | `(this: T, event: Event, instance: T) => boolean`                       |
 
 Other APIs that are affected in a backwards-compatible way:
 
