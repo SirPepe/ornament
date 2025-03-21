@@ -4,7 +4,30 @@
 
 ### BREAKING: revamped function signatures for transforms and predicates in several options objects
 
-This affects the following APIs:
+Ornament has many APIs that take functions that either transform some value or
+act as a predicate. The following example uses the `transform` option for the
+`@subscribe()` decorator to extract information from an event:
+
+```javascript
+// Ornament 2.x
+@define("my-element")
+class MyElement extends HTMLElement {
+  // Note: "evt" is the _second_ argument to "transform" ⮧
+  @subscribe(document, "input", { transform: (instance, evt) => evt.target })
+  lastInputUsed = null;
+}
+```
+
+In Ornament 2.x, functions like this received _the component instance_ as their
+first arguments and not the actual data that they are most likely concerned
+with. Their `this` value, which one would _expect_ to be the component instance,
+was `undefined`. This is not very ergonomic and runs counter to similar APIs in
+almost all libraries and web standards. To remedy this, Ornament 3.x changes the
+function signatures on the following APIs:
+
+| API                               | Before                                                        | After                                                                   |
+| --------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `@reactive()`, option `predicate` | `(instance: T, key: string \| symbol, value: any) => boolean` | `(this: T, key: string \| symbol, value: any, instance: T) => boolean;` |
 
 Other APIs that are affected in a backwards-compatible way:
 

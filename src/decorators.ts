@@ -271,7 +271,12 @@ export function init<T extends HTMLElement>(): LifecycleDecorator<
 type ReactiveOptions<T> = {
   keys?: (string | symbol)[];
   excludeKeys?: (string | symbol)[];
-  predicate?: (instance: T, key: string | symbol, value: any) => boolean;
+  predicate?: (
+    this: T,
+    key: string | symbol,
+    value: any,
+    instance: T,
+  ) => boolean;
 };
 
 type ReactiveDecorator<T extends HTMLElement> = {
@@ -293,7 +298,8 @@ export function reactive<T extends HTMLElement>(
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
       listen(instance, "prop", (name, newValue) => {
         if (
-          (!options.predicate || options.predicate(instance, name, newValue)) &&
+          (!options.predicate ||
+            options.predicate.call(instance, name, newValue, instance)) &&
           (!options.keys || options.keys.includes(name)) &&
           (!options.excludeKeys || !options.excludeKeys.includes(name))
         ) {
