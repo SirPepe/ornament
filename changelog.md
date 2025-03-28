@@ -60,13 +60,15 @@ target.dispatchEvent(event);
 The above code subscribes the accessor `test` to `foo` events on `target`, which
 means that after dispatching `event` on `instance`, `instance.test` contains the
 event object `event`. In Ornament 2.x, the above code also caused the reactive
-method `rect()` to run, but _only_ for updates that originate from the
-subscription created by `@subscribe()`. If the accessor was also decorated with
-`@prop()`, such an update would result in _two_ calls to `react()`... which is
-actually the best-case scenario, since manual invocation of the accessor's
-setter did not result in _any_ updates at all! To summarize the behavior in 2.x:
+method `react()` to run, but _only_ for updates that originate from the
+subscription created by `@subscribe()` - directly setting `test` did not cause
+reactive functions to run. If, in an attempt to work around this, the accessor
+was also decorated with `@prop()`, such an update would result in _two_ calls to
+`react()`... which is actually the best-case scenario, since manual invocation
+of the accessor's setter did not result in _any_ updates at all! To summarize
+the behavior in 2.x:
 
-- Implicit magic behind the scenes (`@subscribe()` caused some of the effects of `@prop()`)
+- Implicit magic behind the scenes (`@subscribe()` caused _some_ of the effects of `@prop()`)
 - Unnecessary reactive updates and in the best-case scenario (`@subscribe()` _with_ `@prop()`)
 - Inconsistent behavior and inconsistent type guards in the worst-case case scenario (`@subscribe()` _without_ `@prop()`)
 
@@ -98,7 +100,7 @@ target.dispatchEvent(event);
 
 ### BUGFIX: fix `attachInternals()` breaking under convoluted circumstances
 
-I certain convoluted, but not entirely impossible scenarios calling
+In certain convoluted, but not entirely impossible scenarios calling
 `attachInternals()` could fail, complaining about
 `TypeError: object is not the right class`. Ornament's `@enhance()` and
 `@define()` inject a mixin class into component's class hierarchies which, among
@@ -140,7 +142,7 @@ in Ornament 2.2.2.
 
 By turning several symbols used in Ornament's plumbing into _registered_
 symbols, use cases where multiple bundles of Ornament have to co-exist on one
-page now work. The different bundles can not track each other's metadata,
+page now work. The different bundles can now track each other's metadata,
 events, component initialization status, and more - as long as they are roughly
 compatible. This update contains no breaking changes and the bug it fixes is,
 frankly, something that nobody should ever have noticed.
@@ -190,8 +192,8 @@ to be.
 
 The utility function `getInternals()` provides easy access to a component's
 [ElementInternals](https://developer.mozilla.org/en-US/docs/Web/API/ElementInternals).
-In contrast to the regular `attachInternals()` method, `getInternals()` be as
-often as required:
+In contrast to the regular `attachInternals()` method, `getInternals()` can be
+called as often as required:
 
 ```javascript
 import { define, getInternals } from "@sirpepe/ornament";
