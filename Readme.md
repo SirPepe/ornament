@@ -5,7 +5,7 @@
   </picture>
 </h1>
 
-📢 **What's new in 3.0.0?** [Check out the Changelog!](./changelog.md)
+📢 **What's new in 3.0.1?** [Check out the Changelog!](./changelog.md)
 
 **Build your own frontend framework** with Ornament, a stable, mid-level,
 pareto-optimal, treeshakable and tiny TypeScript-positive toolkit for web
@@ -1594,6 +1594,30 @@ IDL attribute to values other than `A` or `B` will result in an exception.
 
 The default value is either the value the accessor was initialized with or, if
 the accessor has no initial value, the first element in `values`.
+
+<details>
+<summary>Notes for TypeScript</summary>
+
+To use `literal()` with literal union types, make sure that the `values` option
+is _not_ subject to type widening, eg. via `as const`:
+
+```javascript
+@define("test-element")
+class TestElement extends HTMLElement {
+
+  // Works: values is ["a", "b"]
+  @prop(literal({ values: ["a", "b"] as const, transform: string() }))
+  accessor bah: "a" | "b" = "a";
+
+  // Errors: values is string[]
+  @prop(literal({ values: ["a", "b"], transform: string() }))
+  accessor bbb: "a" | "b" = "a";
+}
+```
+
+The ordering of `values` is not important.
+
+</details>
 
 #### Options for `literal(options?)`
 

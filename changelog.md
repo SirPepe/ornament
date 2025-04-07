@@ -1,5 +1,72 @@
 # Changelog
 
+## 3.0.1
+
+### Bugfix: `literal()` transformer now works with unions of literal types
+
+Despite its name, `literal()` did _not_ type check when applied to an accessor
+typed with an matching literal union type:
+
+```javascript
+// Ornament 3.0.0
+@define("test-element")
+class TestElement extends HTMLElement {
+  // Works as expected
+  @prop(literal({ values: ["a", "b"], transform: string() }))
+  accessor foo: string = "a";
+
+  // Type error: Type 'string' is not assignable to type '"a" | "b"'
+  @prop(literal({ values: ["a", "b"] as const, transform: string() }))
+  accessor bar: "a" | "b" = "a";
+}
+```
+
+Ornament 3.0.1 fixes this oversight while still making sure that the types of
+the accessor, the `values` array and the transformer all match up:
+
+```javascript
+// Ornament 3.0.1
+@define("test-element")
+class TestElement extends HTMLElement {
+
+  // Works as expected
+  @prop(literal({ values: ["a", "b"], transform: string() }))
+  accessor foo: string = "a";
+
+  // Works as expected
+  @prop(literal({ values: ["a", "b"] as const, transform: string() }))
+  accessor bar: "a" | "b" = "a";
+
+  // Errors as expected: "c" not allowed in value
+  @prop(literal({ values: ["a", "b", "c"] as const, transform: string() }))
+  accessor baz: "a" | "b" = "a";
+
+  // Errors as expected: "c" not allowed in initializer
+  @prop(literal({ values: ["a", "b"] as const, transform: string() }))
+  accessor bla: "a" | "b" = "c";
+
+  // Errors as expected: "number()" transformer has the wrong type
+  @prop(literal({ values: ["a", "b"] as const, transform: number() }))
+  accessor bah: "a" | "b" = "a";
+
+  // Errors as expected: values is string[]
+  @prop(literal({ values: ["a", "b"], transform: string() }))
+  accessor bbb: "a" | "b" = "a";
+}
+```
+
+This requires the `values` array to not be subject to type widening, which is
+achieved with `as const` in the examples above.
+
+As a kindof-breaking side effect, this change also means that an empty `values`
+array no longer type checks. This did (and still does, outside of TypeScript)
+throw an exception at run time, but only once the affected element instantiates.
+It is therefore possible, if highly unlikely, that this breaks previously
+"working" code... by an element with a broken `values` array never getting used
+counts as "working".
+
+None of the above nonsense applies to Non-TypeScript users.
+
 ## 3.0.0
 
 ### BREAKING: revamped function signatures for transforms and predicates in several options objects

@@ -580,23 +580,40 @@ describe("Transformers", () => {
   });
 
   describe("literal()", () => {
-    test("invalid options", () => {
-      // No valid values
+    test("invalid options (runtime errors)", () => {
       expect(
         () =>
           class extends HTMLElement {
+            // @ts-expect-error invalid type never[]
             @attr(literal({ values: [], transform: string() }))
             accessor foo = "A";
           },
       ).to.throw();
-      // Invalid transformer
       expect(
         () =>
           class extends HTMLElement {
-            @attr(literal({ values: ["B", "B", "C"], transformer: {} } as any))
+            // @ts-expect-error not a transformer
+            @attr(literal({ values: ["A", "B", "C"], transform: {} }))
             accessor foo = "A";
           },
       ).to.throw();
+      expect(() => {
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          // Invalid initial value
+          @attr(literal({ values: ["A", "B", "C"], transform: string() }))
+          accessor foo = "X";
+        }
+        new Test(); // construction causes init() to run
+      }).to.throw();
+    });
+
+    test("invalid options (TS errors)", () => {
+      class A extends HTMLElement {
+        // @ts-expect-error type mismatch
+        @attr(literal({ values: [1, 2, 3], transform: string() }))
+        accessor foo = 1;
+      }
     });
 
     test("as attribute", async () => {
@@ -657,6 +674,24 @@ describe("Transformers", () => {
       expect(el.foo).to.equal("A");
       el.foo = "B";
       expect(el.foo).to.equal("B");
+    });
+
+    test("union types (string)", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(
+          literal({ values: ["C", "A", "B"] as const, transform: string() }),
+        )
+        accessor foo: "A" | "B" | "C" = "A";
+      }
+    });
+
+    test("union types (number)", async () => {
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @attr(literal({ values: [1, 2, 3] as const, transform: number() }))
+        accessor foo: 1 | 2 | 3 = 1;
+      }
     });
   });
 

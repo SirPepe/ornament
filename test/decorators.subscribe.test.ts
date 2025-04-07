@@ -3,6 +3,7 @@ import { spy } from "sinon";
 import {
   any,
   define,
+  number,
   prop,
   reactive,
   string,
@@ -372,6 +373,23 @@ describe("Decorators", () => {
         target.dispatchEvent(event);
         expect(fn.callCount).to.equal(1);
         expect(fn.getCalls()[0].args).to.eql([instance, "foo"]);
+      });
+
+      test("subscribe an accessor to an event target with a type transform", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "foo", { transform: (evt) => evt.type.length })
+          @prop(number())
+          accessor test: number = 1;
+          @reactive() react = () => fn(this, this.test);
+        }
+        const instance = new Test();
+        const event = new Event("foo");
+        target.dispatchEvent(event);
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, 3]);
       });
 
       test("subscribe a method to multiple events on an event target", async () => {

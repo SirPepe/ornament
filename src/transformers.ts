@@ -327,17 +327,19 @@ export function json<T extends object>(
   });
 }
 
-type LiteralOptions<T, V> = {
-  values: V[];
-  transform: Transformer<T, V>;
+type LiteralOptions<T, Values extends TransformerResult, TransformerResult> = {
+  values: Values[];
+  transform: Transformer<T, TransformerResult>;
 };
 
-function literalOptions<T extends object, V>(
-  input: unknown = {},
-): LiteralOptions<T, V> {
+function literalOptions<
+  T extends object,
+  V extends TransformerResult,
+  TransformerResult,
+>(input: unknown = {}): LiteralOptions<T, V, TransformerResult> {
   assertRecord(input, "options");
   const { values, transform } = input;
-  assertTransformer<T, V>(transform, "transform");
+  assertTransformer<T, TransformerResult>(transform, "transform");
   if (!Array.isArray(values)) {
     throw new TypeError(
       `Expected "values" to be array, got "${typeof values}".`,
@@ -349,16 +351,18 @@ function literalOptions<T extends object, V>(
   return { values, transform };
 }
 
-export function literal<T extends object, V>(
-  options: LiteralOptions<T, V>,
+export function literal<T extends object, V extends R, R>(
+  options: LiteralOptions<T, V, R>,
 ): Transformer<T, V> {
   const initialValues = new WeakMap<T, V>();
-  const { transform, values } = literalOptions<T, V>(options);
+  const { transform, values } = literalOptions<T, V, R>(options);
+  // Contains the unavoidable "as any" as much as reasonable
+  const isValidValue = (value: R): value is V => values.includes(value as any);
   // Used as validation function and in init
   function validate(this: T, value: any, isContentAttribute: boolean): void {
     transform.validate.call(this, value, isContentAttribute);
     const transformed = transform.transform.call(this, value);
-    if (!values.includes(transformed)) {
+    if (!isValidValue(transformed)) {
       throw new Error(
         `Invalid value: ${transform.stringify.call(this, transformed)}`,
       );
@@ -370,7 +374,7 @@ export function literal<T extends object, V>(
         return initialValues.get(this)!;
       }
       const parsed = transform.parse.call(this, value);
-      if (parsed !== NO_VALUE && values.includes(parsed)) {
+      if (parsed !== NO_VALUE && isValidValue(parsed)) {
         return parsed;
       }
       return NO_VALUE;
@@ -378,7 +382,11 @@ export function literal<T extends object, V>(
     validate,
     eql: transform.eql,
     stringify: transform.stringify,
-    transform: transform.transform,
+    transform(value: R): V {
+      // This is called after "value" has been through validate(), so we KNOW
+      // that is actually V
+      return value as V;
+    },
     init(value = values[0], _, isContentAttribute) {
       validate.call(this, value, isContentAttribute);
       initialValues.set(this, value);
