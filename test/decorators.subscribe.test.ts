@@ -226,6 +226,27 @@ describe("Decorators", () => {
         trigger(instance, "disconnected");
       });
 
+      test("multiple subscribe triggers only add a single subscription", async () => {
+        const fn = spy();
+        const counter = signal(0);
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(counter, {
+            activateOn: ["init", "connected"],
+            deactivateOn: ["disconnected"],
+          })
+          test(value: number) {
+            fn(this, value);
+          }
+        }
+        const instance = new Test(); // Init: activates subscription
+        document.body.append(instance); // Connect: activates no new subscription
+        counter.value = 1;
+        expect(fn.callCount).to.equal(2);
+        expect(fn.getCalls()[0].args).to.eql([instance, 0]); // initial value
+        expect(fn.getCalls()[1].args).to.eql([instance, 1]);
+      });
+
       test("require the correct method types", async () => {
         const counter = signal(0);
         class Test extends HTMLElement {
@@ -431,6 +452,31 @@ describe("Decorators", () => {
         target.dispatchEvent(event);
         expect(fn.callCount).to.equal(1);
         expect(fn.getCalls()[0].args).to.eql([instance, event, target, 42]);
+      });
+
+      test("multiple subscribe triggers only add a single subscription", async () => {
+        const fn = spy();
+        const target = new EventTarget();
+        const triggerEvent = () => {
+          const event = new Event("foo");
+          target.dispatchEvent(event);
+          return event;
+        };
+        @define(generateTagName())
+        class Test extends HTMLElement {
+          @subscribe(target, "foo", {
+            activateOn: ["init", "connected"],
+            deactivateOn: ["disconnected"],
+          })
+          test(evt: any) {
+            fn(this, evt);
+          }
+        }
+        const instance = new Test(); // Init: activates subscription
+        document.body.append(instance); // Connect: activates no new subscription
+        const a = triggerEvent();
+        expect(fn.callCount).to.equal(1);
+        expect(fn.getCalls()[0].args).to.eql([instance, a]);
       });
 
       test("custom subscribe and unsubscribe triggers", async () => {
