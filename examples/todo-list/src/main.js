@@ -22,7 +22,7 @@ import { render, html } from "uhtml";
 // - and runs its target once per frame
 // - and also when the component connects
 const reRender = () => (target, context) =>
-  reactive({ predicate: ({ isConnected }) => isConnected })(
+  reactive({ predicate: (prop, value, instance) => instance.isConnected })(
     connected()(debounce({ fn: debounce.raf() })(target, context), context),
     context,
   );
@@ -63,7 +63,7 @@ const handle = (eventName, selector = "*") =>
   // this works because all shadow roots in this project are open, see base
   // class.
   subscribe((el) => el.shadowRoot, eventName, {
-    predicate: (_, evt) => evt.target.matches(selector),
+    predicate: (evt) => evt.target.matches(selector),
   });
 
 // We need a whole lot of events for this application, so we better build a
@@ -150,6 +150,7 @@ class TodoInput extends BaseComponent {
 
   @reRender()
   update() {
+    console.log("update");
     this.render(
       this.html`
         <label>

@@ -25,7 +25,7 @@ import { render, html } from "uhtml";
 const reRender =
   <T extends HTMLElement, V extends (this: T) => any>() =>
   (target: V, context: ClassMethodDecoratorContext<T, V>) =>
-    reactive<T>({ predicate: ({ isConnected }) => isConnected })(
+    reactive<T>({ predicate: (prop, value, instance) => instance.isConnected })(
       connected<T>()(
         debounce<T, V>({ fn: debounce.raf() })(target, context),
         context,
@@ -112,10 +112,10 @@ const capture = <T extends HTMLElement, K extends keyof EventNameMap>(
   selector = "*",
 ) =>
   subscribe<T, ShadowRoot, EventNameMap[K]>(
-    (el: T) => getInternals(el).shadowRoot,
+    (el: T) => getInternals(el).shadowRoot!,
     eventName,
     {
-      predicate: (_: unknown, evt: EventNameMap[K]) =>
+      predicate: (evt: EventNameMap[K]) =>
         evt.target instanceof HTMLElement && evt.target.matches(selector),
     },
   );
