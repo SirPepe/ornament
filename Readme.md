@@ -1,9 +1,4 @@
-<h1>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/logo_dark.png">
-    <img alt="Ornament" src="./assets/logo.png">
-  </picture>
-</h1>
+# [Ornament](https://sirpepe.github.io/use-ornament/) - Framework for web component frameworks
 
 📢 **What's new in 3.1.0?** [Check out the Changelog!](./changelog.md)
 
