@@ -1,18 +1,18 @@
 import { expect } from "@esm-bundle/chai";
 import { spy } from "sinon";
 import {
-  attr,
-  define,
-  prop,
-  string,
-  connected,
-  disconnected,
   adopted,
+  attr,
+  connected,
+  connectedMove,
+  define,
+  disconnected,
   formAssociated,
   formDisabled,
-  init,
   formReset,
-  connectedMove,
+  init,
+  prop,
+  string,
 } from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 const test = it;
@@ -62,6 +62,30 @@ describe("Decorators", () => {
       expect(connectFn.getCalls()[0].args).to.eql([instance]);
       expect(disconnectFn.callCount).to.equal(1);
       expect(disconnectFn.getCalls()[0].args).to.eql([instance]);
+    });
+
+    test("private methods work", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @connected() #connected() {
+          fn(this);
+        }
+      }
+      const instance = new Test();
+      document.body.append(instance);
+      expect(fn.callCount).to.equal(1);
+    });
+
+    test("private field functions work", async () => {
+      const fn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @connected() #connected = () => fn(this);
+      }
+      const instance = new Test();
+      document.body.append(instance);
+      expect(fn.callCount).to.equal(1);
     });
 
     test("original lifecycle callbacks also fire", async () => {
