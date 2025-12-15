@@ -1,14 +1,14 @@
 import globals from "globals";
-import eslint from "@eslint/js";
+import pluginJs from "@eslint/js";
 import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier";
 
-export default tseslint.config(
+export default [
   {
     ignores: ["dist/**/*", "**/lib/main.js"],
   },
-  eslint.configs.recommended,
-  tseslint.configs.recommended,
+  pluginJs.configs.recommended,
+  ...tseslint.configs.recommended,
   eslintConfigPrettier,
   {
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
@@ -18,4 +18,4 @@ export default tseslint.config(
       "no-unused-private-class-members": "off",
     },
   },
-);
+];
