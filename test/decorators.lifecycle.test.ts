@@ -12,9 +12,17 @@ import {
   formDisabled,
   init,
   formReset,
+  connectedMove,
 } from "../src/index.js";
 import { generateTagName, wait } from "./helpers.js";
 const test = it;
+
+// Required until TypeScrip adds this as a built-in type
+declare global {
+  interface HTMLElement {
+    moveBefore(movedNode: Element, referenceNode: Element): void;
+  }
+}
 
 describe("Decorators", () => {
   describe("@connected/@disconnected", () => {
@@ -54,6 +62,26 @@ describe("Decorators", () => {
       expect(connectFn.getCalls()[0].args).to.eql([instance]);
       expect(disconnectFn.callCount).to.equal(1);
       expect(disconnectFn.getCalls()[0].args).to.eql([instance]);
+    });
+
+    test("original lifecycle callbacks also fire", async () => {
+      const fn1 = spy();
+      const fn2 = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @connected() connected() {
+          fn1(this);
+        }
+        connectedCallback() {
+          fn2(this);
+        }
+      }
+      const instance = new Test();
+      document.body.append(instance);
+      expect(fn1.callCount).to.equal(1);
+      expect(fn1.getCalls()[0].args).to.eql([instance]);
+      expect(fn2.callCount).to.equal(1);
+      expect(fn2.getCalls()[0].args).to.eql([instance]);
     });
 
     test("fail on non-functions type fields", async () => {
@@ -124,6 +152,57 @@ describe("Decorators", () => {
       }
       expect(connectFn.callCount).to.equal(1);
       expect(connectFn.getCalls()[0].args).to.eql([instance, 42]);
+    });
+  });
+
+  // Skipped until moveBefore() works everywhere (ATM not in Webkit/Safari)
+  describe.skip("@connectedMove", () => {
+    test("fire methods on move", async () => {
+      const movedFn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @connectedMove()
+        moved() {
+          movedFn(this);
+        }
+      }
+      const instance = new Test();
+      document.body.append(document.createElement("div"), instance);
+      document.body.moveBefore(instance, document.body.firstElementChild!);
+      expect(movedFn.callCount).to.equal(1);
+      expect(movedFn.getCalls()[0].args).to.eql([instance]);
+    });
+
+    test("does not fire @connected/@disconnected methods on move when @connectedMove is used", async () => {
+      const connectionFn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @connectedMove() moved() {}
+        @connected() connect = connectionFn;
+        @disconnected() disconnect = connectionFn;
+      }
+      const instance = new Test();
+      document.body.append(document.createElement("div"), instance);
+      document.body.moveBefore(instance, document.body.firstElementChild!);
+      expect(connectionFn.callCount).to.equal(1); // from initial append()
+    });
+
+    test("vanilla connected/disconnected fire even when @connectedMove is used", async () => {
+      const connectionFn = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @connectedMove() moved() {}
+        connectedCallback() {
+          connectionFn();
+        }
+        disconnectedCallback() {
+          connectionFn();
+        }
+      }
+      const instance = new Test();
+      document.body.append(document.createElement("div"), instance);
+      document.body.moveBefore(instance, document.body.firstElementChild!);
+      expect(connectionFn.callCount).to.equal(3); // append + 2x for moveBefore
     });
   });
 

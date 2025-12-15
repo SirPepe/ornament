@@ -1,4 +1,4 @@
-import type { Method, Transformer } from "./types";
+import type { LifecycleCallbackName, Method, Transformer } from "./types";
 
 export const ORNAMENT_METADATA_KEY: unique symbol = Symbol.for(
   "ORNAMENT_METADATA_KEY",
@@ -12,6 +12,7 @@ type Metadata = {
     { prop: string | symbol; transformer: Transformer<any, any> }
   >;
   method: WeakMap<Method<any, any>, Method<any, any>>;
+  lifecycleDecorators: Set<LifecycleCallbackName>;
 };
 
 export function getMetadataFromContext(context: {
@@ -24,6 +25,7 @@ export function getMetadataFromContext(context: {
     attr: new Map(),
     prop: new Map(),
     method: new WeakMap(),
+    lifecycleDecorators: new Set(),
   });
 }
 

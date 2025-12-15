@@ -5,6 +5,7 @@ import {
   type Transformer,
   type ClassAccessorDecorator,
   type Method,
+  type LifecycleCallbackName,
   assertContext,
   NonOptional,
 } from "./types.js";
@@ -71,9 +72,20 @@ export function enhance<T extends CustomElementConstructor>(): (
     // actual (last) init event.
     const initializerKey = Symbol();
 
+    // Required to decide whether to call the base class'
+    // attributeChangedCallback on an attribute update
     const originalObservedAttributes = new Set<string>(
       (target as any).observedAttributes ?? [],
     );
+
+    // Required to decide whether a call of connectedMoveCallback needs to call
+    // connected/disconnected callbacks on the base class and/or dispatch
+    // connected/disconnected events
+    const baseClassHasConnectedMoveCallback = Boolean(
+      "connectedMove" in target.prototype,
+    );
+    const targetUsesConnectedMoveDecorator =
+      getMetadataFromContext(context).lifecycleDecorators.has("connectedMove");
 
     // Installs the mixin class. This kindof changes the type of the input
     // constructor T, but as TypeScript can as of May 2024 not understand
@@ -109,12 +121,10 @@ export function enhance<T extends CustomElementConstructor>(): (
         trigger(this, "init");
       }
 
-      static get observedAttributes(): string[] {
-        return [
-          ...originalObservedAttributes,
-          ...getMetadataFromContext(context).attr.keys(),
-        ];
-      }
+      static observedAttributes = [
+        ...originalObservedAttributes,
+        ...getMetadataFromContext(context).attr.keys(),
+      ];
 
       // Same API as the original attachInternals(), but allows the rest of the
       // library to liberally access internals via getInternals().
@@ -129,44 +139,17 @@ export function enhance<T extends CustomElementConstructor>(): (
         return getInternals(this);
       }
 
-      connectedCallback(): void {
-        // The base class may or may not have its own connectedCallback, but the
-        // type CustomElementConstructor does not reflect that. TS won't allow
-        // us to access the property speculatively, so we need to tell it to
-        // shut up (and tell eslint to shut up about about @ts-ignore). The same
-        // holds true for all the other lifecycle callbacks.
-        // eslint-disable-next-line
-        // @ts-ignore
-        super.connectedCallback?.call(this);
-        trigger(this, "connected");
-      }
-
-      disconnectedCallback(): void {
-        // eslint-disable-next-line
-        // @ts-ignore
-        super.disconnectedCallback?.call(this);
-        trigger(this, "disconnected");
-      }
-
+      // The base class may or may not have its own adoptedCallback (or any
+      // other lifecycle callback), but the type CustomElementConstructor does
+      // not reflect that possibility at all. TS won't allow to access any of
+      // those callbacks speculatively, so we need to tell it to shut up (and
+      // tell eslint to shut up about about @ts-ignore). The same holds true for
+      // all the other lifecycle callbacks.
       adoptedCallback(): void {
         // eslint-disable-next-line
         // @ts-ignore
         super.adoptedCallback?.call(this);
         trigger(this, "adopted");
-      }
-
-      attributeChangedCallback(
-        this: HTMLElement,
-        name: string,
-        oldValue: string | null,
-        newValue: string | null,
-      ): void {
-        if (originalObservedAttributes.has(name)) {
-          // eslint-disable-next-line
-          // @ts-ignore
-          super.attributeChangedCallback?.call(this, name, oldValue, newValue);
-        }
-        trigger(this, "attr", name, oldValue, newValue);
       }
 
       formAssociatedCallback(owner: HTMLFormElement | null): void {
@@ -198,6 +181,68 @@ export function enhance<T extends CustomElementConstructor>(): (
         // @ts-ignore
         super.formStateRestoreCallback?.call(this, state, reason);
         trigger(this, "formStateRestore", state, reason);
+      }
+
+      // Only forward the attribute changes that were defined in the base class
+      // observedAttributes to super.attributeChangedCallback()
+      attributeChangedCallback(
+        this: HTMLElement,
+        name: string,
+        oldValue: string | null,
+        newValue: string | null,
+      ): void {
+        if (originalObservedAttributes.has(name)) {
+          // eslint-disable-next-line
+          // @ts-ignore
+          super.attributeChangedCallback?.call(this, name, oldValue, newValue);
+        }
+        trigger(this, "attr", name, oldValue, newValue);
+      }
+
+      // By virtue of having connectedMoveCallback() defined, the mixin class
+      // will NOT fire connectedCallback() or disconnectedCallback() when
+      // moveBefore() is used. But the class that is built on top of the mixin
+      // may still expect the legacy behavior of moveBefore() triggering
+      // connectedCallback() and disconnectedCallback(). For this reason, the
+      // following callback definition dispatches to the relevant event and
+      // triggers the relevant base class callbacks when there is no indication
+      // that any logic got attached to connectedMoveCallback(), either via the
+      // base class or via the @moved() decorator.
+      connectedMoveCallback() {
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.connectedMove?.call(this);
+        trigger(this, "connectedMove");
+        // Trigger connected and disconnected callbacks on the base class if it
+        // does not have a hand-rolled connectedMove() callback
+        if (!baseClassHasConnectedMoveCallback) {
+          // eslint-disable-next-line
+          // @ts-ignore
+          super.disconnectedCallback?.call(this);
+          // eslint-disable-next-line
+          // @ts-ignore
+          super.connectedCallback?.call(this);
+        }
+        // Trigger connected and disconnected events on the event bus if the
+        // target class does not use the connectedMove decorator
+        if (!targetUsesConnectedMoveDecorator) {
+          trigger(this, "connected");
+          trigger(this, "disconnected");
+        }
+      }
+
+      connectedCallback(): void {
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.connectedCallback?.call(this);
+        trigger(this, "connected");
+      }
+
+      disconnectedCallback(): void {
+        // eslint-disable-next-line
+        // @ts-ignore
+        super.disconnectedCallback?.call(this);
+        trigger(this, "disconnected");
       }
     };
   };
@@ -399,7 +444,7 @@ function subscribeToEventTarget<
   eventNames: string,
   options: NonOptional<
     EventSubscribeOptionsWithTransform<T, V, U>,
-    "activateOn" | "activateOn" | "transform"
+    "activateOn" | "deactivateOn" | "transform"
   >,
 ): void {
   return runContextInitializerOnOrnamentInit(context, (instance: T) => {
@@ -448,7 +493,7 @@ function subscribeToSignal<T extends HTMLElement, S extends SignalLike<any>, U>(
   target: S,
   options: NonOptional<
     SignalSubscribeOptions<T, SignalType<S>, U>,
-    "activateOn" | "activateOn" | "transform"
+    "activateOn" | "deactivateOn" | "transform"
   >,
 ): void {
   return runContextInitializerOnOrnamentInit(context, (instance: T) => {
@@ -670,7 +715,7 @@ type LifecycleDecorator<T extends HTMLElement, A extends unknown[]> = {
   ): void;
 };
 
-function createLifecycleDecorator<K extends keyof OrnamentEventMap>(
+function createLifecycleDecorator<K extends LifecycleCallbackName>(
   name: K,
 ): <T extends HTMLElement>() => LifecycleDecorator<T, OrnamentEventMap[K]> {
   return <T extends HTMLElement>(): LifecycleDecorator<
@@ -678,9 +723,10 @@ function createLifecycleDecorator<K extends keyof OrnamentEventMap>(
     OrnamentEventMap[K]
   > =>
     function (_, context) {
+      getMetadataFromContext(context).lifecycleDecorators.add(name);
       assertContext(context, name, "method/function");
       context.addInitializer(function () {
-        listen(this, name, (...args) =>
+        listen(this, name, (...args: any) =>
           context.access.get(this).call(this, ...args),
         );
       });
@@ -690,6 +736,7 @@ function createLifecycleDecorator<K extends keyof OrnamentEventMap>(
 // Bulk-create all basic lifecycle decorators
 export const connected = createLifecycleDecorator("connected");
 export const disconnected = createLifecycleDecorator("disconnected");
+export const connectedMove = createLifecycleDecorator("connectedMove");
 export const adopted = createLifecycleDecorator("adopted");
 export const formAssociated = createLifecycleDecorator("formAssociated");
 export const formReset = createLifecycleDecorator("formReset");

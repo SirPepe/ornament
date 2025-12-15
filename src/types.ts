@@ -1,10 +1,21 @@
 import { NO_VALUE } from "./lib.js";
 
+export type LifecycleCallbackName =
+  | "connected"
+  | "disconnected"
+  | "connectedMove"
+  | "adopted"
+  | "formAssociated"
+  | "formReset"
+  | "formDisabled"
+  | "formStateRestore";
+
 declare global {
   interface OrnamentEventMap {
     init: [];
     connected: [];
     disconnected: [];
+    connectedMove: [];
     adopted: [];
     prop: [name: string | symbol, newValue: any];
     attr: [name: string, oldValue: string | null, newValue: string | null];
@@ -74,6 +85,7 @@ export type Transformer<T, Value, IntermediateValue = Value> = {
   ) => boolean | null;
 };
 
+// prettier-ignore
 export type ClassAccessorDecorator<
   T extends HTMLElement,
   V,

@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.1.0
+
+### Enhancement: `@connectedMove` decorator
+
+To support the new [`moveBefore()`](https://developer.mozilla.org/en-US/docs/Web/API/Element/moveBefore)
+DOM API and its associated `connectedMoveCallback` on custom elements, Ornament
+3.1.0 adds support for the `@connectedMove()` decorator. Decorated methods are
+invoked when `moveBefore()` is used on a custom element. If `@connectedMove()`
+is used anywhere in a component, methods decorated with `@connected()` and/or
+`@disconnected()` will _not_ fire when `moveBefore()` is used - this aligns with
+how the vanilla `connectedMoveCallback` behaves.
+
+Note that `moveBefore()` does currently NOT work on Safari, which also means that
+`connectedMoveCallback` nor `@connectedMove()` won't do anything.
+
 ## 3.0.1
 
 ### Bugfix: `literal()` transformer now works with unions of literal types
@@ -62,7 +77,7 @@ As a kindof-breaking side effect, this change also means that an empty `values`
 array no longer type checks. This did (and still does, outside of TypeScript)
 throw an exception at run time, but only once the affected element instantiates.
 It is therefore possible, if highly unlikely, that this breaks previously
-"working" code... by an element with a broken `values` array never getting used
+"working" code... if an element with a broken `values` array never getting used
 counts as "working".
 
 None of the above nonsense applies to Non-TypeScript users.
