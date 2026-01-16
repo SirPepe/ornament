@@ -18,15 +18,16 @@ type Metadata = {
 export function getMetadataFromContext(context: {
   readonly metadata: DecoratorMetadata;
 }): Metadata {
-  // This throws an exception when Symbol.metadata is not defined, which serves
-  // as a reminder to include the relevant polyfills.
-  return ((context.metadata[ORNAMENT_METADATA_KEY] as Metadata) ??= {
-    tagName: null,
-    attr: new Map(),
-    prop: new Map(),
-    method: new WeakMap(),
-    lifecycleDecorators: new Set(),
-  });
+  if (!Object.hasOwn(context.metadata, ORNAMENT_METADATA_KEY)) {
+    context.metadata[ORNAMENT_METADATA_KEY] = {
+      tagName: null,
+      attr: new Map(),
+      prop: new Map(),
+      method: new WeakMap(),
+      lifecycleDecorators: new Set(),
+    };
+  }
+  return context.metadata[ORNAMENT_METADATA_KEY] as Metadata;
 }
 
 function getMetadataInstanceOrCtor<T>(

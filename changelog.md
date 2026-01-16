@@ -1,5 +1,62 @@
 # Changelog
 
+## 3.1.1
+
+### Bugfix: metadata cross-contamination
+
+In previous versions the metadata of subclasses of classes decorated with either
+`@enhance()` or `@define()` was incorrectly mixed up. In the below example, only
+component `A` has an attribute `a` and only component `B` has an attribute `b`,
+yet `getAttribute()` claims that all attributes are available on all classes:
+
+```javascript
+// Behavior BEFORE 3.1.1
+
+@define("base-element")
+class Base extends HTMLElement {}
+
+@define("a-element")
+class A extends Base {
+  @attr(string()) accessor a = "";
+}
+
+@define("b-element")
+class B extends Base {
+  @attr(string()) accessor b = "";
+}
+
+console.log(getAttribute(A, "a")); // logs an attribute definition (correct)
+console.log(getAttribute(A, "b")); // logs an attribute definition (INCORRECT)
+console.log(getAttribute(B, "a")); // logs an attribute definition (INCORRECT)
+console.log(getAttribute(B, "b")); // logs an attribute definition (correct)
+```
+
+This was due to [decorator metadata objects on subclasses inheriting from their superclasses' metadata objects](https://github.com/tc39/proposal-decorator-metadata?tab=readme-ov-file#inheritance). Subtle and inscrutable bugs were the result.
+This has been rectified by ensuring that every class maintains its own metadata
+object and never touches any metadata object's prototype properties:
+
+```javascript
+// New behavior 3.1.1
+
+@define("base-element")
+class Base extends HTMLElement {}
+
+@define("a-element")
+class A extends Base {
+  @attr(string()) accessor a = "";
+}
+
+@define("b-element")
+class B extends Base {
+  @attr(string()) accessor b = "";
+}
+
+console.log(getAttribute(A, "a")); // logs an attribute definition (correct)
+console.log(getAttribute(A, "b")); // logs null (correct)
+console.log(getAttribute(B, "a")); // logs null (correct)
+console.log(getAttribute(B, "b")); // logs an attribute definition (correct)
+```
+
 ## 3.1.0
 
 ### Enhancement: `@connectedMove` decorator

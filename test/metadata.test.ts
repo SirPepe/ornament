@@ -50,4 +50,26 @@ describe("Metadata", () => {
       expect(getAttribute(Test, "baz")).to.equal(null);
     });
   });
+
+  describe("General", () => {
+    test("No cross-contamination", () => {
+      const tagName1 = generateTagName();
+      const tagName2 = generateTagName();
+      const tagName3 = generateTagName();
+      @define(tagName1)
+      class Base extends HTMLElement {}
+      @define(tagName2)
+      class A extends Base {
+        @attr(string()) accessor a = "";
+      }
+      @define(tagName3)
+      class B extends Base {
+        @attr(string()) accessor b = "";
+      }
+      expect(getAttribute(A, "a")).to.not.equal(null);
+      expect(getAttribute(A, "b")).to.equal(null);
+      expect(getAttribute(B, "a")).to.equal(null);
+      expect(getAttribute(B, "b")).to.not.equal(null);
+    });
+  });
 });

@@ -1,6 +1,6 @@
 # [Ornament](https://sirpepe.github.io/use-ornament/) - Framework for web component frameworks
 
-📢 **What's new in 3.1.0?** [Check out the Changelog!](./changelog.md)
+📢 **What's new in 3.1.1?** [Check out the Changelog!](./changelog.md)
 
 **Build your own frontend framework** with Ornament, a stable, mid-level,
 pareto-optimal, treeshakable and tiny TypeScript-positive toolkit for web
