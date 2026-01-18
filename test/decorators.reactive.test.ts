@@ -437,5 +437,34 @@ describe("Decorators", () => {
       expect(fn.callCount).to.equal(2); // initial + one update
       expect(fn.getCalls()[1].args).to.eql(["D"]);
     });
+
+    test("debounced method is run synchronously by @init", async () => {
+      const fn1 = spy();
+      const fn2 = spy();
+      @define(generateTagName())
+      class Test extends HTMLElement {
+        @init()
+        @debounce({ fn: debounce.timeout(0) }) // Using timeout because RAF is unreliable in headless browsers
+        test1() {
+          fn1();
+        }
+        @debounce({ fn: debounce.timeout(0) }) // Using timeout because RAF is unreliable in headless browsers
+        @init()
+        test2() {
+          fn2();
+        }
+      }
+      const el = new Test();
+      // Runs immediately
+      expect(fn1.callCount).to.equal(1);
+      expect(fn2.callCount).to.equal(1);
+      await wait(25);
+      // Runs async
+      el.test1();
+      el.test2();
+      await wait(25);
+      expect(fn1.callCount).to.equal(2);
+      expect(fn2.callCount).to.equal(2);
+    });
   });
 });
