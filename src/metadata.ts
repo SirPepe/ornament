@@ -11,7 +11,7 @@ type Metadata = {
     string | symbol,
     { prop: string | symbol; transformer: Transformer<any, any> }
   >;
-  method: WeakMap<Method<any, any>, Method<any, any>>;
+  method: Map<Method<any, any>, Method<any, any>>;
   lifecycleDecorators: Set<LifecycleCallbackName>;
 };
 
@@ -19,12 +19,19 @@ export function getMetadataFromContext(context: {
   readonly metadata: DecoratorMetadata;
 }): Metadata {
   if (!Object.hasOwn(context.metadata, ORNAMENT_METADATA_KEY)) {
+    // "Inherit" from the prototype by copying data. This can't rely on actual
+    // inheritance, because this would lead to cross-contamination of metadata
+    // in case subclasses depend on a base class and ALL metadata gets written
+    // there
+    const baseData = context.metadata[ORNAMENT_METADATA_KEY] as
+      | Metadata
+      | undefined;
     context.metadata[ORNAMENT_METADATA_KEY] = {
       tagName: null,
-      attr: new Map(),
-      prop: new Map(),
-      method: new WeakMap(),
-      lifecycleDecorators: new Set(),
+      attr: new Map(baseData?.attr),
+      prop: new Map(baseData?.prop),
+      method: new Map(baseData?.method),
+      lifecycleDecorators: new Set(baseData?.lifecycleDecorators),
     };
   }
   return context.metadata[ORNAMENT_METADATA_KEY] as Metadata;
