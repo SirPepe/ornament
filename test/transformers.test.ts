@@ -764,7 +764,7 @@ describe("Transformers", () => {
       expect(() => new Test()).to.throw(Error);
     });
 
-    test("IDL attribute accepts invalid json", async () => {
+    test("DOM attribute accepts invalid json", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(json())
@@ -776,7 +776,7 @@ describe("Transformers", () => {
       expect(el.foo).to.eql({ test: 1n });
     });
 
-    test("IDL attribute accepts invalid initial json", async () => {
+    test("DOM attribute accepts invalid initial json", async () => {
       @define(generateTagName())
       class Test extends HTMLElement {
         @prop(json())

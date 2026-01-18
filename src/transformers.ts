@@ -532,7 +532,7 @@ export function event<
       functions.set(this, value); // change the actual event handler
       return value;
     },
-    // stringify() will never be called, as updating event handler IDL
+    // stringify() will never be called, as updating event handler DOM
     // attributes does not change the content attribute value... so we just
     // don't define it
     updateContentAttr: () => false,

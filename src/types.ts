@@ -39,11 +39,11 @@ export type Transformer<T, Value, IntermediateValue = Value> = {
     context: ClassAccessorDecoratorContext<T, Value>,
     isContentAttribute: boolean,
   ) => Value;
-  // Turns content attribute values into IDL attribute values. Must never throw
+  // Turns content attribute values into DOM attribute values. Must never throw
   // exceptions, and instead always just deal with its input. Must not cause any
   // observable side effects. May return NO_VALUE in case the content attribute
   // can't be parsed, in which case the @attr() decorator must not change the
-  // IDL attribute value
+  // DOM attribute value
   parse: (this: T, value: string | null) => Value | typeof NO_VALUE;
   // Decides if setter inputs, which may be of absolutely any type, should be
   // accepted or rejected. Should throw for invalid values, just like setters on
@@ -56,7 +56,7 @@ export type Transformer<T, Value, IntermediateValue = Value> = {
   // Transforms values that were accepted by validate() into the proper type by
   // eg. clamping numbers, normalizing strings etc.
   transform: (this: T, value: IntermediateValue) => Value;
-  // Turns IDL attribute values into content attribute values (strings), thereby
+  // Turns DOM attribute values into content attribute values (strings), thereby
   // controlling the attribute representation of an accessor together with
   // updateContentAttr(). Must never throw, defaults to the String() function
   stringify: (this: T, value: Value) => string;

@@ -78,7 +78,7 @@ describe("Event bus", () => {
   });
 
   describe("prop event", () => {
-    test("fire for idl attributes defined with @attr", () => {
+    test("fire for DOM attributes defined with @attr", () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {
@@ -96,7 +96,7 @@ describe("Event bus", () => {
       expect(fn.callCount).to.equal(2);
     });
 
-    test("fire for idl attributes defined with @prop", () => {
+    test("fire for DOM attributes defined with @prop", () => {
       const fn = spy();
       @define(generateTagName())
       class Test extends HTMLElement {

@@ -752,34 +752,34 @@ export function attr<T extends HTMLElement, V>(
 ): ClassAccessorDecorator<T, V> {
   const reflective = options.reflective ?? true;
   // Enables early exits from the attributeChangedCallback for content attribute
-  // updates that were caused by invoking IDL setters.
+  // updates that were caused by invoking DOM setters.
   const skipNextReaction = new WeakMap<HTMLElement, boolean>();
   return function (target, context): ClassAccessorDecoratorResult<T, V> {
     assertContext(context, "attr", "accessor");
 
-    // Accessor decorators can be applied to symbol accessors, but IDL attribute
+    // Accessor decorators can be applied to symbol accessors, but DOM attribute
     // names must a) be strings and b) exist. The following checks ensure that
     // the accessor, if it is a symbol or a private property, has a content
     // attribute name and a name for a public API.
     let contentAttrName: string;
-    let idlAttrName: string;
+    let domAttrName: string;
     if (typeof context.name === "symbol" || context.private) {
       if (!options.as) {
         throw new TypeError(
           "Content attribute names must not be symbols or private. Provide the `as` option and a public facade for your accessor or use a regular property name instead of a symbol.",
         );
       }
-      contentAttrName = idlAttrName = options.as;
+      contentAttrName = domAttrName = options.as;
     } else {
       contentAttrName = options.as ?? context.name;
-      idlAttrName = context.name;
+      domAttrName = context.name;
     }
 
     // Add the name to the set of all observed attributes, even if "reflective"
     // is false. The content attribute must in all cases be observed to enable
     // the message bus to emit events.
     getMetadataFromContext(context).attr.set(contentAttrName, {
-      prop: idlAttrName,
+      prop: domAttrName,
       transformer,
     });
 
@@ -832,7 +832,7 @@ export function attr<T extends HTMLElement, V>(
         // Final sanity check: does a public API for this attribute exist? This
         // public API needs to be added manually for private or symbol accessors
         // and might have been forgotten.
-        if (!(idlAttrName in this)) {
+        if (!(domAttrName in this)) {
           throw new TypeError(
             `Content attribute '${contentAttrName}' is missing its public API`,
           );

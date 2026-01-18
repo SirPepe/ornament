@@ -328,7 +328,7 @@ class TodoFilter extends BaseComponent {
 @define("todo-app")
 class TodoApp extends BaseComponent {
   // Expressing data as giant JSON strings is a bit silly, so this component
-  // takes its data as plain objects in IDL properties, rather than as content
+  // takes its data as plain objects in DOM properties, rather than as content
   // attributes.
   @prop(json()) accessor allItems: Item[] = [];
   @prop(json()) accessor filteredItems: Item[] = [];
