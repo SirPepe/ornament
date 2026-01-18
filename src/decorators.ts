@@ -298,10 +298,7 @@ function runContextInitializerOnOrnamentInit<
 
 // Method/class fields decorator @init() runs a method or class field function
 // once an instance initializes (= the outermost constructor finishes).
-export function init<T extends HTMLElement>(): LifecycleDecorator<
-  T,
-  OrnamentEventMap["init"]
-> {
+export function init<T extends HTMLElement>(): LifecycleDecorator<T, []> {
   return function (_, context): void {
     assertContext(context, "init", "method/function");
     runContextInitializerOnOrnamentInit(context, (instance: T): void => {
