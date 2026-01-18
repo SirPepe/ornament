@@ -36,7 +36,7 @@ This has been rectified by ensuring that every class maintains its own metadata
 object and never touches any metadata object's prototype properties:
 
 ```javascript
-// New behavior 3.1.1
+// New behavior in 3.1.1
 
 @define("base-element")
 class Base extends HTMLElement {}
