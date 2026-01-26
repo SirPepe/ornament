@@ -15,7 +15,8 @@ const INITIALIZER_KEY: unique symbol = Symbol.for("ORNAMENT_INITIALIZER_KEY");
 const INITIALIZED_BY: unique symbol = Symbol.for("ORNAMENT_INITIALIZED_BY");
 
 // Un-clobber an accessor's name if the element upgrades after a property with
-// a matching name has already been set ("safe upgrade").
+// a matching name has already been set has own properties, shadowing the
+// accessor members ("safe upgrade").
 function initAccessorInitialValue(
   instance: any,
   name: string | symbol,
@@ -28,8 +29,8 @@ function initAccessorInitialValue(
   return defaultValue;
 }
 
-// Tracks internals to, on one hand, make them available to multiple parts of
-// the library and on the other hand expose the same API (with the same
+// Tracks ElementInternals to, on one hand, make them available to multiple
+// parts of the library and on the other hand expose the same API (with the same
 // constraints, eg. attachInternals() can only be called once) to component
 // classes. ORNAMENT_INTERNALS_KEY and ORNAMENT_ATTACH_INTERNALS_CALLED are
 // symbols rather than private fields to a) allow multiple bundles of ornament
@@ -66,14 +67,17 @@ export function enhance<T extends CustomElementConstructor>(): (
     // "initializerKey" is the key for the mixin class this call to @enhance()
     // creates. The key is stored as a static field [INITIALIZER_KEY] on the
     // mixin class and is set as an instance field [INITIALIZED_BY] by the class
-    // constructor. When the constructor emits the "init" event, handlers can
+    // constructor. When constructors emits the "init" event, handlers can
     // compare the instance and instance.constructor's key to identify the
     // outermost (and therefore final) class constructor - any by proxy the
-    // actual (last) init event.
+    // actual (last) init event. This mechanism ensures that members decorated
+    // with @init() are invoked when ALL constructors, including those from base
+    // and mixin classes, have run to completion.
     const initializerKey = Symbol();
 
     // Required to decide whether to call the base class'
-    // attributeChangedCallback on an attribute update
+    // attributeChangedCallback on an attribute update. This should obviously
+    // exclude updates to attributes that are defined via Ornament.
     const originalObservedAttributes = new Set<string>(
       (target as any).observedAttributes ?? [],
     );
@@ -81,14 +85,13 @@ export function enhance<T extends CustomElementConstructor>(): (
     // Required to decide whether a call of connectedMoveCallback needs to call
     // connected/disconnected callbacks on the base class and/or dispatch
     // connected/disconnected events
-    const baseClassHasConnectedMoveCallback = Boolean(
-      "connectedMove" in target.prototype,
-    );
+    const baseClassHasConnectedMoveCallback =
+      "connectedMove" in target.prototype;
     const targetUsesConnectedMoveDecorator =
       getMetadataFromContext(context).lifecycleDecorators.has("connectedMove");
 
     // Installs the mixin class. This kindof changes the type of the input
-    // constructor T, but as TypeScript can as of May 2024 not understand
+    // constructor T, but as TypeScript can as of early 2026 not understand
     // decorators that change their target's types, we don't bother. The changes
     // are extremely small anyway and the only publicly visible changes affect
     // lifecycle callbacks, which are de facto public, but not meant to be
@@ -118,6 +121,9 @@ export function enhance<T extends CustomElementConstructor>(): (
       constructor(...args: any[]) {
         super(...args);
         this[INITIALIZED_BY] = initializerKey;
+        // The init event only has an effect if this constructor is the final
+        // constructor, that is if this.instance[INITIALIZER_KEY] ===
+        // this[INITIALIZED_BY] inside runContextInitializerOnOrnamentInit()
         trigger(this, "init");
       }
 
@@ -127,7 +133,8 @@ export function enhance<T extends CustomElementConstructor>(): (
       ];
 
       // Same API as the original attachInternals(), but allows the rest of the
-      // library to liberally access internals via getInternals().
+      // library to liberally access internals via getInternals(), which works
+      // even when called multiple times.
       [ORNAMENT_ATTACH_INTERNALS_CALLED] = false;
       attachInternals(): ElementInternals {
         if (this[ORNAMENT_ATTACH_INTERNALS_CALLED]) {
@@ -183,7 +190,7 @@ export function enhance<T extends CustomElementConstructor>(): (
         trigger(this, "formStateRestore", state, reason);
       }
 
-      // Only forward the attribute changes that were defined in the base class
+      // Only forwards the attribute changes that were defined in the base class
       // observedAttributes to super.attributeChangedCallback()
       attributeChangedCallback(
         this: HTMLElement,
@@ -207,7 +214,7 @@ export function enhance<T extends CustomElementConstructor>(): (
       // following callback definition dispatches to the relevant event and
       // triggers the relevant base class callbacks when there is no indication
       // that any logic got attached to connectedMoveCallback(), either via the
-      // base class or via the @moved() decorator.
+      // base class or via the @connectedMove() decorator.
       connectedMoveCallback() {
         // eslint-disable-next-line
         // @ts-ignore
@@ -793,7 +800,7 @@ export function attr<T extends HTMLElement, V>(
         function (
           this: T,
           name: string,
-          _: string | null,
+          _: unknown,
           newValue: string | null,
         ): unknown {
           // Skip obviously irrelevant invocations
@@ -1026,10 +1033,10 @@ export function debounce<
   };
 }
 
-// The following debouncing services for both methods and function class fields.
-// In latter case, storing the cancel functions on a per-instance-basis in a
-// WeakMap is overkill, but for methods (where multiple instances share the same
-// function object) this is just right.
+// The following debouncing logic works for both methods and function class
+// fields. In latter case, storing the cancel functions on a per-instance-basis
+// in a WeakMap is overkill, but for methods (where multiple instances share the
+// same function object) this is the only workable approach.
 const KEY_TO_USE_WHEN_THIS_IS_UNDEFINED = Symbol(); // for bound functions
 
 debounce.asap = function <T extends object, A extends unknown[]>(): (

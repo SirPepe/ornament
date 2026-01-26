@@ -1,7 +1,8 @@
 // Trigger and listener functions simply slap event targets onto the instances
 // as needed, because some event bus functionality is required even before the
-// instances themselves have initialized completely. Lazy initialization is the
-// only way this can work.
+// instances themselves have initialized completely. Lazy initialization (which
+// in this case is actually more eager that what would usually be considered
+// eager) is the only way this can work.
 
 const ORNAMENT_EVENT_BUS_KEY: unique symbol = Symbol.for(
   "ORNAMENT_EVENT_BUS_KEY",

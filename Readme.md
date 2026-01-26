@@ -2,8 +2,8 @@
 
 📢 **What's new in 3.1.1?** [Check out the Changelog!](./changelog.md)
 
-**Build your own frontend framework** with Ornament, a stable, mid-level,
-pareto-optimal, treeshakable and tiny TypeScript-positive toolkit for web
+**Build your own component framework** with Ornament, a stable, mid-level,
+pareto-optimal, treeshakable, tiny and TypeScript-positive toolkit for web
 component infrastructure! Escape from heavyweight frameworks, constant rewrites
 and the all-encompassing frontend FOMO with a declarative, simple, and type-safe
 API for almost-vanilla web components:
@@ -156,20 +156,21 @@ window.customElements.define("my-greeter", MyGreeter);
 
 Ornament makes _only the most tedious bits_ of building vanilla web components
 (attribute handling and lifecycle reactions) easy by adding some primitives that
-really should be part of the standard, but aren't. **Ornament is not a framework,**
-but something that you want to build your own framework on top of. Combine
-Ornament's baseline web component features with something like
-[uhtml](https://github.com/WebReflection/uhtml) or [Preact](https://preactjs.com/)
-for rending, add your favorite state management library (or don't), write some
-glue code and enjoy your very own frontend web framework.
+really should be part of the standard, but aren't. You yourself add everything
+else. **Ornament is not a framework,** but something that you want to build your
+own framework on top of. Combine Ornament's baseline web component features with
+something like [uhtml](https://github.com/WebReflection/uhtml) or
+[Preact](https://preactjs.com/) for rending, add your favorite state management
+library (or don't), write some glue code and enjoy your very own frontend web
+framework.
 
 ## Guide
 
 ### Installation
 
 Install [@sirpepe/ornament](https://www.npmjs.com/package/@sirpepe/ornament)
-with your favorite package manager. To get the decorator syntax working in 2025,
-you will probably need _some_ tooling support, such as:
+with your favorite package manager. To get the decorator syntax working in early
+2026, you will probably need _some_ tooling support, such as:
 
 - [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
   (with the option `version` set to `"2023-11"`)
@@ -184,12 +185,12 @@ required.
 
 The native APIs for web components are verbose and imperative, but lend
 themselves to quite a bit of streamlining with
-[the upcoming syntax for ECMAScript Decorators](https://2ality.com/2022/10/javascript-decorators.html).
-The native APIs are also missing a few important primitives. Ornament's goal is
-to provide the missing primitives and to streamline the developer experience.
-Ornament is **not a framework** but instead aims to be:
+[the ever-upcoming syntax for ECMAScript Decorators](https://2ality.com/2022/10/javascript-decorators.html).
+The native APIs are also missing a few important primitives and conveniences.
+Ornament's goal is to provide the missing primitives and to streamline the
+developer experience. Ornament is **not a framework** but instead aims to be:
 
-- **as stable as possible** by remaining dependency-free, keeping its own code to an absolute minimum, and relying on iron-clad web standards where possible
+- **as stable as possible** by remaining dependency-free, keeping its own code to an absolute minimum, and relying on (or re-implementing) iron-clad web standards where possible
 - **fast and lean** by being nothing more than just a bag of relatively small and simple functions
 - supportive of **gradual** adoption and removal by being able to co-exist with vanilla web component code
 - **malleable** by being easy to extend, easy to customize, and easy to get rid of
@@ -225,7 +226,7 @@ away:
   you can **replace all attribute and update handling piecemeal.** Ornament's
   decorators co-exist with native `attributeChangedCallback()` and friends just
   fine. Ornament _extends_ what you can do with custom elements, it does not
-  abstract anything away.
+  require abstracting anything away.
 - Much of your migration will depend on **how you build on top of Ornament.**
   You should keep reusable components and app-specific state containers
   separate, just as you would do in e.g. React. This will make maintenance and

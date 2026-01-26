@@ -25,15 +25,18 @@ class B extends Base {
   @attr(string()) accessor b = "";
 }
 
-console.log(getAttribute(A, "a")); // logs an attribute definition (correct)
-console.log(getAttribute(A, "b")); // logs an attribute definition (INCORRECT)
-console.log(getAttribute(B, "a")); // logs an attribute definition (INCORRECT)
-console.log(getAttribute(B, "b")); // logs an attribute definition (correct)
+console.log(getAttribute(A, "a")); // ✅ logs an attribute definition (correct)
+console.log(getAttribute(A, "b")); // ❌ logs an attribute definition (INCORRECT)
+console.log(getAttribute(B, "a")); // ❌ logs an attribute definition (INCORRECT)
+console.log(getAttribute(B, "b")); // ✅logs an attribute definition (correct)
 ```
 
-This was due to [decorator metadata objects on subclasses inheriting from their superclasses' metadata objects](https://github.com/tc39/proposal-decorator-metadata?tab=readme-ov-file#inheritance). Subtle and inscrutable bugs were the result.
-This has been rectified by ensuring that every class maintains its own metadata
-object and never touches any metadata object's prototype properties:
+This was due to [decorator metadata objects on subclasses inheriting from their superclasses' metadata objects](https://github.com/tc39/proposal-decorator-metadata?tab=readme-ov-file#inheritance).
+Ornament was doing a naive check
+Subtle and inscrutable bugs (especially when directly using the metadata) were
+the result. This has been rectified by ensuring that every class maintains its
+own metadata object and never touches any metadata object's prototype
+properties:
 
 ```javascript
 // New behavior in 3.1.1
@@ -51,10 +54,10 @@ class B extends Base {
   @attr(string()) accessor b = "";
 }
 
-console.log(getAttribute(A, "a")); // logs an attribute definition (correct)
-console.log(getAttribute(A, "b")); // logs null (correct)
-console.log(getAttribute(B, "a")); // logs null (correct)
-console.log(getAttribute(B, "b")); // logs an attribute definition (correct)
+console.log(getAttribute(A, "a")); // ✅ logs an attribute definition (correct)
+console.log(getAttribute(A, "b")); // ✅ logs null (correct)
+console.log(getAttribute(B, "a")); // ✅ logs null (correct)
+console.log(getAttribute(B, "b")); // ✅ logs an attribute definition (correct)
 ```
 
 ## 3.1.0
