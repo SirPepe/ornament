@@ -174,7 +174,7 @@ with your favorite package manager. To get the decorator syntax working in early
 
 - [@babel/plugin-proposal-decorators](https://babeljs.io/docs/babel-plugin-proposal-decorators)
   (with the option `version` set to `"2023-11"`)
-- [esbuild](https://esbuild.github.io) (with the option `target` set to `esnext`)
+- [esbuild](https://esbuild.github.io) (with the option `target` set to something other than `esnext`)
 - [TypeScript 5.0+](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
   (with the option `experimentalDecorators` turned _off_).
 
